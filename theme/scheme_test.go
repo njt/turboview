@@ -16,7 +16,6 @@ func TestColorSchemeStructExists(t *testing.T) {
 	scheme.WindowFrameInactive = tcell.StyleDefault
 	scheme.WindowTitle = tcell.StyleDefault
 	scheme.WindowShadow = tcell.StyleDefault
-	scheme.WindowBody = tcell.StyleDefault
 	scheme.DesktopBackground = tcell.StyleDefault
 	scheme.DialogBackground = tcell.StyleDefault
 	scheme.DialogFrame = tcell.StyleDefault
@@ -62,7 +61,6 @@ func TestColorSchemeFieldTypes(t *testing.T) {
 	scheme.WindowFrameInactive = style
 	scheme.WindowTitle = style
 	scheme.WindowShadow = style
-	scheme.WindowBody = style
 	scheme.DesktopBackground = style
 	scheme.DialogBackground = style
 	scheme.DialogFrame = style

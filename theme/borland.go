@@ -15,7 +15,6 @@ func init() {
 		WindowFrameInactive: s(tcell.ColorSilver, tcell.ColorBlue),
 		WindowTitle:         s(tcell.ColorWhite, tcell.ColorBlue),
 		WindowShadow:        s(tcell.ColorBlack, tcell.ColorBlack),
-		WindowBody:          s(tcell.ColorYellow, tcell.ColorBlue),
 		DesktopBackground:   s(tcell.ColorTeal, tcell.ColorBlue),
 		DialogBackground:    s(tcell.ColorBlack, tcell.ColorTeal),
 		DialogFrame:         s(tcell.ColorWhite, tcell.ColorTeal),

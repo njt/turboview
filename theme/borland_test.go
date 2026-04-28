@@ -33,7 +33,6 @@ func TestBorlandBlueHasAllFields(t *testing.T) {
 		BorlandBlue.WindowFrameInactive,
 		BorlandBlue.WindowTitle,
 		BorlandBlue.WindowShadow,
-		BorlandBlue.WindowBody,
 		BorlandBlue.DesktopBackground,
 		BorlandBlue.DialogBackground,
 		BorlandBlue.DialogFrame,
@@ -60,8 +59,8 @@ func TestBorlandBlueHasAllFields(t *testing.T) {
 		BorlandBlue.StatusShortcut,
 	}
 
-	if len(fields) != 30 {
-		t.Errorf("Expected 30 fields, got %d", len(fields))
+	if len(fields) != 29 {
+		t.Errorf("Expected 29 fields, got %d", len(fields))
 	}
 
 	// All fields should be accessible without panic
@@ -284,7 +283,6 @@ func TestBorlandBlueWindowFieldsPopulated(t *testing.T) {
 	_ = BorlandBlue.WindowFrameInactive
 	_ = BorlandBlue.WindowTitle
 	_ = BorlandBlue.WindowShadow
-	_ = BorlandBlue.WindowBody
 }
 
 // TestBorlandBlueMenuFieldsPopulated confirms menu-related fields are set.

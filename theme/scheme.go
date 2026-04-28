@@ -8,7 +8,6 @@ type ColorScheme struct {
 	WindowFrameInactive tcell.Style
 	WindowTitle         tcell.Style
 	WindowShadow        tcell.Style
-	WindowBody          tcell.Style
 	DesktopBackground   tcell.Style
 	DialogBackground    tcell.Style
 	DialogFrame         tcell.Style
