@@ -98,3 +98,13 @@ func (g *Group) selectPrevious() {
 		}
 	}
 }
+
+func (g *Group) BringToFront(v View) {
+	for i, child := range g.children {
+		if child == v {
+			g.children = append(append(g.children[:i:i], g.children[i+1:]...), v)
+			g.selectChild(v)
+			return
+		}
+	}
+}
