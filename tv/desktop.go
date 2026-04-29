@@ -101,6 +101,14 @@ func (d *Desktop) HandleEvent(event *Event) {
 				return
 			}
 		}
+		// Tab/Shift+Tab: forward to focused window for widget traversal.
+		// Desktop uses CmNext/CmPrev (F6) for window cycling, not Tab.
+		if event.Key.Key == tcell.KeyTab || event.Key.Key == tcell.KeyBacktab {
+			if focused := d.group.FocusedChild(); focused != nil {
+				focused.HandleEvent(event)
+			}
+			return
+		}
 	}
 
 	// Desktop-level commands
