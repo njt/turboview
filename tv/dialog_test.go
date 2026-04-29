@@ -674,13 +674,14 @@ func TestDialogHandleEventShiftTabMovesFocusBackward(t *testing.T) {
 }
 
 // TestDialogHandleEventKeyboardRoutesToFocusedChild verifies keyboard events
-// (other than Tab) reach the focused child.
+// (other than Tab or Enter, which have special handling) reach the focused child.
 func TestDialogHandleEventKeyboardRoutesToFocusedChild(t *testing.T) {
 	d := NewDialog(NewRect(0, 0, 40, 20), "Test")
 	child := newSelectableMockView(NewRect(0, 0, 10, 1))
 	d.Insert(child)
 
-	ev := enterKey()
+	// Use a plain rune key — not Enter (broadcasts CmDefault) or Tab (traversal).
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'a'}}
 	d.HandleEvent(ev)
 
 	if child.eventHandled != ev {
@@ -1013,8 +1014,12 @@ func TestExecViewReturnsCmNoOnNoButton(t *testing.T) {
 	}
 }
 
-// TestExecViewReturnsCmCloseOnCmClose verifies the modal loop returns CmClose.
-func TestExecViewReturnsCmCloseOnCmClose(t *testing.T) {
+// TestExecViewReturnsCmCancelOnCmClose verifies the modal loop returns CmCancel
+// when CmClose is posted to a modal dialog.
+//
+// Task 10: Dialog.HandleEvent transforms CmClose → CmCancel when SfModal is set,
+// so ExecView's modal loop receives CmCancel and returns it.
+func TestExecViewReturnsCmCancelOnCmClose(t *testing.T) {
 	app, win, screen := execViewStack(t)
 	defer screen.Fini()
 
@@ -1030,11 +1035,11 @@ func TestExecViewReturnsCmCloseOnCmClose(t *testing.T) {
 
 	select {
 	case code := <-done:
-		if code != CmClose {
-			t.Errorf("ExecView returned %v, want CmClose", code)
+		if code != CmCancel {
+			t.Errorf("ExecView returned %v after CmClose posted to modal dialog, want CmCancel", code)
 		}
 	case <-time.After(2 * time.Second):
-		t.Error("ExecView did not return CmClose within 2 s")
+		t.Error("ExecView did not return within 2 s after CmClose posted to modal dialog")
 	}
 }
 

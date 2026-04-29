@@ -233,7 +233,6 @@ func (d *Dialog) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
 		width, height := d.Bounds().Width(), d.Bounds().Height()
 		mx, my := event.Mouse.X, event.Mouse.Y
-		// Client area: forward to group with frame offset
 		if mx > 0 && mx < width-1 && my > 0 && my < height-1 {
 			event.Mouse.X -= 1
 			event.Mouse.Y -= 1
@@ -241,5 +240,29 @@ func (d *Dialog) HandleEvent(event *Event) {
 		}
 		return
 	}
+
+	// Delegate to group first (keyboard, commands, broadcasts)
 	d.group.HandleEvent(event)
+
+	// Escape → CmCancel (if group didn't handle it)
+	if !event.IsCleared() && event.What == EvKeyboard && event.Key != nil {
+		switch event.Key.Key {
+		case tcell.KeyEscape:
+			event.What = EvCommand
+			event.Command = CmCancel
+			event.Key = nil
+
+		case tcell.KeyEnter:
+			broadcast := &Event{What: EvBroadcast, Command: CmDefault}
+			d.group.HandleEvent(broadcast)
+			event.Clear()
+		}
+	}
+
+	// Modal termination: CmClose → CmCancel
+	if !event.IsCleared() && event.What == EvCommand && d.HasState(SfModal) {
+		if event.Command == CmClose {
+			event.Command = CmCancel
+		}
+	}
 }

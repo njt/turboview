@@ -832,6 +832,9 @@ func TestIntegrationExecViewMouseClickOutsideDialogIsDiscarded(t *testing.T) {
 // TestIntegrationExecViewTabTraversalCyclesBetweenButtonsInDialog verifies that
 // Tab keys injected while ExecView is running move focus among the dialog's buttons,
 // so that after a full cycle the originally-focused button can be activated with Enter.
+//
+// Task 10: btn3 fires CmClose, which Dialog.HandleEvent (when modal) transforms to
+// CmCancel before the modal loop sees it, so ExecView returns CmCancel.
 func TestIntegrationExecViewTabTraversalCyclesBetweenButtonsInDialog(t *testing.T) {
 	app, desktop, screen := appWithDesktopAndScreen(t)
 	defer screen.Fini()
@@ -853,19 +856,19 @@ func TestIntegrationExecViewTabTraversalCyclesBetweenButtonsInDialog(t *testing.
 	time.Sleep(50 * time.Millisecond)
 
 	// Tab from btn3 → btn1 (wrap), Tab → btn2, Tab → btn3 (full cycle).
-	// Then Enter fires btn3's command (CmClose).
+	// Then Enter fires btn3's command (CmClose), which Dialog transforms → CmCancel.
 	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn3 → btn1
 	time.Sleep(20 * time.Millisecond)
 	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn1 → btn2
 	time.Sleep(20 * time.Millisecond)
 	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn2 → btn3
 	time.Sleep(20 * time.Millisecond)
-	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone) // fires btn3 → CmClose
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone) // fires btn3 → CmClose → CmCancel (modal)
 
 	select {
 	case cmd := <-result:
-		if cmd != CmClose {
-			t.Errorf("Tab cycle + Enter returned %v, want CmClose (btn3)", cmd)
+		if cmd != CmCancel {
+			t.Errorf("Tab cycle + Enter returned %v, want CmCancel (btn3 CmClose transformed by modal dialog)", cmd)
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("ExecView did not return within 2 s after Tab cycle + Enter")
