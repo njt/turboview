@@ -33,13 +33,6 @@ func NewLabel(bounds Rect, label string, link View) *Label {
 		}
 	}
 
-	// The link is focused exclusively through the label's shortcut, not via
-	// automatic focus-on-insert.  Clearing OfSelectable ensures the link does
-	// not steal focus when it is inserted into a group.
-	if link != nil {
-		link.SetOptions(OfSelectable, false)
-	}
-
 	return l
 }
 
