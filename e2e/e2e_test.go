@@ -30,8 +30,10 @@ func TestBasicAppBoot(t *testing.T) {
 	startTmux(t, session, binPath)
 
 	lines := tmuxCapture(t, session)
+
+	// Desktop pattern visible
 	desktopHasPattern := false
-	for _, line := range lines[:len(lines)-2] {
+	for _, line := range lines {
 		if strings.Contains(line, "░") {
 			desktopHasPattern = true
 			break
@@ -39,6 +41,30 @@ func TestBasicAppBoot(t *testing.T) {
 	}
 	if !desktopHasPattern {
 		t.Error("desktop background pattern '░' not found")
+	}
+
+	// Window frame characters visible (double-line border for active window)
+	frameFound := false
+	for _, line := range lines {
+		if strings.Contains(line, "╔") || strings.Contains(line, "═") {
+			frameFound = true
+			break
+		}
+	}
+	if !frameFound {
+		t.Error("window frame characters not found")
+	}
+
+	// Window title visible
+	titleFound := false
+	for _, line := range lines {
+		if strings.Contains(line, "File Manager") || strings.Contains(line, "Editor") {
+			titleFound = true
+			break
+		}
+	}
+	if !titleFound {
+		t.Error("window title text not found")
 	}
 
 	statusFound := false

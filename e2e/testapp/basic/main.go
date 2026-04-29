@@ -21,6 +21,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 15), "File Manager", tv.WithWindowNumber(1))
+	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
+
+	app.Desktop().Insert(win1)
+	app.Desktop().Insert(win2)
+
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
