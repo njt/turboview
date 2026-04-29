@@ -2,6 +2,118 @@ package tv
 
 import "github.com/gdamore/tcell/v2"
 
+type MsgBoxButton int
+
+const (
+	MbOK     MsgBoxButton = 1 << iota
+	MbCancel
+	MbYes
+	MbNo
+)
+
+func MessageBox(owner Container, title, text string, buttons MsgBoxButton) CommandCode {
+	type btnDef struct {
+		label string
+		cmd   CommandCode
+	}
+	var defs []btnDef
+	if buttons&MbYes != 0 {
+		defs = append(defs, btnDef{"Yes", CmYes})
+	}
+	if buttons&MbNo != 0 {
+		defs = append(defs, btnDef{"No", CmNo})
+	}
+	if buttons&MbOK != 0 {
+		defs = append(defs, btnDef{"OK", CmOK})
+	}
+	if buttons&MbCancel != 0 {
+		defs = append(defs, btnDef{"Cancel", CmCancel})
+	}
+	if len(defs) == 0 {
+		defs = append(defs, btnDef{"OK", CmOK})
+	}
+
+	// Auto-size
+	textRunes := []rune(text)
+	textW := len(textRunes)
+	btnW := 12
+	btnGap := 2
+	buttonRowW := len(defs)*btnW + (len(defs)-1)*btnGap
+	contentW := textW
+	if buttonRowW > contentW {
+		contentW = buttonRowW
+	}
+	titleW := len([]rune(title)) + 4
+	if titleW > contentW {
+		contentW = titleW
+	}
+	dialogW := contentW + 4 // 2 for frame + 2 for padding
+	if dialogW > 60 {
+		dialogW = 60
+	}
+	if dialogW < 20 {
+		dialogW = 20
+	}
+
+	// Text wrapping height
+	innerW := dialogW - 4
+	textLines := 1
+	lineLen := 0
+	for _, r := range textRunes {
+		if r == '\n' {
+			textLines++
+			lineLen = 0
+			continue
+		}
+		lineLen++
+		if lineLen > innerW {
+			textLines++
+			lineLen = 1
+		}
+	}
+
+	dialogH := textLines + 5 // top frame + text rows + gap + button row + bottom frame
+	if dialogH < 6 {
+		dialogH = 6
+	}
+
+	// Center in owner
+	ob := owner.Bounds()
+	dx := (ob.Width() - dialogW) / 2
+	dy := (ob.Height() - dialogH) / 2
+	if dx < 0 {
+		dx = 0
+	}
+	if dy < 0 {
+		dy = 0
+	}
+
+	dlg := NewDialog(NewRect(dx, dy, dialogW, dialogH), title)
+
+	// Insert static text
+	st := NewStaticText(NewRect(1, 0, innerW, textLines), text)
+	dlg.Insert(st)
+
+	// Insert buttons
+	btnY := textLines + 1
+	totalBtnW := len(defs)*btnW + (len(defs)-1)*btnGap
+	startX := (innerW - totalBtnW) / 2
+	if startX < 0 {
+		startX = 0
+	}
+	for i, def := range defs {
+		x := startX + i*(btnW+btnGap)
+		var opts []ButtonOption
+		if i == 0 {
+			opts = append(opts, WithDefault())
+		}
+		btn := NewButton(NewRect(x, btnY, btnW, 2), def.label, def.cmd, opts...)
+		dlg.Insert(btn)
+	}
+
+	return owner.ExecView(dlg)
+}
+
 var _ Container = (*Dialog)(nil)
 
 type Dialog struct {
