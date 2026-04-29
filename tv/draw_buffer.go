@@ -67,6 +67,17 @@ func (db *DrawBuffer) SubBuffer(r Rect) *DrawBuffer {
 	}
 }
 
+func (db *DrawBuffer) SetCellStyle(x, y int, style tcell.Style) {
+	ax, ay := x+db.offset.X, y+db.offset.Y
+	if !db.clip.Contains(NewPoint(ax, ay)) {
+		return
+	}
+	if ay < 0 || ay >= len(db.cells) || ax < 0 || ax >= len(db.cells[0]) {
+		return
+	}
+	db.cells[ay][ax].Style = style
+}
+
 func (db *DrawBuffer) GetCell(x, y int) Cell {
 	ax, ay := x+db.offset.X, y+db.offset.Y
 	if ay < 0 || ay >= len(db.cells) || ax < 0 || ax >= len(db.cells[0]) {

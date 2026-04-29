@@ -40,11 +40,41 @@ func (d *Desktop) BringToFront(v View)         { d.group.BringToFront(v) }
 func (d *Desktop) Draw(buf *DrawBuffer) {
 	w, h := d.Bounds().Width(), d.Bounds().Height()
 	style := tcell.StyleDefault
+	shadowStyle := tcell.StyleDefault
 	if cs := d.ColorScheme(); cs != nil {
 		style = cs.DesktopBackground
+		shadowStyle = cs.WindowShadow
 	}
+
 	buf.Fill(NewRect(0, 0, w, h), d.pattern, style)
-	d.group.Draw(buf)
+
+	for _, child := range d.group.Children() {
+		if !child.HasState(SfVisible) {
+			continue
+		}
+		cb := child.Bounds()
+
+		// Draw the window
+		sub := buf.SubBuffer(cb)
+		child.Draw(sub)
+
+		// Draw shadow (2 right, 1 down)
+		// Right shadow
+		for y := cb.A.Y + 1; y < cb.B.Y+1; y++ {
+			for x := cb.B.X; x < cb.B.X+2; x++ {
+				if x >= 0 && x < w && y >= 0 && y < h {
+					buf.SetCellStyle(x, y, shadowStyle)
+				}
+			}
+		}
+		// Bottom shadow
+		for x := cb.A.X + 2; x < cb.B.X+2; x++ {
+			y := cb.B.Y
+			if x >= 0 && x < w && y >= 0 && y < h {
+				buf.SetCellStyle(x, y, shadowStyle)
+			}
+		}
+	}
 }
 
 func (d *Desktop) HandleEvent(event *Event) {
