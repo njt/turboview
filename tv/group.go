@@ -93,7 +93,23 @@ func (g *Group) Insert(v View) {
 	v.SetOwner(owner)
 	g.children = append(g.children, v)
 	if v.HasOption(OfSelectable) {
-		g.selectChild(v)
+		g.setFocusSilent(v)
+	}
+}
+
+// setFocusSilent updates focused and SfSelected flags without broadcasting.
+// Used by Insert so that construction-time focus changes do not emit focus
+// events to partially-built child lists.
+func (g *Group) setFocusSilent(v View) {
+	if g.focused == v {
+		return
+	}
+	if g.focused != nil {
+		g.focused.SetState(SfSelected, false)
+	}
+	g.focused = v
+	if v != nil {
+		v.SetState(SfSelected, true)
 	}
 }
 
@@ -299,12 +315,41 @@ func (g *Group) HandleEvent(event *Event) {
 }
 
 func (g *Group) selectChild(v View) {
-	if g.focused != nil && g.focused != v {
-		g.focused.SetState(SfSelected, false)
+	old := g.focused
+	if old == v {
+		return
+	}
+
+	if old != nil {
+		old.SetState(SfSelected, false)
 	}
 	g.focused = v
 	if v != nil {
 		v.SetState(SfSelected, true)
+	}
+
+	// Broadcast focus changes — deliver to ALL non-disabled children unconditionally.
+	// CmReleasedFocus: sent whenever a prior focused child is being replaced.
+	// CmReceivedFocus: sent only when transitioning from one focused child to another
+	// (not on initial focus assignment from nil), so that construction via Insert
+	// does not emit spurious broadcasts before the group is fully populated.
+	if old != nil {
+		for _, child := range g.children {
+			if child.HasState(SfDisabled) {
+				continue
+			}
+			ev := &Event{What: EvBroadcast, Command: CmReleasedFocus, Info: old}
+			child.HandleEvent(ev)
+		}
+		if v != nil {
+			for _, child := range g.children {
+				if child.HasState(SfDisabled) {
+					continue
+				}
+				ev := &Event{What: EvBroadcast, Command: CmReceivedFocus, Info: v}
+				child.HandleEvent(ev)
+			}
+		}
 	}
 }
 

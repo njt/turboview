@@ -24,8 +24,9 @@ func newFocusTestView(bounds Rect) *focusTestView {
 }
 
 func (v *focusTestView) HandleEvent(event *Event) {
+	wasMouse := event.What == EvMouse
 	v.BaseView.HandleEvent(event)
-	if !event.IsCleared() {
+	if wasMouse && !event.IsCleared() {
 		v.handleEventCalled = true
 	}
 }
