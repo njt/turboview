@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/njt/turboview/theme"
 	"github.com/njt/turboview/tv"
 )
@@ -71,6 +73,31 @@ func main() {
 	win1.Insert(radioButtons)
 
 	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
+
+	// Create a custom scheme for win2
+	editorScheme := &theme.ColorScheme{}
+	*editorScheme = *theme.BorlandBlue
+	editorScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	editorScheme.ListSelected = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorGreen)
+	editorScheme.ListFocused = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
+	editorScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	win2.SetColorScheme(editorScheme)
+
+	// ListViewer fills client area minus scrollbar column
+	clientW := 40 - 2 // window width minus frame
+	clientH := 12 - 2 // window height minus frame
+
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i+1)
+	}
+
+	lv := tv.NewListViewer(tv.NewRect(0, 0, clientW-1, clientH), tv.NewStringList(items))
+	sb := tv.NewScrollBar(tv.NewRect(clientW-1, 0, 1, clientH), tv.Vertical)
+	lv.SetScrollBar(sb)
+
+	win2.Insert(lv)
+	win2.Insert(sb)
 
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win2)

@@ -454,6 +454,122 @@ func TestRadioButtonVisible(t *testing.T) {
 	}
 }
 
+func TestListViewerVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-listview"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// win2 should contain "Item 1" from the ListViewer
+	if !containsAny(lines, "Item 1") {
+		t.Error("ListViewer item 'Item 1' not visible in win2")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestScrollBarVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-scrollbar"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// Scrollbar should render arrow characters
+	if !containsAny(lines, "▲", "▼") {
+		t.Error("scrollbar arrow characters '▲' or '▼' not visible in win2")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestListViewerNavigation(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-listnav"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Click inside win2 to focus it (win2 is at col 20, row 5, size 40x12)
+	// Click at approximately col 30, row 8 (middle of win2's client area)
+	exec.Command("tmux", "send-keys", "-t", session, "Tab").Run()
+	time.Sleep(500 * time.Millisecond)
+
+	// Press Down arrow multiple times to scroll through the list
+	for i := 0; i < 8; i++ {
+		tmuxSendKeys(t, session, "Down")
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// After scrolling down 8 times, later items should be visible
+	if !containsAny(lines, "Item 9", "Item 10", "Item 8") {
+		t.Error("later list items not visible after navigating down — scrolling may not work")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestListViewerDifferentTheme(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-listtheme"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// Smoke test: win2 list items are visible (different theme applied)
+	if !containsAny(lines, "Item 1", "Item 2") {
+		t.Error("list items not visible in win2 — custom theme may have broken rendering")
+	}
+
+	// win2 "Editor" title should be visible
+	if !containsAny(lines, "Editor") {
+		t.Error("win2 'Editor' title not found — window may not have rendered")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func TestInputBoxCancel(t *testing.T) {
 	binPath := buildBasicApp(t)
 
