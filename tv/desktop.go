@@ -90,15 +90,180 @@ func (d *Desktop) HandleEvent(event *Event) {
 		return
 	}
 
-	// Delegate to group (three-phase dispatch reaches focused child).
+	// Alt+N window switching
+	if event.What == EvKeyboard && event.Key != nil {
+		if event.Key.Modifiers&tcell.ModAlt != 0 && event.Key.Key == tcell.KeyRune {
+			n := int(event.Key.Rune - '0')
+			if n >= 1 && n <= 9 {
+				if d.selectWindowByNumber(n) {
+					event.Clear()
+				}
+				return
+			}
+		}
+	}
+
+	// Desktop-level commands
+	if event.What == EvCommand {
+		switch event.Command {
+		case CmNext:
+			d.SelectNextWindow()
+			event.Clear()
+			return
+		case CmPrev:
+			d.SelectPrevWindow()
+			event.Clear()
+			return
+		case CmTile:
+			d.Tile()
+			event.Clear()
+			return
+		case CmCascade:
+			d.Cascade()
+			event.Clear()
+			return
+		}
+	}
+
 	d.group.HandleEvent(event)
 
-	// After dispatch, handle CmClose at the Desktop level if not yet cleared.
+	// After group dispatch, handle CmClose at Desktop level if not yet cleared.
 	if event.What == EvCommand && event.Command == CmClose {
 		if focused := d.group.FocusedChild(); focused != nil {
 			d.Remove(focused)
 			event.Clear()
 		}
+	}
+}
+
+func (d *Desktop) selectWindowByNumber(n int) bool {
+	for _, child := range d.group.Children() {
+		if w, ok := child.(*Window); ok && w.Number() == n {
+			d.BringToFront(w)
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Desktop) SelectNextWindow() {
+	children := d.group.Children()
+	if len(children) == 0 {
+		return
+	}
+	current := d.group.FocusedChild()
+	if current == nil {
+		d.BringToFront(children[0])
+		return
+	}
+	for i, child := range children {
+		if child == current {
+			next := children[(i+1)%len(children)]
+			d.BringToFront(next)
+			return
+		}
+	}
+}
+
+func (d *Desktop) SelectPrevWindow() {
+	children := d.group.Children()
+	if len(children) == 0 {
+		return
+	}
+	current := d.group.FocusedChild()
+	if current == nil {
+		d.BringToFront(children[len(children)-1])
+		return
+	}
+	for i, child := range children {
+		if child == current {
+			prev := children[(i-1+len(children))%len(children)]
+			d.BringToFront(prev)
+			return
+		}
+	}
+}
+
+func (d *Desktop) visibleWindows() []*Window {
+	var windows []*Window
+	for _, child := range d.group.Children() {
+		if w, ok := child.(*Window); ok && w.HasState(SfVisible) {
+			windows = append(windows, w)
+		}
+	}
+	return windows
+}
+
+func (d *Desktop) Tile() {
+	windows := d.visibleWindows()
+	n := len(windows)
+	if n == 0 {
+		return
+	}
+	dw, dh := d.Bounds().Width(), d.Bounds().Height()
+
+	cols := 1
+	for cols*cols < n {
+		cols++
+	}
+	rows := (n + cols - 1) / cols
+
+	cellW := dw / cols
+	cellH := dh / rows
+
+	for i, win := range windows {
+		col := i % cols
+		row := i / cols
+		x := col * cellW
+		y := row * cellH
+		w := cellW
+		h := cellH
+		if col == cols-1 {
+			w = dw - x
+		}
+		// Last window in its column: absorb remaining height.
+		nextInSameCol := i + cols
+		if row == rows-1 || nextInSameCol >= n {
+			h = dh - y
+		}
+		if w < 10 {
+			w = 10
+		}
+		if h < 5 {
+			h = 5
+		}
+		win.SetBounds(NewRect(x, y, w, h))
+		win.zoomed = false
+	}
+}
+
+func (d *Desktop) Cascade() {
+	windows := d.visibleWindows()
+	n := len(windows)
+	if n == 0 {
+		return
+	}
+	dw, dh := d.Bounds().Width(), d.Bounds().Height()
+	winW := dw * 3 / 4
+	winH := dh * 3 / 4
+	if winW < 10 {
+		winW = 10
+	}
+	if winH < 5 {
+		winH = 5
+	}
+
+	for i, win := range windows {
+		x := i * 2
+		y := i
+		if x+winW > dw {
+			x = 0
+		}
+		if y+winH > dh {
+			y = 0
+		}
+		win.SetBounds(NewRect(x, y, winW, winH))
+		win.zoomed = false
 	}
 }
 
