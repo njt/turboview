@@ -26,6 +26,12 @@ func WithStatusLine(sl *StatusLine) AppOption {
 	}
 }
 
+func WithMenuBar(mb *MenuBar) AppOption {
+	return func(app *Application) {
+		app.menuBar = mb
+	}
+}
+
 func WithTheme(scheme *theme.ColorScheme) AppOption {
 	return func(app *Application) {
 		app.scheme = scheme
@@ -44,6 +50,7 @@ type Application struct {
 	screenOwn  bool
 	desktop    *Desktop
 	statusLine *StatusLine
+	menuBar    *MenuBar
 	scheme     *theme.ColorScheme
 	quit       bool
 	onCommand  func(CommandCode, any) bool
@@ -77,6 +84,11 @@ func NewApplication(opts ...AppOption) (*Application, error) {
 		app.statusLine.scheme = app.scheme
 	}
 
+	if app.menuBar != nil {
+		app.menuBar.scheme = app.scheme
+		app.menuBar.app = app
+	}
+
 	// Set initial bounds from screen size so Draw works without Run.
 	w, h := app.screen.Size()
 	app.bounds = NewRect(0, 0, w, h)
@@ -87,6 +99,7 @@ func NewApplication(opts ...AppOption) (*Application, error) {
 
 func (app *Application) Desktop() *Desktop      { return app.desktop }
 func (app *Application) StatusLine() *StatusLine { return app.statusLine }
+func (app *Application) MenuBar() *MenuBar       { return app.menuBar }
 func (app *Application) Screen() tcell.Screen    { return app.screen }
 
 func (app *Application) PollEvent() *Event {
@@ -144,14 +157,29 @@ func (app *Application) Draw(buf *DrawBuffer) {
 	h := app.bounds.Height()
 	w := app.bounds.Width()
 
+	menuH := 0
+	if app.menuBar != nil {
+		menuH = 1
+	}
+
 	desktopBottom := h
 	if app.statusLine != nil {
 		desktopBottom = h - 1
 	}
+	desktopH := desktopBottom - menuH
 
-	if app.desktop != nil && desktopBottom > 0 {
-		desktopBuf := buf.SubBuffer(NewRect(0, 0, w, desktopBottom))
+	if app.desktop != nil && desktopH > 0 {
+		desktopBuf := buf.SubBuffer(NewRect(0, menuH, w, desktopH))
 		app.desktop.Draw(desktopBuf)
+	}
+
+	if app.menuBar != nil {
+		menuBuf := buf.SubBuffer(NewRect(0, 0, w, 1))
+		app.menuBar.Draw(menuBuf)
+
+		if popup := app.menuBar.Popup(); popup != nil {
+			popup.Draw(buf.SubBuffer(popup.Bounds()), app.scheme)
+		}
 	}
 
 	if app.statusLine != nil && h > 0 {
@@ -162,8 +190,14 @@ func (app *Application) Draw(buf *DrawBuffer) {
 
 func (app *Application) layoutChildren() {
 	w, h := app.bounds.Width(), app.bounds.Height()
-	desktopBottom := h
 
+	menuH := 0
+	if app.menuBar != nil {
+		menuH = 1
+		app.menuBar.SetBounds(NewRect(0, 0, w, 1))
+	}
+
+	desktopBottom := h
 	if app.statusLine != nil {
 		statusRow := h - 1
 		if statusRow < 0 {
@@ -174,10 +208,11 @@ func (app *Application) layoutChildren() {
 	}
 
 	if app.desktop != nil {
-		if desktopBottom < 0 {
-			desktopBottom = 0
+		desktopH := desktopBottom - menuH
+		if desktopH < 0 {
+			desktopH = 0
 		}
-		app.desktop.SetBounds(NewRect(0, 0, w, desktopBottom))
+		app.desktop.SetBounds(NewRect(0, menuH, w, desktopH))
 	}
 }
 
@@ -192,6 +227,12 @@ func (app *Application) handleEvent(event *Event) {
 
 	if app.statusLine != nil {
 		app.statusLine.HandleEvent(event)
+	}
+
+	if !event.IsCleared() && event.What == EvCommand && event.Command == CmMenu && app.menuBar != nil {
+		app.menuBar.Activate(app)
+		event.Clear()
+		return
 	}
 
 	if !event.IsCleared() && app.desktop != nil {
@@ -221,6 +262,14 @@ func (app *Application) handleCommand(event *Event) {
 
 func (app *Application) routeMouseEvent(event *Event) {
 	mx, my := event.Mouse.X, event.Mouse.Y
+
+	if app.menuBar != nil && my == 0 {
+		idx := app.menuBar.menuIndexAtX(mx)
+		if idx >= 0 {
+			app.menuBar.ActivateAt(app, idx, true)
+		}
+		return
+	}
 
 	if app.statusLine != nil {
 		slBounds := app.statusLine.Bounds()
