@@ -862,6 +862,107 @@ func TestTabFocusNavigation(t *testing.T) {
 	}
 }
 
+func TestCheckboxFocusIndicator(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-cbfocus"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1
+	tmuxSendKeys(t, session, "M-1")
+
+	// win1's tab order: radioButtons (focused initially) → checkBoxes → ...
+	// Tab once to move focus to checkBoxes cluster
+	tmuxSendKeys(t, session, "Tab")
+
+	lines := tmuxCapture(t, session)
+
+	// The focused checkbox item should show ► prefix (SfSelected indicator)
+	foundIndicator := false
+	for _, line := range lines {
+		if strings.Contains(line, "►") && strings.Contains(line, "[") {
+			foundIndicator = true
+			break
+		}
+	}
+	if !foundIndicator {
+		t.Error("checkbox focus indicator '►' with bracket not found — cluster focus indicator may not be rendering")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMenuTileRearrangesWindows(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-tile"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Verify both windows exist before tiling
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "File Manager") {
+		t.Fatal("win1 'File Manager' not visible before tile")
+	}
+	if !containsAny(lines, "Editor") {
+		t.Fatal("win2 'Editor' not visible before tile")
+	}
+
+	// Open Window menu: F10 → Right (to Window menu) → Enter (open popup) → Enter (select Tile)
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// After tiling, both window titles must still be visible
+	if !containsAny(lines, "File Manager") {
+		t.Error("win1 'File Manager' not visible after Tile")
+	}
+	if !containsAny(lines, "Editor") {
+		t.Error("win2 'Editor' not visible after Tile")
+	}
+
+	// Both windows tiled side by side: their top borders appear on the same row.
+	// Active window uses ╔, inactive uses ┌ — look for a row with both frame corners.
+	tiledRow := false
+	for _, line := range lines {
+		hasDouble := strings.Contains(line, "╔")
+		hasSingle := strings.Contains(line, "┌")
+		if hasDouble && hasSingle {
+			tiledRow = true
+			break
+		}
+	}
+	if !tiledRow {
+		t.Error("no row with both '╔' and '┌' found — windows may not be tiled side by side")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func TestContextMenuSmoke(t *testing.T) {
 	binPath := buildBasicApp(t)
 
