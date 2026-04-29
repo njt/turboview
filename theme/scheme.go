@@ -33,4 +33,5 @@ type ColorScheme struct {
 	MenuDisabled        tcell.Style
 	StatusNormal        tcell.Style
 	StatusShortcut      tcell.Style
+	StatusSelected      tcell.Style
 }

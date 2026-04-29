@@ -32,35 +32,86 @@ func (st *StaticText) Draw(buf *DrawBuffer) {
 		style = cs.LabelNormal
 	}
 
-	x, y := 0, 0
-	words := splitWords(st.text)
-	for _, word := range words {
-		runes := []rune(word)
-		if x > 0 && x+len(runes) > w {
-			x = 0
-			y++
-			if y >= h {
-				return
+	lines := wrapText(st.text, w)
+	for y, line := range lines {
+		if y >= h {
+			break
+		}
+		centered := false
+		runes := []rune(line)
+		if len(runes) > 0 && runes[0] == '\x03' {
+			centered = true
+			runes = runes[1:]
+		}
+		x := 0
+		if centered {
+			x = (w - len(runes)) / 2
+			if x < 0 {
+				x = 0
 			}
 		}
 		for _, r := range runes {
-			if r == '\n' {
-				x = 0
-				y++
-				if y >= h {
-					return
-				}
-				continue
-			}
 			if x < w {
 				buf.WriteChar(x, y, r, style)
 			}
 			x++
 		}
-		if x < w {
-			x++ // space after word
+	}
+}
+
+// wrapText splits text into display lines, preserving \x03 centering prefix
+// per line and honoring the given width for word-wrapping.
+func wrapText(text string, width int) []string {
+	rawLines := splitOnNewlines(text)
+	var result []string
+	for _, raw := range rawLines {
+		prefix := ""
+		content := raw
+		if len(raw) > 0 && raw[0] == '\x03' {
+			prefix = "\x03"
+			content = raw[1:]
+		}
+		words := splitWords(content)
+		if len(words) == 0 {
+			result = append(result, prefix)
+			continue
+		}
+		line := prefix
+		lineLen := 0
+		for _, word := range words {
+			wLen := len([]rune(word))
+			if lineLen > 0 && lineLen+1+wLen > width {
+				result = append(result, line)
+				line = word
+				lineLen = wLen
+			} else {
+				if lineLen > 0 {
+					line += " "
+					lineLen++
+				}
+				line += word
+				lineLen += wLen
+			}
+		}
+		result = append(result, line)
+	}
+	return result
+}
+
+// splitOnNewlines splits s on '\n' characters, returning at least one element.
+func splitOnNewlines(s string) []string {
+	var lines []string
+	current := ""
+	for _, r := range s {
+		if r == '\n' {
+			lines = append(lines, current)
+			current = ""
+		} else {
+			current += string(r)
 		}
 	}
+	lines = append(lines, current)
+	return lines
 }
 
 func splitWords(s string) []string {

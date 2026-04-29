@@ -754,6 +754,12 @@ func TestEnterOnPopupItemFiresCommandAndDeactivates(t *testing.T) {
 	if mb.IsActive() {
 		t.Error("Enter+Enter: loop still active after popup item selected; deactivation missing")
 	}
+
+	// The command is posted to the event queue via PostCommand; drain it.
+	if event := app.PollEvent(); event != nil {
+		app.handleCommand(event)
+	}
+
 	if receivedCmd != CmUser+1 {
 		t.Errorf("posted command = %v, want CmUser+1 (%v)", receivedCmd, CmUser+1)
 	}
@@ -804,6 +810,12 @@ func TestPopupResultNonCancelNonZeroDeactivates(t *testing.T) {
 	if mb.IsActive() {
 		t.Error("loop still active after non-CmCancel popup result")
 	}
+
+	// The command is posted to the event queue via PostCommand; drain it.
+	if event := app.PollEvent(); event != nil {
+		app.handleCommand(event)
+	}
+
 	if !commandPosted {
 		t.Error("no command posted after popup item selected; PostCommand must be called")
 	}
@@ -976,6 +988,12 @@ func TestMouseClickInsidePopupForwardsAndDeactivates(t *testing.T) {
 	if mb.IsActive() {
 		t.Error("Enter+click-in-popup: loop still active; popup click must fire command and deactivate")
 	}
+
+	// The command is posted to the event queue via PostCommand; drain it.
+	if event := app.PollEvent(); event != nil {
+		app.handleCommand(event)
+	}
+
 	if receivedCmd == 0 {
 		t.Error("no command received after clicking inside popup; popup click must fire item command")
 	}

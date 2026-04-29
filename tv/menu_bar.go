@@ -148,8 +148,6 @@ func (mb *MenuBar) handleModalEvent(event *Event, app *Application) {
 	if event.What == EvCommand {
 		if event.Command == CmMenu {
 			mb.active = false
-		} else {
-			app.handleCommand(event)
 		}
 		return
 	}
@@ -256,9 +254,7 @@ func (mb *MenuBar) checkPopupResult(app *Application) {
 	}
 	mb.closePopup()
 	mb.active = false
-	// Dispatch the command directly so it is handled even though the modal loop exits.
-	cmdEvent := &Event{What: EvCommand, Command: result}
-	app.handleCommand(cmdEvent)
+	app.PostCommand(result, nil)
 }
 
 func (mb *MenuBar) matchMenuShortcut(r rune) {

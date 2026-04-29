@@ -40,6 +40,7 @@ func init() {
 		MenuDisabled:        s(tcell.ColorSilver, tcell.ColorTeal),
 		StatusNormal:        s(tcell.ColorBlack, tcell.ColorTeal),
 		StatusShortcut:      s(tcell.ColorYellow, tcell.ColorTeal),
+		StatusSelected:      s(tcell.ColorBlack, tcell.ColorWhite),
 	}
 
 	Register("borland-blue", BorlandBlue)
