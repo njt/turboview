@@ -16,6 +16,67 @@ func NewGroup(bounds Rect) *Group {
 	return g
 }
 
+func (g *Group) SetBounds(r Rect) {
+	oldW := g.size.X
+	oldH := g.size.Y
+	g.BaseView.SetBounds(r)
+	newW := r.Width()
+	newH := r.Height()
+
+	deltaW := newW - oldW
+	deltaH := newH - oldH
+
+	if deltaW == 0 && deltaH == 0 {
+		return
+	}
+
+	for _, child := range g.children {
+		gm := child.GrowMode()
+		if gm == 0 {
+			continue
+		}
+
+		cb := child.Bounds()
+
+		if gm&GfGrowRel != 0 {
+			ax, ay := cb.A.X, cb.A.Y
+			bx, by := cb.B.X, cb.B.Y
+			if oldW > 0 {
+				ax = ax * newW / oldW
+				bx = bx * newW / oldW
+			}
+			if oldH > 0 {
+				ay = ay * newH / oldH
+				by = by * newH / oldH
+			}
+			child.SetBounds(Rect{A: Point{ax, ay}, B: Point{bx, by}})
+			continue
+		}
+
+		ax, ay := cb.A.X, cb.A.Y
+		bx, by := cb.B.X, cb.B.Y
+		if gm&GfGrowLoX != 0 {
+			ax += deltaW
+			if gm&GfGrowHiX == 0 {
+				bx += deltaW
+			}
+		}
+		if gm&GfGrowHiX != 0 {
+			bx += deltaW
+		}
+		if gm&GfGrowLoY != 0 {
+			ay += deltaH
+			if gm&GfGrowHiY == 0 {
+				by += deltaH
+			}
+		}
+		if gm&GfGrowHiY != 0 {
+			by += deltaH
+		}
+		child.SetBounds(Rect{A: Point{ax, ay}, B: Point{bx, by}})
+	}
+}
+
 func (g *Group) SetFacade(c Container) {
 	g.facade = c
 }
