@@ -720,3 +720,84 @@ func TestThemeRegistration(t *testing.T) {
 		t.Error("app did not exit after Alt+X")
 	}
 }
+
+func TestTerminalResize(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-resize"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Verify initial state
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "░") {
+		t.Fatal("desktop pattern not visible at startup")
+	}
+
+	// Resize the tmux pane to 100x30
+	err := exec.Command("tmux", "resize-window", "-t", session, "-x", "100", "-y", "30").Run()
+	if err != nil {
+		t.Fatalf("tmux resize-window failed: %v", err)
+	}
+	time.Sleep(1 * time.Second) // give app time to handle resize
+
+	// Capture after resize
+	lines = tmuxCapture(t, session)
+
+	// Desktop pattern should fill the wider area
+	if !containsAny(lines, "░") {
+		t.Error("desktop pattern not visible after resize")
+	}
+
+	// Window titles should still be visible
+	if !containsAny(lines, "File Manager") {
+		t.Error("'File Manager' window title not visible after resize")
+	}
+	if !containsAny(lines, "Editor") {
+		t.Error("'Editor' window title not visible after resize")
+	}
+
+	// App should still be responsive — Alt+X exits cleanly
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X following resize")
+	}
+}
+
+func TestContextMenuSmoke(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-ctxmenu"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Verify app boots and exits cleanly with ContextMenu code compiled in
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "░") {
+		t.Error("desktop pattern not visible at startup")
+	}
+
+	// Alt+X exits cleanly
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}

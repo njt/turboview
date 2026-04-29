@@ -102,6 +102,9 @@ func main() {
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)
+	win2.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
+	lv.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
+	sb.SetGrowMode(tv.GfGrowLoX | tv.GfGrowHiY)
 
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win2)
