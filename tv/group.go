@@ -30,6 +30,10 @@ func (g *Group) SetBounds(r Rect) {
 		return
 	}
 
+	if oldW == 0 && oldH == 0 {
+		return
+	}
+
 	for _, child := range g.children {
 		gm := child.GrowMode()
 		if gm == 0 {
