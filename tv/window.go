@@ -1,6 +1,9 @@
 package tv
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"github.com/gdamore/tcell/v2"
+	"github.com/njt/turboview/theme"
+)
 
 var _ Container = (*Window)(nil)
 
@@ -44,6 +47,9 @@ func NewWindow(bounds Rect, title string, opts ...WindowOption) *Window {
 func (w *Window) Title() string     { return w.title }
 func (w *Window) SetTitle(t string) { w.title = t }
 func (w *Window) Number() int       { return w.number }
+func (w *Window) SetColorScheme(cs *theme.ColorScheme) {
+	w.scheme = cs
+}
 
 func (w *Window) Insert(v View)               { w.group.Insert(v) }
 func (w *Window) Remove(v View)               { w.group.Remove(v) }

@@ -1,6 +1,9 @@
 package tv
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"github.com/gdamore/tcell/v2"
+	"github.com/njt/turboview/theme"
+)
 
 type MsgBoxButton int
 
@@ -151,6 +154,9 @@ func NewDialog(bounds Rect, title string, opts ...DialogOption) *Dialog {
 }
 
 func (d *Dialog) Title() string { return d.title }
+func (d *Dialog) SetColorScheme(cs *theme.ColorScheme) {
+	d.scheme = cs
+}
 
 func (d *Dialog) SetBounds(r Rect) {
 	d.BaseView.SetBounds(r)
