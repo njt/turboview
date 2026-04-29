@@ -208,6 +208,17 @@ func (g *Group) Draw(buf *DrawBuffer) {
 	}
 }
 
+func (g *Group) canReceiveEvent(child View, eventType EventType) bool {
+	if child.HasState(SfDisabled) {
+		return false
+	}
+	mask := child.EventMask()
+	if mask == 0 {
+		return true
+	}
+	return eventType&mask != 0
+}
+
 func (g *Group) HandleEvent(event *Event) {
 	if event.IsCleared() {
 		return
@@ -218,7 +229,7 @@ func (g *Group) HandleEvent(event *Event) {
 		mx, my := event.Mouse.X, event.Mouse.Y
 		for i := len(g.children) - 1; i >= 0; i-- {
 			child := g.children[i]
-			if !child.HasState(SfVisible) {
+			if !child.HasState(SfVisible) || child.HasState(SfDisabled) {
 				continue
 			}
 			if child.Bounds().Contains(NewPoint(mx, my)) {
@@ -231,11 +242,14 @@ func (g *Group) HandleEvent(event *Event) {
 		return
 	}
 
-	// Broadcast: deliver to all children
+	// Broadcast: deliver to all children (skip disabled; do NOT check EventMask)
 	if event.What == EvBroadcast {
 		for _, child := range g.children {
 			if event.IsCleared() {
 				return
+			}
+			if child.HasState(SfDisabled) {
+				continue
 			}
 			child.HandleEvent(event)
 		}
@@ -263,13 +277,13 @@ func (g *Group) HandleEvent(event *Event) {
 		if event.IsCleared() {
 			return
 		}
-		if child != g.focused && child.HasOption(OfPreProcess) {
+		if child != g.focused && child.HasOption(OfPreProcess) && g.canReceiveEvent(child, event.What) {
 			child.HandleEvent(event)
 		}
 	}
 
 	// Phase 2: Focused
-	if !event.IsCleared() && g.focused != nil {
+	if !event.IsCleared() && g.focused != nil && g.canReceiveEvent(g.focused, event.What) {
 		g.focused.HandleEvent(event)
 	}
 
@@ -278,7 +292,7 @@ func (g *Group) HandleEvent(event *Event) {
 		if event.IsCleared() {
 			return
 		}
-		if child != g.focused && child.HasOption(OfPostProcess) {
+		if child != g.focused && child.HasOption(OfPostProcess) && g.canReceiveEvent(child, event.What) {
 			child.HandleEvent(event)
 		}
 	}
