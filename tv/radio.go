@@ -99,13 +99,7 @@ func (rb *RadioButton) HandleEvent(event *Event) {
 	}
 
 	if event.What == EvKeyboard && event.Key != nil {
-		switch event.Key.Key {
-		case tcell.KeyRune:
-			if event.Key.Rune == ' ' {
-				rb.selectInCluster()
-				event.Clear()
-			}
-		case tcell.KeyEnter:
+		if event.Key.Key == tcell.KeyRune && event.Key.Rune == ' ' {
 			rb.selectInCluster()
 			event.Clear()
 		}
@@ -232,11 +226,11 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 	// Handle Up/Down arrow for selection (not just focus)
 	if event.What == EvKeyboard && event.Key != nil {
 		switch event.Key.Key {
-		case tcell.KeyDown:
+		case tcell.KeyDown, tcell.KeyRight:
 			rbs.moveSelection(1)
 			event.Clear()
 			return
-		case tcell.KeyUp:
+		case tcell.KeyUp, tcell.KeyLeft:
 			rbs.moveSelection(-1)
 			event.Clear()
 			return

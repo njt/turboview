@@ -100,13 +100,7 @@ func (cb *CheckBox) HandleEvent(event *Event) {
 	}
 
 	if event.What == EvKeyboard && event.Key != nil {
-		switch event.Key.Key {
-		case tcell.KeyRune:
-			if event.Key.Rune == ' ' {
-				cb.checked = !cb.checked
-				event.Clear()
-			}
-		case tcell.KeyEnter:
+		if event.Key.Key == tcell.KeyRune && event.Key.Rune == ' ' {
 			cb.checked = !cb.checked
 			event.Clear()
 		}
@@ -213,6 +207,38 @@ func (cbs *CheckBoxes) HandleEvent(event *Event) {
 		}
 	}
 
+	// Handle Up/Down arrow for focus navigation (does NOT toggle)
+	if event.What == EvKeyboard && event.Key != nil {
+		switch event.Key.Key {
+		case tcell.KeyDown:
+			cbs.moveNavigation(1)
+			event.Clear()
+			return
+		case tcell.KeyUp:
+			cbs.moveNavigation(-1)
+			event.Clear()
+			return
+		}
+	}
+
 	// Delegate to group for Tab/Shift+Tab and other events
 	cbs.group.HandleEvent(event)
+}
+
+func (cbs *CheckBoxes) moveNavigation(delta int) {
+	current := -1
+	for i, item := range cbs.items {
+		if item.HasState(SfSelected) {
+			current = i
+			break
+		}
+	}
+	if current < 0 {
+		current = 0
+	}
+	next := current + delta
+	if next < 0 || next >= len(cbs.items) {
+		return
+	}
+	cbs.group.SetFocusedChild(cbs.items[next])
 }

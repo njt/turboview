@@ -537,36 +537,38 @@ func TestRadioButtonHandleEventSpaceConsumesEvent(t *testing.T) {
 	}
 }
 
-// TestRadioButtonHandleEventEnterSelectsButton verifies the Enter key selects the button.
-// Spec: "Enter: same as Space."
-func TestRadioButtonHandleEventEnterSelectsButton(t *testing.T) {
+// TestRadioButtonHandleEventEnterDoesNotSelectButton verifies the Enter key does NOT
+// select the button (Enter handling removed per Task 4).
+// Spec: "RadioButton.HandleEvent does NOT handle KeyEnter."
+func TestRadioButtonHandleEventEnterDoesNotSelectButton(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 10, 1), "Item")
 	rb.SetSelected(false)
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	rb.HandleEvent(ev)
 
-	if !rb.Selected() {
-		t.Error("Enter key did not select the RadioButton")
+	if rb.Selected() {
+		t.Error("Enter key selected the RadioButton; Enter must not select after removal")
 	}
 }
 
-// TestRadioButtonHandleEventEnterConsumesEvent verifies the Enter key clears the event.
-// Spec: "Enter: … consumes event."
-func TestRadioButtonHandleEventEnterConsumesEvent(t *testing.T) {
+// TestRadioButtonHandleEventEnterDoesNotConsumeEvent verifies the Enter key does NOT
+// clear the event (Enter handling removed per Task 4).
+// Spec: "RadioButton.HandleEvent does NOT handle KeyEnter."
+func TestRadioButtonHandleEventEnterDoesNotConsumeEvent(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 10, 1), "Item")
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	rb.HandleEvent(ev)
 
-	if !ev.IsCleared() {
-		t.Errorf("Enter key did not consume the event; ev.What = %v, want EvNothing", ev.What)
+	if ev.IsCleared() {
+		t.Errorf("Enter key was consumed by RadioButton; Enter must not be consumed after removal")
 	}
 }
 
 // TestRadioButtonHandleEventOtherKeyDoesNotSelect verifies that a key other than
-// Space/Enter does not select the button.
-// Spec: only Space and Enter select.
+// Space does not select the button.
+// Spec: only Space selects.
 func TestRadioButtonHandleEventOtherKeyDoesNotSelect(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 10, 1), "Item")
 	rb.SetSelected(false)
@@ -575,13 +577,13 @@ func TestRadioButtonHandleEventOtherKeyDoesNotSelect(t *testing.T) {
 	rb.HandleEvent(ev)
 
 	if rb.Selected() {
-		t.Error("pressing 'x' selected the RadioButton; only Space and Enter should select it")
+		t.Error("pressing 'x' selected the RadioButton; only Space should select it")
 	}
 }
 
 // TestRadioButtonHandleEventOtherKeyDoesNotConsumeEvent verifies that a non-selecting
 // key does not consume the event.
-// Spec: only Space/Enter consume the event.
+// Spec: only Space consumes the event.
 func TestRadioButtonHandleEventOtherKeyDoesNotConsumeEvent(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 10, 1), "Item")
 
@@ -589,7 +591,7 @@ func TestRadioButtonHandleEventOtherKeyDoesNotConsumeEvent(t *testing.T) {
 	rb.HandleEvent(ev)
 
 	if ev.IsCleared() {
-		t.Error("pressing 'x' consumed the event; only Space and Enter should consume it")
+		t.Error("pressing 'x' consumed the event; only Space should consume it")
 	}
 }
 
@@ -1339,11 +1341,10 @@ func TestRadioButtonsOnlyOneSelectedAfterUpDownSequence(t *testing.T) {
 // RadioButtons — Fix 1: Enter key exclusive selection within cluster
 // =============================================================================
 
-// TestRadioButtonsEnterKeyExclusiveSelection verifies that pressing Enter on a
-// focused (but not selected) button selects it and deselects the previously
-// selected button.
-// Spec: "Enter: same as Space" — with exclusive selection enforced by the cluster.
-func TestRadioButtonsEnterKeyExclusiveSelection(t *testing.T) {
+// TestRadioButtonsEnterKeyDoesNotChangeSelection verifies that pressing Enter on a
+// focused (but not selected) button does NOT change selection (Enter removed per Task 4).
+// Spec: "RadioButton.HandleEvent does NOT handle KeyEnter."
+func TestRadioButtonsEnterKeyDoesNotChangeSelection(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	// Item(0) is selected by default; move focus to Item(1).
 	rbs.SetFocusedChild(rbs.Item(1))
@@ -1351,11 +1352,12 @@ func TestRadioButtonsEnterKeyExclusiveSelection(t *testing.T) {
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	rbs.HandleEvent(ev)
 
-	if !rbs.Item(1).Selected() {
-		t.Error("Enter key did not select Item(1)")
+	// Enter must not change selection; Item(0) remains selected.
+	if rbs.Item(1).Selected() {
+		t.Error("Enter key selected Item(1); Enter must not select after removal")
 	}
-	if rbs.Item(0).Selected() {
-		t.Error("Item(0) should be deselected after Enter selected Item(1)")
+	if !rbs.Item(0).Selected() {
+		t.Error("Item(0) should still be selected; Enter must not change selection")
 	}
 }
 

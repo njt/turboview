@@ -464,36 +464,37 @@ func TestCheckBoxHandleEventSpaceConsumesEvent(t *testing.T) {
 	}
 }
 
-// TestCheckBoxHandleEventEnterTogglesCheckedState verifies Enter also toggles the
-// checked state.
-// Spec: "Enter: toggles checked state, consumes event."
-func TestCheckBoxHandleEventEnterTogglesCheckedState(t *testing.T) {
+// TestCheckBoxHandleEventEnterDoesNotToggleCheckedState verifies Enter does NOT
+// toggle the checked state (Enter handling removed per Task 4).
+// Spec: "CheckBox.HandleEvent does NOT handle KeyEnter."
+func TestCheckBoxHandleEventEnterDoesNotToggleCheckedState(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	cb.HandleEvent(ev)
 
-	if !cb.Checked() {
-		t.Error("Enter on unchecked CheckBox: Checked() = false, want true")
+	if cb.Checked() {
+		t.Error("Enter on unchecked CheckBox toggled it; Enter must not toggle")
 	}
 }
 
-// TestCheckBoxHandleEventEnterConsumesEvent verifies Enter clears the event.
-// Spec: "Enter: toggles checked state, consumes event."
-func TestCheckBoxHandleEventEnterConsumesEvent(t *testing.T) {
+// TestCheckBoxHandleEventEnterDoesNotConsumeEvent verifies Enter does NOT clear the
+// event (Enter handling removed per Task 4).
+// Spec: "CheckBox.HandleEvent does NOT handle KeyEnter."
+func TestCheckBoxHandleEventEnterDoesNotConsumeEvent(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	cb.HandleEvent(ev)
 
-	if !ev.IsCleared() {
-		t.Errorf("Enter event not consumed; ev.What = %v, want EvNothing", ev.What)
+	if ev.IsCleared() {
+		t.Errorf("Enter event was consumed by CheckBox; Enter must not be consumed")
 	}
 }
 
 // TestCheckBoxHandleEventOtherKeyDoesNotToggle verifies other keys do not toggle
 // the checked state.
-// Spec: "Space … Enter …" — only these keys toggle.
+// Spec: "Space … " — only Space toggles.
 func TestCheckBoxHandleEventOtherKeyDoesNotToggle(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 
@@ -501,7 +502,7 @@ func TestCheckBoxHandleEventOtherKeyDoesNotToggle(t *testing.T) {
 	cb.HandleEvent(ev)
 
 	if cb.Checked() {
-		t.Error("pressing 'x' toggled CheckBox; only Space and Enter should toggle")
+		t.Error("pressing 'x' toggled CheckBox; only Space should toggle")
 	}
 }
 
@@ -514,7 +515,7 @@ func TestCheckBoxHandleEventOtherKeyDoesNotConsumeEvent(t *testing.T) {
 	cb.HandleEvent(ev)
 
 	if ev.IsCleared() {
-		t.Error("pressing 'x' consumed event; CheckBox should not consume keys other than Space/Enter")
+		t.Error("pressing 'x' consumed event; CheckBox should not consume keys other than Space")
 	}
 }
 
