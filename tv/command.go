@@ -16,5 +16,12 @@ const (
 	CmCascade
 	CmNext
 	CmPrev
+
+	CmDefault
+	CmGrabDefault
+	CmReleaseDefault
+	CmReceivedFocus
+	CmReleasedFocus
+
 	CmUser CommandCode = 1000
 )
