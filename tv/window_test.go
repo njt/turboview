@@ -250,21 +250,6 @@ func TestWindowSetFocusedChildDelegatesToGroup(t *testing.T) {
 	}
 }
 
-// TestWindowExecViewDelegatesToGroup verifies ExecView delegates to the internal group.
-// Spec: "Window delegates Container methods (..., ExecView) to its internal Group"
-// The Group's ExecView panics ("not implemented"), so we expect a panic here too.
-func TestWindowExecViewDelegatesToGroup(t *testing.T) {
-	w := NewWindow(NewRect(0, 0, 40, 20), "Test")
-	child := newMockView(NewRect(0, 0, 5, 5))
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("ExecView did not panic (group's ExecView panics)")
-		}
-	}()
-
-	w.ExecView(child)
-}
 
 // TestWindowInsertSetsChildOwnerToWindow verifies that children's Owner is the Window
 // (the facade), not the internal group.

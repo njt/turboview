@@ -59,7 +59,74 @@ func (g *Group) SetFocusedChild(v View) {
 }
 
 func (g *Group) ExecView(v View) CommandCode {
-	panic("ExecView not implemented")
+	g.Insert(v)
+	v.SetState(SfModal, true)
+
+	// Walk owner chain from facade to find Application via Desktop.
+	var app *Application
+	var current Container = g.facade
+	if current == nil {
+		current = Container(g)
+	}
+	for current != nil {
+		if d, ok := current.(*Desktop); ok && d.app != nil {
+			app = d.app
+			break
+		}
+		if view, ok := current.(View); ok {
+			current = view.Owner()
+		} else {
+			break
+		}
+	}
+
+	if app == nil {
+		g.Remove(v)
+		v.SetState(SfModal, false)
+		return CmCancel
+	}
+
+	// Modal event loop
+	var result CommandCode
+	for {
+		event := app.PollEvent()
+		if event == nil {
+			result = CmCancel
+			break
+		}
+
+		// Route event to modal view only
+		if event.What == EvMouse && event.Mouse != nil {
+			vb := v.Bounds()
+			mx, my := event.Mouse.X, event.Mouse.Y
+			if vb.Contains(NewPoint(mx, my)) {
+				event.Mouse.X -= vb.A.X
+				event.Mouse.Y -= vb.A.Y
+				v.HandleEvent(event)
+			}
+			// Outside clicks are discarded
+		} else {
+			v.HandleEvent(event)
+		}
+
+		// Check for closing command (Button.press transforms event in place)
+		if event.What == EvCommand {
+			switch event.Command {
+			case CmOK, CmCancel, CmClose, CmYes, CmNo:
+				result = event.Command
+			}
+		}
+
+		app.drawAndFlush()
+
+		if result != 0 {
+			break
+		}
+	}
+
+	g.Remove(v)
+	v.SetState(SfModal, false)
+	return result
 }
 
 func (g *Group) Draw(buf *DrawBuffer) {

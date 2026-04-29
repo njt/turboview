@@ -493,17 +493,3 @@ func TestHandleEventClearedEventNotForwarded(t *testing.T) {
 	}
 }
 
-// TestExecViewPanics verifies that ExecView is a stub that panics.
-// Spec: "ExecView is a stub that panics with 'not implemented'".
-func TestExecViewPanics(t *testing.T) {
-	g := NewGroup(NewRect(0, 0, 80, 25))
-	v := newMockView(NewRect(0, 0, 10, 5))
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("ExecView did not panic")
-		}
-	}()
-
-	g.ExecView(v)
-}

@@ -202,20 +202,6 @@ func TestDesktopSetFocusedChildDeselectsPrevious(t *testing.T) {
 // Desktop.ExecView
 // ---------------------------------------------------------------------------
 
-// Spec: "Desktop.ExecView(v) delegates to the internal Group (panics 'not implemented')"
-// Confirming: ExecView panics.
-func TestDesktopExecViewPanics(t *testing.T) {
-	d := NewDesktop(NewRect(0, 0, 80, 25))
-	v := newMockView(NewRect(0, 0, 10, 5))
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Desktop.ExecView did not panic")
-		}
-	}()
-
-	d.ExecView(v)
-}
 
 // ---------------------------------------------------------------------------
 // Desktop.SetBounds
