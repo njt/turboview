@@ -32,6 +32,12 @@ func WithTheme(scheme *theme.ColorScheme) AppOption {
 	}
 }
 
+func WithOnCommand(fn func(CommandCode, any) bool) AppOption {
+	return func(app *Application) {
+		app.onCommand = fn
+	}
+}
+
 type Application struct {
 	bounds     Rect
 	screen     tcell.Screen
@@ -40,6 +46,7 @@ type Application struct {
 	statusLine *StatusLine
 	scheme     *theme.ColorScheme
 	quit       bool
+	onCommand  func(CommandCode, any) bool
 }
 
 func NewApplication(opts ...AppOption) (*Application, error) {
@@ -64,6 +71,7 @@ func NewApplication(opts ...AppOption) (*Application, error) {
 
 	app.desktop = NewDesktop(NewRect(0, 0, 0, 0))
 	app.desktop.scheme = app.scheme
+	app.desktop.app = app
 
 	if app.statusLine != nil {
 		app.statusLine.scheme = app.scheme
@@ -80,6 +88,23 @@ func NewApplication(opts ...AppOption) (*Application, error) {
 func (app *Application) Desktop() *Desktop      { return app.desktop }
 func (app *Application) StatusLine() *StatusLine { return app.statusLine }
 func (app *Application) Screen() tcell.Screen    { return app.screen }
+
+func (app *Application) PollEvent() *Event {
+	for {
+		tcellEv := app.screen.PollEvent()
+		if tcellEv == nil {
+			return nil
+		}
+		if resizeEv, ok := tcellEv.(*tcell.EventResize); ok {
+			w, h := resizeEv.Size()
+			app.bounds = NewRect(0, 0, w, h)
+			app.layoutChildren()
+		}
+		if event := app.convertEvent(tcellEv); event != nil {
+			return event
+		}
+	}
+}
 
 func (app *Application) Run() error {
 	if app.screenOwn {
@@ -98,22 +123,11 @@ func (app *Application) Run() error {
 	app.drawAndFlush()
 
 	for !app.quit {
-		tcellEv := app.screen.PollEvent()
-		if tcellEv == nil {
+		event := app.PollEvent()
+		if event == nil {
 			break
 		}
-
-		if _, ok := tcellEv.(*tcell.EventResize); ok {
-			w, h = app.screen.Size()
-			app.bounds = NewRect(0, 0, w, h)
-			app.layoutChildren()
-		}
-
-		event := app.convertEvent(tcellEv)
-		if event != nil {
-			app.handleEvent(event)
-		}
-
+		app.handleEvent(event)
 		app.drawAndFlush()
 	}
 
@@ -195,6 +209,12 @@ func (app *Application) handleCommand(event *Event) {
 		case CmQuit:
 			app.quit = true
 			event.Clear()
+			return
+		}
+		if app.onCommand != nil {
+			if app.onCommand(event.Command, event.Info) {
+				event.Clear()
+			}
 		}
 	}
 }

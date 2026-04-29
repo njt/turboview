@@ -8,6 +8,7 @@ type Desktop struct {
 	BaseView
 	group   *Group
 	pattern rune
+	app     *Application
 }
 
 func NewDesktop(bounds Rect) *Desktop {
