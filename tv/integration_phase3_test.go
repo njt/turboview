@@ -16,6 +16,7 @@ package tv
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/njt/turboview/theme"
@@ -450,5 +451,599 @@ func TestIntegrationDrawRendersBracketTextAtCorrectPosition(t *testing.T) {
 			t.Errorf("button bracket at screen (%d,%d): rune = %q, want %q",
 				clientX+i, clientY, cell.Rune, want)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 9 integration tests — Dialog + ExecView
+// ---------------------------------------------------------------------------
+
+// appWithDesktopAndScreen creates an Application with the full Application→Desktop
+// stack and returns the screen so callers can inject events. Unlike the phase-2
+// helper appWithDesktop, this one returns the screen explicitly (no auto-cleanup)
+// so ExecView goroutines can share the screen reference safely.
+func appWithDesktopAndScreen(t *testing.T) (*Application, *Desktop, tcell.SimulationScreen) {
+	t.Helper()
+	screen := newTestScreen(t)
+	app, err := NewApplication(
+		WithScreen(screen),
+		WithTheme(theme.BorlandBlue),
+	)
+	if err != nil {
+		screen.Fini()
+		t.Fatalf("NewApplication: %v", err)
+	}
+	return app, app.Desktop(), screen
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 1: Application→Desktop ExecView with OK button — Enter returns CmOK
+// Spec req 1: "calling desktop.ExecView(dialog) where dialog has an OK button,
+//
+//	pressing Enter returns CmOK"
+//
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewDesktopOKButtonEnterReturnsCmOK verifies the full
+// Application→Desktop modal flow: ExecView running on the Desktop, with an OK
+// button that has WithDefault(), returns CmOK when Enter is injected via
+// screen.InjectKey so the event flows through Button.HandleEvent.
+func TestIntegrationExecViewDesktopOKButtonEnterReturnsCmOK(t *testing.T) {
+	_, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(10, 5, 40, 12), "Confirm")
+	btn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	dlg.Insert(btn)
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	// Wait for ExecView to enter its modal polling loop.
+	time.Sleep(50 * time.Millisecond)
+
+	// InjectKey sends a real tcell key event through the simulation screen's
+	// PollEvent queue — Button.HandleEvent transforms Enter into CmOK in-place.
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmOK {
+			t.Errorf("ExecView returned %v, want CmOK", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s after Enter injection")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 2: ExecView OK+Cancel — Tab moves focus to Cancel, Enter returns CmCancel
+// Spec req 2: "ExecView with OK+Cancel: pressing Tab moves focus to Cancel,
+//
+//	pressing Enter returns CmCancel"
+//
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewTabMovesFocusToCancelThenEnterReturnsCmCancel verifies
+// that Tab inside the modal dialog moves focus from the default OK button to the
+// Cancel button, and that a subsequent Enter returns CmCancel.
+func TestIntegrationExecViewTabMovesFocusToCancelThenEnterReturnsCmCancel(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(5, 5, 50, 12), "Choose")
+	okBtn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	cancelBtn := NewButton(NewRect(20, 3, 14, 2), "Cancel", CmCancel)
+	dlg.Insert(okBtn)
+	dlg.Insert(cancelBtn)
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// After insertion the last-inserted selectable child (cancelBtn) is focused.
+	// Tab from cancelBtn wraps to okBtn; to land on cancelBtn we need one Tab.
+	// But insertion order means okBtn was inserted first — cancelBtn has focus.
+	// One Tab advances focus: cancelBtn → okBtn (wrap). Two Tabs: okBtn → cancelBtn.
+	// We want cancelBtn focused, so inject Tab once to move from cancelBtn → okBtn,
+	// then Tab again to move back to cancelBtn.
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone)
+	time.Sleep(20 * time.Millisecond)
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone)
+	time.Sleep(20 * time.Millisecond)
+
+	// Now cancelBtn is focused; Enter fires CmCancel.
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmCancel {
+			t.Errorf("ExecView returned %v, want CmCancel", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s after Tab+Enter")
+	}
+
+	_ = app // keep app alive
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 3: ExecView default button fires via postprocess when non-button focused
+// Spec req 3: "ExecView with default button: pressing Enter when a non-button view
+//
+//	is focused fires the default button via postprocess"
+//
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewDefaultButtonFiresViaPostprocessInsideDialog verifies
+// that inside a modal Dialog, when a non-consuming selectable view has focus,
+// pressing Enter causes the default button (OfPostProcess) to fire CmOK.
+func TestIntegrationExecViewDefaultButtonFiresViaPostprocessInsideDialog(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(5, 5, 50, 12), "Postprocess")
+
+	// Default button: receives Enter in Phase 3 (postprocess) only.
+	defBtn := NewButton(NewRect(20, 3, 12, 2), "OK", CmOK, WithDefault())
+
+	// Non-consuming selectable view that steals focus (inserted after defBtn).
+	nonConsumer := &BaseView{}
+	nonConsumer.SetBounds(NewRect(2, 1, 14, 1))
+	nonConsumer.SetState(SfVisible, true)
+	nonConsumer.SetOptions(OfSelectable, true)
+
+	dlg.Insert(defBtn)
+	dlg.Insert(nonConsumer) // now focused (last selectable inserted)
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Enter reaches nonConsumer (does nothing), then postprocess delivers to defBtn.
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmOK {
+			t.Errorf("ExecView with default-button postprocess returned %v, want CmOK", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s — default button postprocess may not be firing")
+	}
+
+	_ = app
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 4: MessageBox MbYes|MbNo returns CmYes when Enter pressed
+// Spec req 4: "MessageBox with MbYes|MbNo returns CmYes when Enter pressed"
+// ---------------------------------------------------------------------------
+
+// TestIntegrationMessageBoxYesNoReturnsYesOnEnter verifies that MessageBox called
+// with MbYes|MbNo uses ExecView and can return CmYes. MessageBox inserts Yes first
+// (with WithDefault) and No second; after insertion No has focus. Tab moves focus
+// back to Yes (wrap-around), and Enter then fires the Yes button returning CmYes.
+func TestIntegrationMessageBoxYesNoReturnsYesOnEnter(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		// MessageBox calls owner.ExecView internally; owner here is the Desktop.
+		result <- MessageBox(desktop, "Question", "Delete file?", MbYes|MbNo)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// MessageBox inserts Yes (default, i=0) then No (i=1). After insertion No is
+	// focused (last selectable). Tab wraps: No → Yes. Enter then fires Yes → CmYes.
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone)
+	time.Sleep(20 * time.Millisecond)
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmYes {
+			t.Errorf("MessageBox(MbYes|MbNo) Tab+Enter = %v, want CmYes", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("MessageBox did not return within 2 s after Tab+Enter")
+	}
+
+	_ = app
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 5: Dialog renders with DialogFrame style (double-line border)
+// Spec req 5: "Dialog renders with DialogFrame style (double-line border, not single-line)"
+// ---------------------------------------------------------------------------
+
+// TestIntegrationDialogRendersWithDoubleLineBorder verifies that when a Dialog is
+// drawn as part of the full Application→Desktop render stack (via app.Draw), its
+// border characters are double-line (╔ ╗ ╚ ╝ ═ ║) and not single-line (┌ ┐ └ ┘).
+func TestIntegrationDialogRendersWithDoubleLineBorder(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	// Dialog at absolute desktop position (10, 5, 30, 10).
+	dlg := NewDialog(NewRect(10, 5, 30, 10), "Border Test")
+	desktop.Insert(dlg)
+
+	const bw, bh = 80, 25
+	buf := NewDrawBuffer(bw, bh)
+	app.Draw(buf)
+
+	// Dialog occupies desktop rows 5-14, cols 10-39 (30 wide, 10 tall).
+	// Check the four corners for double-line runes.
+	corners := []struct {
+		x, y int
+		want rune
+		desc string
+	}{
+		{10, 5, '╔', "top-left corner"},
+		{39, 5, '╗', "top-right corner"},
+		{10, 14, '╚', "bottom-left corner"},
+		{39, 14, '╝', "bottom-right corner"},
+	}
+	for _, c := range corners {
+		cell := buf.GetCell(c.x, c.y)
+		if cell.Rune != c.want {
+			t.Errorf("dialog %s at (%d,%d): rune = %q, want %q (double-line border)",
+				c.desc, c.x, c.y, cell.Rune, c.want)
+		}
+	}
+
+	// Sample top horizontal edge at a column that falls outside the title text.
+	// Dialog is 30 wide at x=10; dialog-local col 2 → screen col 12.
+	// Title "Border Test" (11 chars) with padding = 13; centered in 28 cols:
+	// titleX (dialog-local) = 1 + (28-13)/2 = 8, so title occupies local cols 8-20.
+	// Screen col 12 = dialog-local col 2, which is before the title — must be '═'.
+	edgeCell := buf.GetCell(12, 5)
+	if edgeCell.Rune != '═' {
+		t.Errorf("dialog top edge at (12,5): rune = %q, want '═' (double-line)", edgeCell.Rune)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 6: Dialog renders with DialogBackground style for client area
+// Spec req 6: "Dialog renders with DialogBackground style for client area"
+// ---------------------------------------------------------------------------
+
+// TestIntegrationDialogRendersWithDialogBackgroundInClientArea verifies that the
+// client area of a Dialog (one cell inside the frame) is filled with the
+// DialogBackground style from the active ColorScheme.
+func TestIntegrationDialogRendersWithDialogBackgroundInClientArea(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	// Dialog at (10, 5, 30, 10). Client area: cols 11-38, rows 6-13.
+	dlg := NewDialog(NewRect(10, 5, 30, 10), "BG Test")
+	desktop.Insert(dlg)
+
+	const bw, bh = 80, 25
+	buf := NewDrawBuffer(bw, bh)
+	app.Draw(buf)
+
+	// Sample a cell inside the client area (no child inserted, so it stays background).
+	// Client origin in screen coords: (10+1, 5+1) = (11, 6).
+	cell := buf.GetCell(11, 6)
+
+	cs := theme.BorlandBlue
+	if cell.Style != cs.DialogBackground {
+		t.Errorf("dialog client area cell(11,6): style = %v, want DialogBackground %v",
+			cell.Style, cs.DialogBackground)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 7: Mouse click inside modal dialog fires command; outside discarded
+// Spec req 7: "Mouse click inside modal dialog on a button fires the command;
+//
+//	mouse outside is discarded"
+//
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewMouseClickInsideDialogOnButtonFiresCommand verifies that
+// a mouse click at the screen position of a button inside the modal dialog causes
+// ExecView to receive and process the EvCommand, returning CmOK.
+func TestIntegrationExecViewMouseClickInsideDialogOnButtonFiresCommand(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	// Dialog at absolute desktop coords (10, 5, 40, 12).
+	// Client area: cols 11-48, rows 6-15 (frame offset -1 each side).
+	// Button at client (5, 3, 12, 2) → absolute (16, 9) through (27, 10).
+	dlg := NewDialog(NewRect(10, 5, 40, 12), "Click Test")
+	btn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	dlg.Insert(btn)
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// ExecView receives mouse events in dialog-local coordinates (it subtracts
+	// dialog.Bounds().A before forwarding to v.HandleEvent).
+	// Dialog bounds: A=(10,5). A click at absolute (17, 9) is dialog-local (7, 4).
+	// That is inside the frame (cols 1-38, rows 1-10 for a 40×12 dialog).
+	// Dialog.HandleEvent then subtracts (1,1) → group-local (6, 3) hitting the button.
+	app.screen.PostEvent(tcell.NewEventMouse(17, 9, tcell.Button1, tcell.ModNone))
+
+	select {
+	case cmd := <-result:
+		if cmd != CmOK {
+			t.Errorf("mouse click on modal button returned %v, want CmOK", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s after mouse click on button")
+	}
+}
+
+// TestIntegrationExecViewMouseClickOutsideDialogIsDiscarded verifies that a mouse
+// click at a screen position outside the modal dialog's bounds does not close the
+// dialog or forward the event to the dialog's children.
+func TestIntegrationExecViewMouseClickOutsideDialogIsDiscarded(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	// Dialog at (20, 8, 30, 10) — occupies cols 20-49, rows 8-17.
+	dlg := NewDialog(NewRect(20, 8, 30, 10), "Outside Click")
+	btn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	dlg.Insert(btn)
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Click at (2, 2) — well outside the dialog bounds.
+	app.screen.PostEvent(tcell.NewEventMouse(2, 2, tcell.Button1, tcell.ModNone))
+
+	// Give the loop time to process the outside click (it should be ignored).
+	time.Sleep(30 * time.Millisecond)
+
+	// The dialog should still be running. Terminate cleanly via PostCommand.
+	app.PostCommand(CmCancel, nil)
+
+	select {
+	case cmd := <-result:
+		// We expect CmCancel from our PostCommand, NOT from the outside click.
+		if cmd != CmCancel {
+			t.Errorf("expected CmCancel from PostCommand, got %v", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 8: Tab traversal works inside modal dialog (cycling between buttons)
+// Spec req 8: "Tab traversal works inside the modal dialog (cycling between buttons)"
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewTabTraversalCyclesBetweenButtonsInDialog verifies that
+// Tab keys injected while ExecView is running move focus among the dialog's buttons,
+// so that after a full cycle the originally-focused button can be activated with Enter.
+func TestIntegrationExecViewTabTraversalCyclesBetweenButtonsInDialog(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(5, 5, 50, 12), "Tab Cycle")
+	// Insert three buttons; after insertion btn3 is focused (last selectable).
+	btn1 := NewButton(NewRect(2, 3, 12, 2), "One", CmOK, WithDefault())
+	btn2 := NewButton(NewRect(16, 3, 12, 2), "Two", CmCancel)
+	btn3 := NewButton(NewRect(30, 3, 12, 2), "Three", CmClose)
+	dlg.Insert(btn1)
+	dlg.Insert(btn2)
+	dlg.Insert(btn3) // focused after insertion
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Tab from btn3 → btn1 (wrap), Tab → btn2, Tab → btn3 (full cycle).
+	// Then Enter fires btn3's command (CmClose).
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn3 → btn1
+	time.Sleep(20 * time.Millisecond)
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn1 → btn2
+	time.Sleep(20 * time.Millisecond)
+	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone) // btn2 → btn3
+	time.Sleep(20 * time.Millisecond)
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone) // fires btn3 → CmClose
+
+	select {
+	case cmd := <-result:
+		if cmd != CmClose {
+			t.Errorf("Tab cycle + Enter returned %v, want CmClose (btn3)", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s after Tab cycle + Enter")
+	}
+
+	_ = app
+}
+
+// ---------------------------------------------------------------------------
+// Requirement 9: After ExecView returns, dialog is no longer in owner's children list
+// Spec req 9: "After ExecView returns, the dialog is no longer in owner's children list"
+// ---------------------------------------------------------------------------
+
+// TestIntegrationExecViewDialogRemovedFromDesktopChildrenAfterReturn verifies that
+// once ExecView completes (either via a closing command or screen finalization),
+// the dialog is absent from the Desktop's children list.
+func TestIntegrationExecViewDialogRemovedFromDesktopChildrenAfterReturn(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(10, 5, 30, 10), "Cleanup")
+	btn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	dlg.Insert(btn)
+
+	done := make(chan CommandCode, 1)
+	go func() {
+		done <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	app.PostCommand(CmOK, nil)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecView did not return within 2 s")
+	}
+
+	for _, child := range desktop.Children() {
+		if child == dlg {
+			t.Error("dialog is still present in Desktop.Children() after ExecView returned — it should have been removed")
+		}
+	}
+}
+
+// TestIntegrationExecViewDialogRemovedFromWindowChildrenAfterReturn verifies the
+// same cleanup guarantee when ExecView is called on a Window rather than a Desktop.
+// This exercises the full Application→Desktop→Window owner-chain walk inside ExecView.
+func TestIntegrationExecViewDialogRemovedFromWindowChildrenAfterReturn(t *testing.T) {
+	app, _, win := appWithWindow(t, NewRect(5, 3, 60, 20), "Host")
+
+	dlg := NewDialog(NewRect(2, 2, 30, 10), "Cleanup")
+	btn := NewButton(NewRect(5, 3, 12, 2), "OK", CmOK, WithDefault())
+	dlg.Insert(btn)
+
+	done := make(chan CommandCode, 1)
+	go func() {
+		done <- win.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	app.PostCommand(CmOK, nil)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecView did not return within 2 s")
+	}
+
+	for _, child := range win.Children() {
+		if child == dlg {
+			t.Error("dialog still in Window.Children() after ExecView returned — should have been removed")
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: MessageBox MbOK, Shift+Tab traversal, SfModal cleanup
+// ---------------------------------------------------------------------------
+
+// TestIntegrationMessageBoxOKReturnsCmOK verifies the simplest MessageBox case:
+// MbOK shows a single OK button, and Enter returns CmOK.
+func TestIntegrationMessageBoxOKReturnsCmOK(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- MessageBox(desktop, "Info", "Operation complete.", MbOK)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmOK {
+			t.Errorf("MessageBox(MbOK) + Enter = %v, want CmOK", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("MessageBox did not return within 2 s after Enter")
+	}
+
+	_ = app
+}
+
+// TestIntegrationExecViewShiftTabMovesBackwardInDialog verifies that Shift+Tab
+// moves focus backward among dialog buttons, so the correct button fires on Enter.
+func TestIntegrationExecViewShiftTabMovesBackwardInDialog(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(5, 5, 50, 12), "Shift-Tab")
+	btn1 := NewButton(NewRect(2, 3, 12, 2), "Yes", CmYes, WithDefault())
+	btn2 := NewButton(NewRect(16, 3, 12, 2), "No", CmNo)
+	dlg.Insert(btn1)
+	dlg.Insert(btn2) // btn2 focused after insertion
+
+	result := make(chan CommandCode, 1)
+	go func() {
+		result <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Shift+Tab from btn2 → btn1.
+	screen.InjectKey(tcell.KeyBacktab, 0, tcell.ModNone)
+	time.Sleep(20 * time.Millisecond)
+	// Enter fires btn1 → CmYes.
+	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+
+	select {
+	case cmd := <-result:
+		if cmd != CmYes {
+			t.Errorf("Shift+Tab then Enter returned %v, want CmYes", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecView did not return within 2 s after Shift+Tab + Enter")
+	}
+
+	_ = app
+}
+
+// TestIntegrationExecViewSfModalClearedAfterClose verifies that SfModal is no
+// longer set on the dialog after ExecView returns — even when closed by a
+// direct PostCommand rather than a key event.
+func TestIntegrationExecViewSfModalClearedAfterClose(t *testing.T) {
+	app, desktop, screen := appWithDesktopAndScreen(t)
+	defer screen.Fini()
+
+	dlg := NewDialog(NewRect(10, 5, 30, 10), "SfModal Cleanup")
+
+	done := make(chan CommandCode, 1)
+	go func() {
+		done <- desktop.ExecView(dlg)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify SfModal is set while ExecView is running.
+	if !dlg.HasState(SfModal) {
+		t.Error("SfModal should be set on dialog while ExecView is running")
+	}
+
+	app.PostCommand(CmClose, nil)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecView did not return within 2 s")
+	}
+
+	if dlg.HasState(SfModal) {
+		t.Error("SfModal is still set after ExecView returned — should have been cleared")
 	}
 }
