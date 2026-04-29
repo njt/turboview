@@ -23,7 +23,17 @@ func NewStatusItem(label string, kb KeyBinding, cmd CommandCode) *StatusItem {
 
 type StatusLine struct {
 	BaseView
-	items []*StatusItem
+	items     []*StatusItem
+	activeCtx HelpContext
+}
+
+func (si *StatusItem) ForHelpCtx(hc HelpContext) *StatusItem {
+	si.HelpCtx = hc
+	return si
+}
+
+func (sl *StatusLine) SetActiveContext(hc HelpContext) {
+	sl.activeCtx = hc
 }
 
 func NewStatusLine(items ...*StatusItem) *StatusLine {
@@ -46,10 +56,15 @@ func (sl *StatusLine) Draw(buf *DrawBuffer) {
 	buf.Fill(NewRect(0, 0, w, 1), ' ', normalStyle)
 
 	x := 1
-	for i, item := range sl.items {
-		if i > 0 {
+	first := true
+	for _, item := range sl.items {
+		if item.HelpCtx != HcNoContext && item.HelpCtx != sl.activeCtx {
+			continue
+		}
+		if !first {
 			x += 2
 		}
+		first = false
 		segments := ParseTildeLabel(item.Label)
 		for _, seg := range segments {
 			style := normalStyle
@@ -67,6 +82,9 @@ func (sl *StatusLine) HandleEvent(event *Event) {
 		return
 	}
 	for _, item := range sl.items {
+		if item.HelpCtx != HcNoContext && item.HelpCtx != sl.activeCtx {
+			continue
+		}
 		if item.KeyBinding.Matches(event.Key) {
 			event.What = EvCommand
 			event.Command = item.Command

@@ -183,9 +183,38 @@ func (app *Application) Draw(buf *DrawBuffer) {
 	}
 
 	if app.statusLine != nil && h > 0 {
+		app.statusLine.SetActiveContext(app.resolveHelpCtx())
 		statusBuf := buf.SubBuffer(NewRect(0, h-1, w, 1))
 		app.statusLine.Draw(statusBuf)
 	}
+}
+
+func (app *Application) resolveHelpCtx() HelpContext {
+	if app.desktop == nil {
+		return HcNoContext
+	}
+	type helpCtxer interface {
+		HelpCtx() HelpContext
+	}
+	ctx := HcNoContext
+	var current View = app.desktop
+	for {
+		if h, ok := current.(helpCtxer); ok {
+			if hc := h.HelpCtx(); hc != HcNoContext {
+				ctx = hc
+			}
+		}
+		c, ok := current.(Container)
+		if !ok {
+			break
+		}
+		focused := c.FocusedChild()
+		if focused == nil {
+			break
+		}
+		current = focused
+	}
+	return ctx
 }
 
 func (app *Application) layoutChildren() {
