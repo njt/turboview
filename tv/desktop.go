@@ -48,5 +48,31 @@ func (d *Desktop) Draw(buf *DrawBuffer) {
 }
 
 func (d *Desktop) HandleEvent(event *Event) {
+	if event.What == EvMouse && event.Mouse != nil {
+		d.routeMouseEvent(event)
+		return
+	}
 	d.group.HandleEvent(event)
+}
+
+func (d *Desktop) routeMouseEvent(event *Event) {
+	mx, my := event.Mouse.X, event.Mouse.Y
+
+	children := d.group.Children()
+	for i := len(children) - 1; i >= 0; i-- {
+		child := children[i]
+		if !child.HasState(SfVisible) {
+			continue
+		}
+		bounds := child.Bounds()
+		if bounds.Contains(NewPoint(mx, my)) {
+			if child.HasOption(OfTopSelect) && event.Mouse.Button&tcell.Button1 != 0 {
+				d.BringToFront(child)
+			}
+			event.Mouse.X -= bounds.A.X
+			event.Mouse.Y -= bounds.A.Y
+			child.HandleEvent(event)
+			return
+		}
+	}
 }

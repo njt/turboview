@@ -168,6 +168,14 @@ func (app *Application) layoutChildren() {
 }
 
 func (app *Application) handleEvent(event *Event) {
+	if event.What == EvMouse && event.Mouse != nil {
+		app.routeMouseEvent(event)
+		if !event.IsCleared() && event.What == EvCommand {
+			app.handleCommand(event)
+		}
+		return
+	}
+
 	if app.statusLine != nil {
 		app.statusLine.HandleEvent(event)
 	}
@@ -176,11 +184,40 @@ func (app *Application) handleEvent(event *Event) {
 		app.desktop.HandleEvent(event)
 	}
 
-	if !event.IsCleared() && event.What == EvCommand {
+	if !event.IsCleared() {
+		app.handleCommand(event)
+	}
+}
+
+func (app *Application) handleCommand(event *Event) {
+	if event.What == EvCommand {
 		switch event.Command {
 		case CmQuit:
 			app.quit = true
 			event.Clear()
+		}
+	}
+}
+
+func (app *Application) routeMouseEvent(event *Event) {
+	mx, my := event.Mouse.X, event.Mouse.Y
+
+	if app.statusLine != nil {
+		slBounds := app.statusLine.Bounds()
+		if slBounds.Contains(NewPoint(mx, my)) {
+			event.Mouse.X -= slBounds.A.X
+			event.Mouse.Y -= slBounds.A.Y
+			app.statusLine.HandleEvent(event)
+			return
+		}
+	}
+
+	if app.desktop != nil {
+		dBounds := app.desktop.Bounds()
+		if dBounds.Contains(NewPoint(mx, my)) {
+			event.Mouse.X -= dBounds.A.X
+			event.Mouse.Y -= dBounds.A.Y
+			app.desktop.HandleEvent(event)
 		}
 	}
 }

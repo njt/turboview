@@ -149,5 +149,24 @@ func (w *Window) Draw(buf *DrawBuffer) {
 }
 
 func (w *Window) HandleEvent(event *Event) {
+	if event.What == EvMouse && event.Mouse != nil {
+		w.handleMouseEvent(event)
+		return
+	}
 	w.group.HandleEvent(event)
+}
+
+func (w *Window) handleMouseEvent(event *Event) {
+	mx, my := event.Mouse.X, event.Mouse.Y
+	width, height := w.Bounds().Width(), w.Bounds().Height()
+
+	// Client area: forward to group with translated coordinates
+	if mx > 0 && mx < width-1 && my > 0 && my < height-1 {
+		event.Mouse.X -= 1
+		event.Mouse.Y -= 1
+		w.group.HandleEvent(event)
+		return
+	}
+
+	// Frame clicks handled in Task 5
 }
