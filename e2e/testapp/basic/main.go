@@ -11,6 +11,7 @@ func main() {
 	statusLine := tv.NewStatusLine(
 		tv.NewStatusItem("~Alt+X~ Exit", tv.KbAlt('X'), tv.CmQuit),
 		tv.NewStatusItem("~F2~ Dialog", tv.KbFunc(2), tv.CmUser),
+		tv.NewStatusItem("~F3~ Input", tv.KbFunc(3), tv.CmUser+10),
 		tv.NewStatusItem("~F10~ Menu", tv.KbFunc(10), tv.CmMenu),
 	)
 
@@ -27,6 +28,8 @@ func main() {
 		),
 	)
 
+	st := tv.NewStaticText(tv.NewRect(1, 1, 30, 1), "Press F2 for dialog")
+
 	var app *tv.Application
 	var err error
 
@@ -42,6 +45,13 @@ func main() {
 				}
 				return true
 			}
+			if cmd == tv.CmUser+10 {
+				text, result := tv.InputBox(app.Desktop(), "Open File", "~N~ame:", "untitled.txt")
+				if result == tv.CmOK {
+					st.SetText("File: " + text)
+				}
+				return true
+			}
 			return false
 		}),
 	)
@@ -50,12 +60,15 @@ func main() {
 	}
 
 	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 15), "File Manager", tv.WithWindowNumber(1))
-	st := tv.NewStaticText(tv.NewRect(1, 1, 30, 1), "Press F2 for dialog")
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
 	win1.Insert(btnOK)
 	btnClose := tv.NewButton(tv.NewRect(15, 3, 12, 2), "Close", tv.CmClose)
 	win1.Insert(btnClose)
+	checkBoxes := tv.NewCheckBoxes(tv.NewRect(1, 5, 25, 3), []string{"~R~ead only", "~H~idden", "~S~ystem"})
+	win1.Insert(checkBoxes)
+	radioButtons := tv.NewRadioButtons(tv.NewRect(1, 9, 25, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
+	win1.Insert(radioButtons)
 
 	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
 

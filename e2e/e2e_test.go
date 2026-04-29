@@ -355,3 +355,154 @@ func TestMenuSelectExit(t *testing.T) {
 		t.Error("app did not exit after selecting Exit from File menu")
 	}
 }
+
+func TestInputBoxFlow(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-inputbox"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Press F3 to open the InputBox dialog
+	tmuxSendKeys(t, session, "F3")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// "Name:" prompt should be visible in the dialog
+	if !containsAny(lines, "Name:") {
+		t.Error("InputBox prompt 'Name:' not found after F3")
+	}
+
+	// Select all existing text (Ctrl+A) then type new filename as literal text
+	tmuxSendKeys(t, session, "C-a")
+	tmuxType(t, session, "test.go")
+	// Press Enter — passes through InputLine to default OK button
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Dialog should be gone — "Name:" no longer visible
+	if containsAny(lines, "Name:") {
+		t.Error("InputBox dialog still visible after pressing Enter")
+	}
+
+	// Static text should now show "File: test.go"
+	if !containsAny(lines, "File: test.go") {
+		t.Error("static text 'File: test.go' not found after confirming InputBox")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestCheckBoxVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-checkbox"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// CheckBox indicators "[ ]" should be visible in win1
+	if !containsAny(lines, "[ ]") {
+		t.Error("checkbox indicator '[ ]' not found in rendered output")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestRadioButtonVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-radio"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// First radio button is selected by default — "(*)" should be visible
+	if !containsAny(lines, "(*)") {
+		t.Error("radio button indicator '(*)' not found in rendered output")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestInputBoxCancel(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-inputcancel"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Press F3 to open the InputBox dialog
+	tmuxSendKeys(t, session, "F3")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Dialog should be open — "Name:" prompt visible
+	if !containsAny(lines, "Name:") {
+		t.Error("InputBox prompt 'Name:' not found after F3")
+	}
+
+	// Tab twice to move focus past the InputLine and OK button to the Cancel button,
+	// then press Enter to activate Cancel (there is no Escape handler in the dialog).
+	tmuxSendKeys(t, session, "Tab")
+	tmuxSendKeys(t, session, "Tab")
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Dialog should be gone
+	if containsAny(lines, "Name:") {
+		t.Error("InputBox dialog still visible after pressing Cancel")
+	}
+
+	// App should still be running — desktop pattern visible
+	if !containsAny(lines, "░") {
+		t.Error("desktop pattern not visible after cancelling InputBox — app may have crashed")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}

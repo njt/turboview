@@ -28,6 +28,15 @@ func tmuxSendKeys(t *testing.T, session string, keys ...string) {
 	time.Sleep(300 * time.Millisecond)
 }
 
+// tmuxType sends a literal string to the tmux session without key-name interpretation.
+func tmuxType(t *testing.T, session string, text string) {
+	t.Helper()
+	if err := exec.Command("tmux", "send-keys", "-t", session, "-l", text).Run(); err != nil {
+		t.Fatalf("failed to type text: %v", err)
+	}
+	time.Sleep(300 * time.Millisecond)
+}
+
 func tmuxCapture(t *testing.T, session string) []string {
 	t.Helper()
 	out, err := exec.Command("tmux", "capture-pane", "-t", session, "-p").Output()
