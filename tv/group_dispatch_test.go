@@ -379,22 +379,28 @@ func TestMouseEventPreprocessChildNotCalled(t *testing.T) {
 	}
 }
 
-// TestMouseEventPostprocessChildNotCalled verifies OfPostProcess children are
-// completely bypassed for mouse events.
-// Spec: "Mouse events (EvMouse) skip three-phase dispatch."
-func TestMouseEventPostprocessChildNotCalled(t *testing.T) {
+// TestMouseEventUsesPositionalRoutingNotThreePhase verifies mouse events use
+// positional routing (topmost visible child at the point) rather than
+// three-phase dispatch. A postprocess child at the same bounds is the topmost
+// child and receives the event via positional routing.
+// Spec: "Mouse events use positional routing, not three-phase dispatch."
+func TestMouseEventUsesPositionalRoutingNotThreePhase(t *testing.T) {
 	g := NewGroup(NewRect(0, 0, 80, 25))
 	focused := newSelectablePhaseView("focused", defaultBounds())
 	post := newPhaseView("post", defaultBounds())
 	post.SetOptions(OfPostProcess, true)
+	post.SetState(SfVisible, true)
 
 	g.Insert(focused)
-	g.Insert(post)
+	g.Insert(post) // topmost — positional routing picks this one
 
 	g.HandleEvent(&Event{What: EvMouse, Mouse: &MouseEvent{}})
 
-	if post.handleCount != 0 {
-		t.Errorf("postprocess child handleCount = %d, want 0 for mouse event", post.handleCount)
+	if post.handleCount != 1 {
+		t.Errorf("topmost child handleCount = %d, want 1 via positional routing", post.handleCount)
+	}
+	if focused.handleCount != 0 {
+		t.Errorf("focused child handleCount = %d, want 0 (not topmost at point)", focused.handleCount)
 	}
 }
 

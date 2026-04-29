@@ -213,10 +213,20 @@ func (g *Group) HandleEvent(event *Event) {
 		return
 	}
 
-	// Mouse events: forward to focused child (positional routing done by caller)
+	// Mouse events: positional routing, back-to-front
 	if event.What == EvMouse {
-		if g.focused != nil {
-			g.focused.HandleEvent(event)
+		mx, my := event.Mouse.X, event.Mouse.Y
+		for i := len(g.children) - 1; i >= 0; i-- {
+			child := g.children[i]
+			if !child.HasState(SfVisible) {
+				continue
+			}
+			if child.Bounds().Contains(NewPoint(mx, my)) {
+				event.Mouse.X -= child.Bounds().A.X
+				event.Mouse.Y -= child.Bounds().A.Y
+				child.HandleEvent(event)
+				return
+			}
 		}
 		return
 	}
