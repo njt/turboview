@@ -51,16 +51,17 @@ func WithConfigFile(path string) AppOption {
 }
 
 type Application struct {
-	bounds     Rect
-	screen     tcell.Screen
-	screenOwn  bool
-	desktop    *Desktop
-	statusLine *StatusLine
-	menuBar    *MenuBar
-	scheme     *theme.ColorScheme
-	configFile string
-	quit       bool
-	onCommand  func(CommandCode, any) bool
+	bounds       Rect
+	screen       tcell.Screen
+	screenOwn    bool
+	desktop      *Desktop
+	statusLine   *StatusLine
+	menuBar      *MenuBar
+	scheme       *theme.ColorScheme
+	configFile   string
+	quit         bool
+	onCommand    func(CommandCode, any) bool
+	contextPopup *MenuPopup
 }
 
 func NewApplication(opts ...AppOption) (*Application, error) {
@@ -208,6 +209,62 @@ func (app *Application) Draw(buf *DrawBuffer) {
 		statusBuf := buf.SubBuffer(NewRect(0, h-1, w, 1))
 		app.statusLine.Draw(statusBuf)
 	}
+
+	if app.contextPopup != nil {
+		pb := app.contextPopup.Bounds()
+		app.contextPopup.Draw(buf.SubBuffer(pb), app.scheme)
+	}
+}
+
+func (app *Application) ContextMenu(x, y int, items ...any) CommandCode {
+	popup := NewMenuPopup(items, x, y)
+	app.contextPopup = popup
+	app.drawAndFlush()
+
+	var result CommandCode
+	for result == 0 {
+		event := app.PollEvent()
+		if event == nil {
+			result = CmCancel
+			break
+		}
+
+		if event.What == EvKeyboard && event.Key != nil {
+			popup.HandleEvent(event)
+			if r := popup.Result(); r != 0 {
+				result = r
+				break
+			}
+		} else if event.What == EvMouse && event.Mouse != nil {
+			pb := popup.Bounds()
+			mx, my := event.Mouse.X, event.Mouse.Y
+			if pb.Contains(NewPoint(mx, my)) {
+				localEvent := *event
+				localMouse := *event.Mouse
+				localMouse.X = mx - pb.A.X
+				localMouse.Y = my - pb.A.Y
+				localEvent.Mouse = &localMouse
+				popup.HandleEvent(&localEvent)
+				if r := popup.Result(); r != 0 {
+					result = r
+					break
+				}
+			} else if event.Mouse.Button&tcell.Button1 != 0 {
+				result = CmCancel
+				break
+			}
+		}
+
+		app.drawAndFlush()
+	}
+
+	app.contextPopup = nil
+	app.drawAndFlush()
+
+	if result == CmCancel {
+		return CmCancel
+	}
+	return result
 }
 
 func (app *Application) resolveHelpCtx() HelpContext {
