@@ -166,6 +166,14 @@ func (il *InputLine) Draw(buf *DrawBuffer) {
 			buf.WriteChar(cursorCol, 0, ch, selectionStyle)
 		}
 	}
+
+	// Scroll overflow indicators
+	if il.scrollOffset > 0 {
+		buf.WriteChar(0, 0, '◄', selectionStyle)
+	}
+	if il.scrollOffset+w < len(il.text) {
+		buf.WriteChar(w-1, 0, '►', selectionStyle)
+	}
 }
 
 func (il *InputLine) HandleEvent(event *Event) {
@@ -200,6 +208,18 @@ func (il *InputLine) HandleEvent(event *Event) {
 				il.selStart = 0
 				il.selEnd = 0
 			} else {
+				w := il.Bounds().Width()
+				localX := event.Mouse.X - il.Bounds().A.X
+				if localX <= 0 && il.scrollOffset > 0 {
+					il.scrollOffset--
+					col = il.scrollOffset
+				} else if localX >= w-1 && il.scrollOffset+w < len(il.text) {
+					il.scrollOffset++
+					col = il.scrollOffset + w - 1
+				}
+				if col > len(il.text) {
+					col = len(il.text)
+				}
 				il.cursorPos = col
 				il.selStart = il.dragAnchor
 				il.selEnd = il.cursorPos
