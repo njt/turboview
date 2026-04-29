@@ -122,7 +122,11 @@ func (w *Window) Draw(buf *DrawBuffer) {
 
 	// Zoom icon [↑] at (width-4, 0)-(width-2, 0)
 	buf.WriteChar(width-4, 0, '[', frameStyle)
-	buf.WriteChar(width-3, 0, '↑', frameStyle)
+	if w.zoomed {
+		buf.WriteChar(width-3, 0, '↕', frameStyle)
+	} else {
+		buf.WriteChar(width-3, 0, '↑', frameStyle)
+	}
 	buf.WriteChar(width-2, 0, ']', frameStyle)
 
 	// Title centered between icons
@@ -156,17 +160,130 @@ func (w *Window) HandleEvent(event *Event) {
 	w.group.HandleEvent(event)
 }
 
+// IsZoomed returns true if the window is currently zoomed.
+func (w *Window) IsZoomed() bool { return w.zoomed }
+
+// Zoom toggles the window's zoom state. When zooming in the current bounds
+// are stored and the window expands to fill the owner's area; when zooming
+// out the stored bounds are restored.
+func (w *Window) Zoom() {
+	if w.zoomed {
+		w.SetBounds(w.zoomBounds)
+		w.zoomed = false
+	} else {
+		w.zoomBounds = w.Bounds()
+		if owner := w.Owner(); owner != nil {
+			ob := owner.Bounds()
+			w.SetBounds(NewRect(0, 0, ob.Width(), ob.Height()))
+		}
+		w.zoomed = true
+	}
+}
+
 func (w *Window) handleMouseEvent(event *Event) {
 	mx, my := event.Mouse.X, event.Mouse.Y
 	width, height := w.Bounds().Width(), w.Bounds().Height()
 
-	// Client area: forward to group with translated coordinates
+	// During drag: coordinates are in Desktop-local space
+	if w.HasState(SfDragging) {
+		if event.Mouse.Button&tcell.Button1 != 0 {
+			bounds := w.Bounds()
+			newX := mx - w.dragOff.X
+			newY := my - w.dragOff.Y
+			w.SetBounds(NewRect(newX, newY, bounds.Width(), bounds.Height()))
+		} else {
+			w.SetState(SfDragging, false)
+		}
+		event.Clear()
+		return
+	}
+
+	// During resize: coordinates are in Desktop-local space
+	if w.resizing {
+		if event.Mouse.Button&tcell.Button1 != 0 {
+			bounds := w.Bounds()
+			if w.resizeLeft {
+				newX := mx
+				newW := bounds.B.X - newX
+				newH := my - bounds.A.Y + 1
+				if newW < 10 {
+					newW = 10
+					newX = bounds.B.X - newW
+				}
+				if newH < 5 {
+					newH = 5
+				}
+				w.SetBounds(NewRect(newX, bounds.A.Y, newW, newH))
+			} else {
+				newW := mx - bounds.A.X + 1
+				newH := my - bounds.A.Y + 1
+				if newW < 10 {
+					newW = 10
+				}
+				if newH < 5 {
+					newH = 5
+				}
+				w.SetBounds(NewRect(bounds.A.X, bounds.A.Y, newW, newH))
+			}
+		} else {
+			w.resizing = false
+		}
+		event.Clear()
+		return
+	}
+
+	// Frame clicks (window-local coordinates)
+	if event.Mouse.Button&tcell.Button1 != 0 {
+		// Top border
+		if my == 0 {
+			// Close icon [×] at (1-3, 0)
+			if mx >= 1 && mx <= 3 {
+				event.What = EvCommand
+				event.Command = CmClose
+				event.Mouse = nil
+				return
+			}
+			// Zoom icon at (width-4 to width-2, 0)
+			if mx >= width-4 && mx <= width-2 {
+				w.Zoom()
+				event.Clear()
+				return
+			}
+			// Double-click on title bar: zoom
+			if event.Mouse.ClickCount >= 2 {
+				w.Zoom()
+				event.Clear()
+				return
+			}
+			// Title bar: start drag
+			w.SetState(SfDragging, true)
+			w.dragOff = NewPoint(mx, my)
+			event.Clear()
+			return
+		}
+
+		// Bottom-right corner: start resize
+		if mx == width-1 && my == height-1 {
+			w.resizing = true
+			w.resizeLeft = false
+			event.Clear()
+			return
+		}
+
+		// Bottom-left corner: start resize (left edge)
+		if mx == 0 && my == height-1 {
+			w.resizing = true
+			w.resizeLeft = true
+			event.Clear()
+			return
+		}
+	}
+
+	// Client area: forward to group
 	if mx > 0 && mx < width-1 && my > 0 && my < height-1 {
 		event.Mouse.X -= 1
 		event.Mouse.Y -= 1
 		w.group.HandleEvent(event)
 		return
 	}
-
-	// Frame clicks handled in Task 5
 }

@@ -50,14 +50,45 @@ func (d *Desktop) Draw(buf *DrawBuffer) {
 func (d *Desktop) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
 		d.routeMouseEvent(event)
+		// A child may have transformed the mouse event into a command (e.g. CmClose).
+		if event.What == EvCommand && event.Command == CmClose {
+			if focused := d.group.FocusedChild(); focused != nil {
+				d.Remove(focused)
+				event.Clear()
+			}
+		}
 		return
 	}
+
+	// Delegate to group (three-phase dispatch reaches focused child).
 	d.group.HandleEvent(event)
+
+	// After dispatch, handle CmClose at the Desktop level if not yet cleared.
+	if event.What == EvCommand && event.Command == CmClose {
+		if focused := d.group.FocusedChild(); focused != nil {
+			d.Remove(focused)
+			event.Clear()
+		}
+	}
 }
 
 func (d *Desktop) routeMouseEvent(event *Event) {
 	mx, my := event.Mouse.X, event.Mouse.Y
 
+	// Mouse capture: if any child is being dragged or resized,
+	// route all mouse events to it WITHOUT translating coordinates
+	for _, child := range d.group.Children() {
+		if child.HasState(SfDragging) {
+			child.HandleEvent(event)
+			return
+		}
+		if w, ok := child.(*Window); ok && w.resizing {
+			child.HandleEvent(event)
+			return
+		}
+	}
+
+	// Normal hit-testing: front-to-back
 	children := d.group.Children()
 	for i := len(children) - 1; i >= 0; i-- {
 		child := children[i]
