@@ -133,6 +133,9 @@ func TestDialogFlow(t *testing.T) {
 
 	startTmux(t, session, binPath)
 
+	// win2 is focused on startup; switch to win1 (HelpCtx=1) so F2 is active
+	tmuxSendKeys(t, session, "M-1")
+
 	// Press F2 to open dialog
 	tmuxSendKeys(t, session, "F2")
 	lines := tmuxCapture(t, session)
@@ -185,6 +188,9 @@ func TestDialogDismissNoQuit(t *testing.T) {
 	exec.Command("tmux", "kill-session", "-t", session).Run()
 
 	startTmux(t, session, binPath)
+
+	// win2 is focused on startup; switch to win1 (HelpCtx=1) so F2 is active
+	tmuxSendKeys(t, session, "M-1")
 
 	// Press F2 to open dialog
 	tmuxSendKeys(t, session, "F2")
@@ -363,6 +369,9 @@ func TestInputBoxFlow(t *testing.T) {
 	exec.Command("tmux", "kill-session", "-t", session).Run()
 
 	startTmux(t, session, binPath)
+
+	// win2 is focused on startup; switch to win1 (HelpCtx=1) so F3 is active
+	tmuxSendKeys(t, session, "M-1")
 
 	// Press F3 to open the InputBox dialog
 	tmuxSendKeys(t, session, "F3")
@@ -578,6 +587,9 @@ func TestInputBoxCancel(t *testing.T) {
 
 	startTmux(t, session, binPath)
 
+	// win2 is focused on startup; switch to win1 (HelpCtx=1) so F3 is active
+	tmuxSendKeys(t, session, "M-1")
+
 	// Press F3 to open the InputBox dialog
 	tmuxSendKeys(t, session, "F3")
 	time.Sleep(500 * time.Millisecond)
@@ -609,6 +621,92 @@ func TestInputBoxCancel(t *testing.T) {
 	}
 
 	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestHelpContextFiltering(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-helpctx"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// win2 gets focus last (inserted after win1), so it is the focused window at startup.
+	lines := tmuxCapture(t, session)
+
+	// Alt+X is a global item (no HelpCtx) — must always be visible
+	if !containsAny(lines, "Alt+X") {
+		t.Error("status line should always show 'Alt+X' (global item)")
+	}
+
+	// win2 has HelpCtx=2 so F4 Search should be visible
+	if !containsAny(lines, "Search") {
+		t.Error("status line should show 'Search' when win2 (HelpCtx=2) is focused")
+	}
+
+	// F2 Dialog is HelpCtx=1 — should NOT appear when win2 is focused
+	if containsAny(lines, "Dialog") {
+		t.Error("status line should NOT show 'Dialog' when win2 (HelpCtx=2) is focused")
+	}
+
+	// Switch to win1 using Alt+1
+	tmuxSendKeys(t, session, "M-1")
+
+	lines = tmuxCapture(t, session)
+
+	// win1 has HelpCtx=1 so F2 Dialog should now be visible
+	if !containsAny(lines, "Dialog") {
+		t.Error("status line should show 'Dialog' when win1 (HelpCtx=1) is focused")
+	}
+
+	// F4 Search is HelpCtx=2 — should NOT appear when win1 is focused
+	if containsAny(lines, "Search") {
+		t.Error("status line should NOT show 'Search' when win1 (HelpCtx=1) is focused")
+	}
+
+	// Alt+X exits cleanly
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestThemeRegistration(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-themes"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// If any theme init() panicked the app would not have started; verify it booted.
+	lines := tmuxCapture(t, session)
+
+	if !containsAny(lines, "░") {
+		t.Error("desktop background pattern '░' not found — app may have failed to start")
+	}
+
+	// Alt+X exits cleanly
 	tmuxSendKeys(t, session, "M-x")
 	exited := false
 	for i := 0; i < 15; i++ {

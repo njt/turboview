@@ -12,8 +12,9 @@ import (
 func main() {
 	statusLine := tv.NewStatusLine(
 		tv.NewStatusItem("~Alt+X~ Exit", tv.KbAlt('X'), tv.CmQuit),
-		tv.NewStatusItem("~F2~ Dialog", tv.KbFunc(2), tv.CmUser),
-		tv.NewStatusItem("~F3~ Input", tv.KbFunc(3), tv.CmUser+10),
+		tv.NewStatusItem("~F2~ Dialog", tv.KbFunc(2), tv.CmUser).ForHelpCtx(1),
+		tv.NewStatusItem("~F3~ Input", tv.KbFunc(3), tv.CmUser+10).ForHelpCtx(1),
+		tv.NewStatusItem("~F4~ Search", tv.KbFunc(4), tv.CmUser+20).ForHelpCtx(2),
 		tv.NewStatusItem("~F10~ Menu", tv.KbFunc(10), tv.CmMenu),
 	)
 
@@ -98,6 +99,9 @@ func main() {
 
 	win2.Insert(lv)
 	win2.Insert(sb)
+
+	win1.SetHelpCtx(1)
+	win2.SetHelpCtx(2)
 
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win2)
