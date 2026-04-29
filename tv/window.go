@@ -163,6 +163,13 @@ func (w *Window) HandleEvent(event *Event) {
 		w.handleMouseEvent(event)
 		return
 	}
+
+	// Modal window: CmClose → CmCancel
+	if event.What == EvCommand && event.Command == CmClose && w.HasState(SfModal) {
+		event.Command = CmCancel
+		return
+	}
+
 	w.group.HandleEvent(event)
 }
 
