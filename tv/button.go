@@ -32,6 +32,7 @@ func NewButton(bounds Rect, title string, command CommandCode, opts ...ButtonOpt
 	for _, opt := range opts {
 		opt(b)
 	}
+	b.SetSelf(b)
 	return b
 }
 

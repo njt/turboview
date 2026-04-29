@@ -35,6 +35,7 @@ func NewRadioButton(bounds Rect, label string) *RadioButton {
 		}
 	}
 
+	rb.SetSelf(rb)
 	return rb
 }
 
@@ -153,6 +154,7 @@ func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 		rbs.items[0].selected = true
 	}
 
+	rbs.SetSelf(rbs)
 	return rbs
 }
 

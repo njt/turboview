@@ -25,6 +25,7 @@ func NewScrollBar(bounds Rect, orientation Orientation) *ScrollBar {
 	sb := &ScrollBar{orientation: orientation}
 	sb.SetBounds(bounds)
 	sb.SetState(SfVisible, true)
+	sb.SetSelf(sb)
 	return sb
 }
 

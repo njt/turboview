@@ -33,6 +33,7 @@ func NewLabel(bounds Rect, label string, link View) *Label {
 		}
 	}
 
+	l.SetSelf(l)
 	return l
 }
 

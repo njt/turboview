@@ -13,6 +13,7 @@ func NewStaticText(bounds Rect, text string) *StaticText {
 	st := &StaticText{text: text}
 	st.SetBounds(bounds)
 	st.SetState(SfVisible, true)
+	st.SetSelf(st)
 	return st
 }
 

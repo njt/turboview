@@ -26,6 +26,7 @@ func NewInputLine(bounds Rect, maxLen int, opts ...InputLineOption) *InputLine {
 	for _, opt := range opts {
 		opt(il)
 	}
+	il.SetSelf(il)
 	return il
 }
 

@@ -34,6 +34,7 @@ func NewListViewer(bounds Rect, dataSource ListDataSource) *ListViewer {
 	lv.SetBounds(bounds)
 	lv.SetState(SfVisible, true)
 	lv.SetOptions(OfSelectable, true)
+	lv.SetSelf(lv)
 	return lv
 }
 

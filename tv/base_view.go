@@ -1,6 +1,9 @@
 package tv
 
-import "github.com/njt/turboview/theme"
+import (
+	"github.com/gdamore/tcell/v2"
+	"github.com/njt/turboview/theme"
+)
 
 type ViewState uint16
 
@@ -77,10 +80,25 @@ type BaseView struct {
 	owner     Container
 	scheme    *theme.ColorScheme
 	helpCtx   HelpContext
+	self      View
 }
 
-func (b *BaseView) Draw(buf *DrawBuffer)        {}
-func (b *BaseView) HandleEvent(event *Event)     {}
+func (b *BaseView) SetSelf(v View) { b.self = v }
+
+func (b *BaseView) Draw(buf *DrawBuffer) {}
+func (b *BaseView) HandleEvent(event *Event) {
+	if event.What == EvMouse && event.Mouse != nil {
+		realButtons := event.Mouse.Button & (tcell.Button1 | tcell.Button2 | tcell.Button3)
+		if realButtons != 0 && !b.HasState(SfSelected) && !b.HasState(SfDisabled) && b.HasOption(OfSelectable) && b.self != nil {
+			if b.owner != nil {
+				b.owner.SetFocusedChild(b.self)
+			}
+			if !b.HasOption(OfFirstClick) {
+				event.Clear()
+			}
+		}
+	}
+}
 
 func (b *BaseView) Bounds() Rect {
 	return Rect{

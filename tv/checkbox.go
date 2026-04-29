@@ -36,6 +36,7 @@ func NewCheckBox(bounds Rect, label string) *CheckBox {
 		}
 	}
 
+	cb.SetSelf(cb)
 	return cb
 }
 
@@ -138,6 +139,7 @@ func NewCheckBoxes(bounds Rect, labels []string) *CheckBoxes {
 		cbs.group.Insert(cb)
 	}
 
+	cbs.SetSelf(cbs)
 	return cbs
 }
 
