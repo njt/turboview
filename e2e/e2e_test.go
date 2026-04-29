@@ -773,6 +773,95 @@ func TestTerminalResize(t *testing.T) {
 	}
 }
 
+func TestDialogEscapeDismiss(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-dlg-esc"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1 (HelpCtx=1) so F2 is active
+	tmuxSendKeys(t, session, "M-1")
+
+	// Press F2 to open the "Confirm" dialog
+	tmuxSendKeys(t, session, "F2")
+	lines := tmuxCapture(t, session)
+
+	if !containsAny(lines, "Confirm") {
+		t.Fatal("dialog title 'Confirm' not found after F2")
+	}
+
+	// Press Escape — Dialog.HandleEvent converts KeyEscape → CmCancel → ExecView exits
+	tmuxSendKeys(t, session, "Escape")
+	lines = tmuxCapture(t, session)
+
+	// Dialog should be gone
+	if containsAny(lines, "Confirm") {
+		t.Error("dialog 'Confirm' still visible after pressing Escape — Escape should dismiss the dialog")
+	}
+
+	// App should still be running (Escape = cancel, not quit)
+	if !containsAny(lines, "░") {
+		t.Error("desktop pattern not visible after Escape-dismissing dialog — app may have crashed")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestTabFocusNavigation(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-tabfocus"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1 which has buttons, checkboxes, and radio buttons
+	tmuxSendKeys(t, session, "M-1")
+
+	// Tab cycles through win1's widgets. When a button gets focus it renders ►.
+	tmuxSendKeys(t, session, "Tab")
+	lines := tmuxCapture(t, session)
+
+	focusIndicator := false
+	for _, line := range lines {
+		if strings.Contains(line, "►") {
+			focusIndicator = true
+			break
+		}
+	}
+	if !focusIndicator {
+		t.Error("focus indicator '►' not found after Tab in win1 — Tab focus navigation may not be working")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
 func TestContextMenuSmoke(t *testing.T) {
 	binPath := buildBasicApp(t)
 
