@@ -2,6 +2,7 @@ package tv
 
 import (
 	"fmt"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v2"
@@ -43,10 +44,8 @@ func FormatAccel(kb KeyBinding) string {
 		ch := rune(kb.Key) + 'A' - 1
 		return fmt.Sprintf("Ctrl+%c", ch)
 	}
-	// KbAlt stores Key as tcell.KeyRune and Rune as unicode.ToLower(ch).
-	// Spec does not require uppercase for Alt; preserve the stored rune as-is.
 	if kb.Mod&tcell.ModAlt != 0 && kb.Key == tcell.KeyRune {
-		return fmt.Sprintf("Alt+%c", kb.Rune)
+		return fmt.Sprintf("Alt+%c", unicode.ToUpper(kb.Rune))
 	}
 	if kb.Key >= tcell.KeyF1 && kb.Key <= tcell.KeyF12 {
 		n := int(kb.Key-tcell.KeyF1) + 1
