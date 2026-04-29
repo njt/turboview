@@ -66,6 +66,9 @@ func (lv *ListViewer) SetDataSource(ds ListDataSource) {
 }
 
 func (lv *ListViewer) SetScrollBar(sb *ScrollBar) {
+	if lv.scrollBar != nil {
+		lv.scrollBar.OnChange = nil
+	}
 	lv.scrollBar = sb
 	if sb != nil {
 		sb.OnChange = func(val int) {
