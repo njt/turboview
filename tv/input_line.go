@@ -14,6 +14,7 @@ type InputLine struct {
 	scrollOffset int
 	selStart     int
 	selEnd       int
+	overwrite    bool
 }
 
 type InputLineOption func(*InputLine)
@@ -33,6 +34,7 @@ func NewInputLine(bounds Rect, maxLen int, opts ...InputLineOption) *InputLine {
 func (il *InputLine) Text() string          { return string(il.text) }
 func (il *InputLine) CursorPos() int        { return il.cursorPos }
 func (il *InputLine) Selection() (int, int) { return il.selStart, il.selEnd }
+func (il *InputLine) Overwrite() bool       { return il.overwrite }
 
 func (il *InputLine) SetText(s string) {
 	runes := []rune(s)
@@ -83,6 +85,37 @@ func (il *InputLine) adjustScroll() {
 	if il.cursorPos < il.scrollOffset {
 		il.scrollOffset = il.cursorPos
 	}
+}
+
+// wordLeft returns the start of the word to the left of pos.
+func (il *InputLine) wordLeft(pos int) int {
+	if pos <= 0 {
+		return 0
+	}
+	i := pos - 1
+	for i > 0 && il.text[i] == ' ' {
+		i--
+	}
+	for i > 0 && il.text[i-1] != ' ' {
+		i--
+	}
+	return i
+}
+
+// wordRight returns the start of the next word to the right of pos.
+func (il *InputLine) wordRight(pos int) int {
+	n := len(il.text)
+	if pos >= n {
+		return n
+	}
+	i := pos
+	for i < n && il.text[i] != ' ' {
+		i++
+	}
+	for i < n && il.text[i] == ' ' {
+		i++
+	}
+	return i
 }
 
 func (il *InputLine) Draw(buf *DrawBuffer) {
@@ -160,7 +193,23 @@ func (il *InputLine) HandleEvent(event *Event) {
 
 		switch ke.Key {
 		case tcell.KeyLeft:
-			if shift {
+			ctrl := ke.Modifiers&tcell.ModCtrl != 0
+			if ctrl {
+				if shift {
+					// Ctrl+Shift+Left: extend selection word-left.
+					if !il.hasSelection() {
+						il.selStart = il.cursorPos
+						il.selEnd = il.cursorPos
+					}
+					il.cursorPos = il.wordLeft(il.cursorPos)
+					il.selEnd = il.cursorPos
+				} else {
+					// Ctrl+Left: move cursor word-left, clear selection.
+					il.selStart = 0
+					il.selEnd = 0
+					il.cursorPos = il.wordLeft(il.cursorPos)
+				}
+			} else if shift {
 				// Start selection from current cursorPos if no selection.
 				if !il.hasSelection() {
 					il.selStart = il.cursorPos
@@ -181,7 +230,23 @@ func (il *InputLine) HandleEvent(event *Event) {
 			event.Clear()
 
 		case tcell.KeyRight:
-			if shift {
+			ctrl := ke.Modifiers&tcell.ModCtrl != 0
+			if ctrl {
+				if shift {
+					// Ctrl+Shift+Right: extend selection word-right.
+					if !il.hasSelection() {
+						il.selStart = il.cursorPos
+						il.selEnd = il.cursorPos
+					}
+					il.cursorPos = il.wordRight(il.cursorPos)
+					il.selEnd = il.cursorPos
+				} else {
+					// Ctrl+Right: move cursor word-right, clear selection.
+					il.selStart = 0
+					il.selEnd = 0
+					il.cursorPos = il.wordRight(il.cursorPos)
+				}
+			} else if shift {
 				if !il.hasSelection() {
 					il.selStart = il.cursorPos
 					il.selEnd = il.cursorPos
@@ -233,8 +298,16 @@ func (il *InputLine) HandleEvent(event *Event) {
 			event.Clear()
 
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
+			ctrl := ke.Modifiers&(tcell.ModCtrl|tcell.ModAlt) != 0
 			if il.hasSelection() {
 				il.deleteSelection()
+			} else if ctrl {
+				// Ctrl+Backspace: delete from wordLeft(cursorPos) to cursorPos.
+				wl := il.wordLeft(il.cursorPos)
+				if wl < il.cursorPos {
+					il.text = append(il.text[:wl], il.text[il.cursorPos:]...)
+					il.cursorPos = wl
+				}
 			} else if il.cursorPos > 0 {
 				il.text = append(il.text[:il.cursorPos-1], il.text[il.cursorPos:]...)
 				il.cursorPos--
@@ -243,8 +316,15 @@ func (il *InputLine) HandleEvent(event *Event) {
 			event.Clear()
 
 		case tcell.KeyDelete:
+			ctrl := ke.Modifiers&tcell.ModCtrl != 0
 			if il.hasSelection() {
 				il.deleteSelection()
+			} else if ctrl {
+				// Ctrl+Delete: delete from cursorPos to wordRight(cursorPos).
+				wr := il.wordRight(il.cursorPos)
+				if wr > il.cursorPos {
+					il.text = append(il.text[:il.cursorPos], il.text[wr:]...)
+				}
 			} else if il.cursorPos < len(il.text) {
 				il.text = append(il.text[:il.cursorPos], il.text[il.cursorPos+1:]...)
 			}
@@ -260,17 +340,27 @@ func (il *InputLine) HandleEvent(event *Event) {
 			if il.hasSelection() {
 				il.deleteSelection()
 			}
-			// No-op if at maxLen.
-			if il.maxLen > 0 && len(il.text) >= il.maxLen {
-				event.Clear()
-				return
+			if il.overwrite && il.cursorPos < len(il.text) {
+				// Overwrite mode: replace char at cursorPos (no maxLen check needed — not changing length).
+				il.text[il.cursorPos] = ke.Rune
+				il.cursorPos++
+			} else {
+				// Insert mode (or at end in overwrite mode): insert rune at cursor.
+				// No-op if at maxLen.
+				if il.maxLen > 0 && len(il.text) >= il.maxLen {
+					event.Clear()
+					return
+				}
+				il.text = append(il.text, 0)
+				copy(il.text[il.cursorPos+1:], il.text[il.cursorPos:])
+				il.text[il.cursorPos] = ke.Rune
+				il.cursorPos++
 			}
-			// Insert rune at cursor.
-			il.text = append(il.text, 0)
-			copy(il.text[il.cursorPos+1:], il.text[il.cursorPos:])
-			il.text[il.cursorPos] = ke.Rune
-			il.cursorPos++
 			il.adjustScroll()
+			event.Clear()
+
+		case tcell.KeyInsert:
+			il.overwrite = !il.overwrite
 			event.Clear()
 
 		default:
@@ -322,6 +412,14 @@ func (il *InputLine) HandleEvent(event *Event) {
 				il.text = newText
 				il.cursorPos += len(paste)
 				il.adjustScroll()
+				event.Clear()
+
+			case tcell.KeyCtrlY:
+				il.text = il.text[:0]
+				il.cursorPos = 0
+				il.selStart = 0
+				il.selEnd = 0
+				il.scrollOffset = 0
 				event.Clear()
 
 			// Tab, Escape, Enter and other unhandled keys pass through.
