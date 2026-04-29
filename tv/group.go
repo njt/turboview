@@ -1,5 +1,7 @@
 package tv
 
+import "github.com/gdamore/tcell/v2"
+
 type Group struct {
 	BaseView
 	children []View
@@ -95,6 +97,20 @@ func (g *Group) HandleEvent(event *Event) {
 		return
 	}
 
+	// Tab/Shift+Tab focus traversal — before three-phase dispatch
+	if event.What == EvKeyboard && event.Key != nil {
+		if event.Key.Key == tcell.KeyTab && event.Key.Modifiers == 0 {
+			g.focusNext()
+			event.Clear()
+			return
+		}
+		if event.Key.Key == tcell.KeyBacktab {
+			g.focusPrev()
+			event.Clear()
+			return
+		}
+	}
+
 	// Three-phase dispatch for keyboard and command events
 
 	// Phase 1: Preprocess
@@ -137,6 +153,52 @@ func (g *Group) selectPrevious() {
 	for i := len(g.children) - 1; i >= 0; i-- {
 		if g.children[i].HasOption(OfSelectable) {
 			g.selectChild(g.children[i])
+			return
+		}
+	}
+}
+
+func (g *Group) focusNext() {
+	if len(g.children) == 0 {
+		return
+	}
+	start := 0
+	if g.focused != nil {
+		for i, child := range g.children {
+			if child == g.focused {
+				start = i + 1
+				break
+			}
+		}
+	}
+	n := len(g.children)
+	for i := 0; i < n; i++ {
+		idx := (start + i) % n
+		if g.children[idx].HasOption(OfSelectable) && g.children[idx] != g.focused {
+			g.selectChild(g.children[idx])
+			return
+		}
+	}
+}
+
+func (g *Group) focusPrev() {
+	if len(g.children) == 0 {
+		return
+	}
+	start := len(g.children) - 1
+	if g.focused != nil {
+		for i, child := range g.children {
+			if child == g.focused {
+				start = i - 1
+				break
+			}
+		}
+	}
+	n := len(g.children)
+	for i := 0; i < n; i++ {
+		idx := (start - i + n) % n
+		if g.children[idx].HasOption(OfSelectable) && g.children[idx] != g.focused {
+			g.selectChild(g.children[idx])
 			return
 		}
 	}
