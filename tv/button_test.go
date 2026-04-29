@@ -46,28 +46,29 @@ func TestNewButtonStoresBounds(t *testing.T) {
 
 // TestNewButtonStoresCommand verifies the button stores its CommandCode for later firing.
 // Spec: "NewButton(bounds Rect, title string, command CommandCode, opts ...ButtonOption) *Button"
-// Verified indirectly: pressing Enter fires event.Command == b.command.
+// Verified indirectly: pressing Space (when focused) fires event.Command == b.command.
 func TestNewButtonStoresCommand(t *testing.T) {
 	b := NewButton(NewRect(0, 0, 12, 1), "~O~K", CmOK)
 	b.SetState(SfSelected, true)
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: ' '}}
 	b.HandleEvent(ev)
 
 	if ev.Command != CmOK {
-		t.Errorf("after Enter, ev.Command = %v, want CmOK (%v)", ev.Command, CmOK)
+		t.Errorf("after Space, ev.Command = %v, want CmOK (%v)", ev.Command, CmOK)
 	}
 }
 
 // TestNewButtonIsNotDefaultByDefault verifies NewButton without WithDefault does not
-// set OfPostProcess.
-// Spec: "WithDefault() is a ButtonOption that marks the button as the default button
-// (sets OfPostProcess and an internal isDefault flag)."
+// act as the default button (IsDefault() == false, amDefault starts false).
+// All buttons now have OfPostProcess for broadcasts and Alt+shortcuts,
+// but only WithDefault() buttons start as the active default.
+// Spec: "amDefault starts false for non-default button"
 func TestNewButtonIsNotDefaultByDefault(t *testing.T) {
 	b := NewButton(NewRect(0, 0, 12, 1), "~O~K", CmOK)
 
-	if b.HasOption(OfPostProcess) {
-		t.Error("NewButton without WithDefault must not set OfPostProcess")
+	if b.IsDefault() {
+		t.Error("NewButton without WithDefault must not start as active default (IsDefault() must be false)")
 	}
 }
 
@@ -408,42 +409,36 @@ func TestButtonDrawShadowStyleDiffersFromNormal(t *testing.T) {
 	}
 }
 
-// --- HandleEvent: Enter key ---
+// --- HandleEvent: Enter key (removed in phase9) ---
 
-// TestButtonHandleEventEnterFiresCommand verifies Enter key sets event to EvCommand
-// and sets the correct command code.
-// Spec: "Enter key (tcell.KeyEnter): fires the command by setting event.What = EvCommand,
-// event.Command = b.command, event.Key = nil."
-func TestButtonHandleEventEnterFiresCommand(t *testing.T) {
+// TestButtonHandleEventEnterDoesNotFireCommand verifies Enter key does NOT fire the
+// button. Enter handling has been removed; Dialog converts Enter to a CmDefault
+// broadcast instead, which reaches the active default button via EvBroadcast.
+// Spec: "Enter handler completely removed."
+func TestButtonHandleEventEnterDoesNotFireCommand(t *testing.T) {
 	b := NewButton(NewRect(0, 0, 12, 1), "OK", CmOK)
 	b.SetState(SfSelected, true)
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
 	b.HandleEvent(ev)
 
-	if ev.What != EvCommand {
-		t.Errorf("after Enter, ev.What = %v, want EvCommand (%v)", ev.What, EvCommand)
-	}
-	if ev.Command != CmOK {
-		t.Errorf("after Enter, ev.Command = %v, want CmOK (%v)", ev.Command, CmOK)
-	}
-	if ev.Key != nil {
-		t.Errorf("after Enter, ev.Key = %v, want nil", ev.Key)
+	if ev.What == EvCommand {
+		t.Errorf("Enter should NOT fire button (handler removed); ev.What = %v", ev.What)
 	}
 }
 
-// TestButtonHandleEventEnterSetsCommandToButtonCommand verifies the fired command
+// TestButtonHandleEventSpaceFiresCommandForCancel verifies the fired Space command
 // matches the command passed to NewButton, tested with a non-standard command code.
 // Spec: "event.Command = b.command"
-func TestButtonHandleEventEnterSetsCommandToButtonCommand(t *testing.T) {
+func TestButtonHandleEventSpaceFiresCommandForCancel(t *testing.T) {
 	b := NewButton(NewRect(0, 0, 14, 1), "~C~ancel", CmCancel)
 	b.SetState(SfSelected, true)
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: ' '}}
 	b.HandleEvent(ev)
 
 	if ev.Command != CmCancel {
-		t.Errorf("after Enter on Cancel button, ev.Command = %v, want CmCancel (%v)", ev.Command, CmCancel)
+		t.Errorf("after Space on Cancel button, ev.Command = %v, want CmCancel (%v)", ev.Command, CmCancel)
 	}
 }
 
@@ -543,13 +538,13 @@ func TestButtonHandleEventMouseOtherButtonDoesNotFireCommand(t *testing.T) {
 
 // --- HandleEvent: postprocess default button ---
 
-// TestDefaultButtonFiresViaPostprocessWhenEnterNotConsumed verifies that a default
-// button (WithDefault) fires its command when Enter reaches the postprocess phase
-// (i.e., the focused child did not consume it).
-// Spec: "As a default button with OfPostProcess: responds to Enter in the postprocess
-// phase (the focused child gets first crack; if it doesn't consume Enter, the default
-// button fires)."
-func TestDefaultButtonFiresViaPostprocessWhenEnterNotConsumed(t *testing.T) {
+// TestDefaultButtonFiresViaCmDefaultBroadcast verifies that a default button
+// (WithDefault) fires its command when it receives a CmDefault broadcast via the
+// postprocess phase.
+// Spec: "As a default button with OfPostProcess: responds to CmDefault broadcast
+// (the focused child gets first crack via normal event dispatch; the dialog converts
+// Enter to a CmDefault broadcast which reaches the default button via postprocess)."
+func TestDefaultButtonFiresViaCmDefaultBroadcast(t *testing.T) {
 	g := NewGroup(NewRect(0, 0, 80, 25))
 
 	// A non-consuming focused child (plain BaseView doesn't consume any event).
@@ -568,68 +563,67 @@ func TestDefaultButtonFiresViaPostprocessWhenEnterNotConsumed(t *testing.T) {
 		t.Fatalf("precondition: FocusedChild() = %v, want nonConsumer", g.FocusedChild())
 	}
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	// Dialog sends CmDefault broadcast when Enter is pressed; replicate that here.
+	ev := &Event{What: EvBroadcast, Command: CmDefault}
 	g.HandleEvent(ev)
 
 	if ev.What != EvCommand {
-		t.Errorf("default button did not fire via postprocess; ev.What = %v, want EvCommand (%v)", ev.What, EvCommand)
+		t.Errorf("default button did not fire via CmDefault broadcast; ev.What = %v, want EvCommand (%v)", ev.What, EvCommand)
 	}
 	if ev.Command != CmOK {
-		t.Errorf("default button postprocess fired wrong command; ev.Command = %v, want CmOK (%v)", ev.Command, CmOK)
+		t.Errorf("default button CmDefault broadcast fired wrong command; ev.Command = %v, want CmOK (%v)", ev.Command, CmOK)
 	}
 }
 
-// TestDefaultButtonDoesNotFireWhenFocusedChildConsumesEnter verifies that if the
-// focused child consumes Enter (clears the event), the default button does NOT fire.
-// Spec: "the focused child gets first crack."
-func TestDefaultButtonDoesNotFireWhenFocusedChildConsumesEnter(t *testing.T) {
+// TestDefaultButtonDoesNotFireWhenAmDefaultFalse verifies that a WithDefault button
+// with amDefault=false (because a non-default sibling has focus) does NOT fire on
+// CmDefault broadcast.
+// Spec: "When button receives CmDefault broadcast: if amDefault, call press(event)"
+func TestDefaultButtonDoesNotFireWhenAmDefaultFalse(t *testing.T) {
 	g := NewGroup(NewRect(0, 0, 80, 25))
 
-	// A child that consumes Enter by clearing the event.
-	enterConsumer := &enterConsumingView{}
-	enterConsumer.SetBounds(NewRect(0, 0, 20, 1))
-	enterConsumer.SetState(SfVisible, true)
-	enterConsumer.SetOptions(OfSelectable, true)
-
-	okBtn := NewButton(NewRect(22, 0, 12, 1), "~O~K", CmOK, WithDefault())
+	// A selectable child that will steal the default status.
+	sibling := NewButton(NewRect(0, 0, 12, 1), "Other", CmCancel)
+	okBtn := NewButton(NewRect(14, 0, 12, 1), "~O~K", CmOK, WithDefault())
 
 	g.Insert(okBtn)
-	g.Insert(enterConsumer) // inserted last → steals focus
+	g.Insert(sibling) // steals focus → sibling.amDefault=true, okBtn.amDefault=false
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	// okBtn.amDefault is now false; CmDefault should fire sibling (Cancel).
+	ev := &Event{What: EvBroadcast, Command: CmDefault}
 	g.HandleEvent(ev)
 
-	// The event was cleared by enterConsumer; okBtn must not have fired.
 	if ev.What == EvCommand && ev.Command == CmOK {
-		t.Errorf("default button fired even though focused child consumed Enter")
+		t.Errorf("default button (amDefault=false) fired on CmDefault; should not fire when not active default")
 	}
 }
 
-// TestNonDefaultButtonDoesNotFireViaPostprocess verifies that a button created without
-// WithDefault does NOT fire via postprocess (it does not have OfPostProcess).
-// Spec: only buttons with WithDefault/OfPostProcess participate in postprocess.
-func TestNonDefaultButtonDoesNotFireViaPostprocess(t *testing.T) {
+// TestNonDefaultButtonWithFocusFiresViaCmDefault verifies that a non-default button
+// that has gained focus (amDefault=true) fires when it receives CmDefault broadcast,
+// even though it was not created with WithDefault.
+// Spec: "Non-default focused button responds to CmDefault"
+func TestNonDefaultButtonWithFocusFiresViaCmDefault(t *testing.T) {
 	g := NewGroup(NewRect(0, 0, 80, 25))
 
-	nonConsumer := &BaseView{}
-	nonConsumer.SetBounds(NewRect(0, 0, 20, 1))
-	nonConsumer.SetState(SfVisible, true)
-	nonConsumer.SetOptions(OfSelectable, true)
+	defBtn := NewButton(NewRect(0, 0, 12, 1), "~O~K", CmOK, WithDefault())
+	plainBtn := NewButton(NewRect(14, 0, 14, 1), "~C~ancel", CmCancel)
 
-	plainBtn := NewButton(NewRect(22, 0, 12, 1), "~O~K", CmOK) // no WithDefault
+	g.Insert(defBtn)
+	g.Insert(plainBtn) // plainBtn focused → plainBtn.amDefault = true, defBtn.amDefault = false
 
-	g.Insert(plainBtn)
-	g.Insert(nonConsumer) // steals focus from plainBtn
-
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	// plainBtn is the active default; CmDefault should fire CmCancel.
+	ev := &Event{What: EvBroadcast, Command: CmDefault}
 	g.HandleEvent(ev)
 
-	if ev.What == EvCommand {
-		t.Errorf("non-default button fired via postprocess; only WithDefault buttons should do this")
+	if ev.What != EvCommand {
+		t.Errorf("focused non-default button should fire on CmDefault; ev.What = %v", ev.What)
+	}
+	if ev.Command != CmCancel {
+		t.Errorf("focused non-default button CmDefault fired %v, want CmCancel (%v)", ev.Command, CmCancel)
 	}
 }
 
-// TestDefaultButtonFiresCommandForCustomCode verifies the postprocess mechanism
+// TestDefaultButtonFiresCommandForCustomCode verifies the CmDefault broadcast mechanism
 // works for command codes other than CmOK.
 // Spec: "event.Command = b.command"
 func TestDefaultButtonFiresCommandForCustomCode(t *testing.T) {
@@ -646,23 +640,14 @@ func TestDefaultButtonFiresCommandForCustomCode(t *testing.T) {
 	g.Insert(btn)
 	g.Insert(nonConsumer)
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyEnter}}
+	// btn loses amDefault because nonConsumer (non-button) stole focus but didn't
+	// broadcast CmGrabDefault (BaseView doesn't), so btn still has amDefault=true.
+	// Wait — nonConsumer is BaseView, not Button. Only buttons broadcast.
+	// So btn.amDefault stays true. Confirm and send CmDefault.
+	ev := &Event{What: EvBroadcast, Command: CmDefault}
 	g.HandleEvent(ev)
 
 	if ev.Command != customCmd {
-		t.Errorf("default button postprocess fired command %v, want %v", ev.Command, customCmd)
-	}
-}
-
-// --- enterConsumingView: test helper ---
-
-// enterConsumingView is a selectable view that consumes Enter by clearing the event.
-type enterConsumingView struct {
-	BaseView
-}
-
-func (v *enterConsumingView) HandleEvent(event *Event) {
-	if event.What == EvKeyboard && event.Key != nil && event.Key.Key == tcell.KeyEnter {
-		event.Clear()
+		t.Errorf("default button CmDefault broadcast fired command %v, want %v", ev.Command, customCmd)
 	}
 }

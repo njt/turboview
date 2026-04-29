@@ -255,7 +255,13 @@ func (d *Dialog) HandleEvent(event *Event) {
 		case tcell.KeyEnter:
 			broadcast := &Event{What: EvBroadcast, Command: CmDefault}
 			d.group.HandleEvent(broadcast)
-			event.Clear()
+			if broadcast.What == EvCommand {
+				event.What = broadcast.What
+				event.Command = broadcast.Command
+				event.Key = nil
+			} else {
+				event.Clear()
+			}
 		}
 	}
 

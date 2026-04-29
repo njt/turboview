@@ -1,6 +1,7 @@
 package tv
 
 import (
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v2"
@@ -11,15 +12,18 @@ var _ Widget = (*Button)(nil)
 type Button struct {
 	BaseView
 	title     string
+	shortcut  rune
 	command   CommandCode
-	isDefault bool
+	bfDefault bool
+	amDefault bool
 }
 
 type ButtonOption func(*Button)
 
 func WithDefault() ButtonOption {
 	return func(b *Button) {
-		b.isDefault = true
+		b.bfDefault = true
+		b.amDefault = true
 		b.SetOptions(OfPostProcess, true)
 	}
 }
@@ -29,6 +33,17 @@ func NewButton(bounds Rect, title string, command CommandCode, opts ...ButtonOpt
 	b.SetBounds(bounds)
 	b.SetState(SfVisible, true)
 	b.SetOptions(OfSelectable, true)
+	b.SetOptions(OfFirstClick, true)  // click fires even on first (focus) click
+	b.SetOptions(OfPostProcess, true) // all buttons get OfPostProcess
+
+	segments := ParseTildeLabel(title)
+	for _, seg := range segments {
+		if seg.Shortcut && len(seg.Text) > 0 {
+			b.shortcut, _ = utf8.DecodeRuneInString(seg.Text)
+			break
+		}
+	}
+
 	for _, opt := range opts {
 		opt(b)
 	}
@@ -38,7 +53,33 @@ func NewButton(bounds Rect, title string, command CommandCode, opts ...ButtonOpt
 
 func (b *Button) Title() string        { return b.title }
 func (b *Button) Command() CommandCode { return b.command }
-func (b *Button) IsDefault() bool      { return b.isDefault }
+func (b *Button) IsDefault() bool      { return b.amDefault }
+
+func (b *Button) SetState(flag ViewState, on bool) {
+	b.BaseView.SetState(flag, on)
+	if flag&SfSelected != 0 && !b.bfDefault {
+		if on {
+			b.broadcastToOwner(CmGrabDefault)
+			b.amDefault = true
+		} else {
+			b.broadcastToOwner(CmReleaseDefault)
+			b.amDefault = false
+		}
+	}
+}
+
+func (b *Button) broadcastToOwner(cmd CommandCode) {
+	if b.owner == nil {
+		return
+	}
+	ev := &Event{What: EvBroadcast, Command: cmd, Info: b}
+	for _, child := range b.owner.Children() {
+		if child.HasState(SfDisabled) {
+			continue
+		}
+		child.HandleEvent(ev)
+	}
+}
 
 func (b *Button) Draw(buf *DrawBuffer) {
 	w, h := b.Bounds().Width(), b.Bounds().Height()
@@ -51,7 +92,7 @@ func (b *Button) Draw(buf *DrawBuffer) {
 	shortcutStyle := tcell.StyleDefault
 	shadowStyle := tcell.StyleDefault
 	if cs != nil {
-		if b.isDefault {
+		if b.amDefault {
 			normalStyle = cs.ButtonDefault
 		} else {
 			normalStyle = cs.ButtonNormal
@@ -114,19 +155,46 @@ func (b *Button) Draw(buf *DrawBuffer) {
 }
 
 func (b *Button) HandleEvent(event *Event) {
+	// Click-to-focus (from BaseView) then fire on Button1
 	if event.What == EvMouse && event.Mouse != nil {
+		b.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		if event.Mouse.Button&tcell.Button1 != 0 {
 			b.press(event)
 		}
 		return
 	}
+
+	// Broadcast handling
+	if event.What == EvBroadcast {
+		switch event.Command {
+		case CmDefault:
+			if b.amDefault {
+				b.press(event)
+			}
+		case CmGrabDefault:
+			if b.bfDefault {
+				b.amDefault = false
+			}
+		case CmReleaseDefault:
+			if b.bfDefault {
+				b.amDefault = true
+			}
+		}
+		return
+	}
+
 	if event.What == EvKeyboard && event.Key != nil {
 		switch event.Key.Key {
-		case tcell.KeyEnter:
-			b.press(event)
 		case tcell.KeyRune:
-			if event.Key.Rune == ' ' {
+			if event.Key.Rune == ' ' && b.HasState(SfSelected) {
 				b.press(event)
+			} else if event.Key.Modifiers&tcell.ModAlt != 0 && b.shortcut != 0 {
+				if unicode.ToLower(event.Key.Rune) == unicode.ToLower(b.shortcut) {
+					b.press(event)
+				}
 			}
 		}
 	}

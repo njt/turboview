@@ -70,14 +70,15 @@ func shiftTabKey() *Event {
 // Requirement 1: Button in Window fires command via app.handleEvent(Enter)
 // ---------------------------------------------------------------------------
 
-// TestIntegrationButtonInWindowFiresCommandOnEnter verifies that pressing Enter
+// TestIntegrationButtonInWindowFiresCommandOnSpace verifies that pressing Space
 // while a Button has focus inside a Window inside a Desktop inside an Application
 // transforms the event to EvCommand with the button's command code.
 //
-// Spec req 1: "A Button inserted into a Window, inside a Desktop, inside an
-// Application: injecting an Enter key via app.handleEvent reaches the Button and
-// fires its command (transforms event to EvCommand)."
-func TestIntegrationButtonInWindowFiresCommandOnEnter(t *testing.T) {
+// Spec req 1 (updated): "A Button inserted into a Window, inside a Desktop, inside
+// an Application: injecting a Space key (when focused) via app.handleEvent fires
+// the button's command (transforms event to EvCommand)."
+// Note: Enter handling was removed from buttons in phase9; Space fires when focused.
+func TestIntegrationButtonInWindowFiresCommandOnSpace(t *testing.T) {
 	app, _, win := appWithWindow(t, NewRect(5, 3, 30, 10), "Test")
 
 	btn := NewButton(NewRect(0, 0, 10, 1), "OK", CmOK)
@@ -88,14 +89,14 @@ func TestIntegrationButtonInWindowFiresCommandOnEnter(t *testing.T) {
 		t.Fatal("pre-condition: button should be focused after insertion")
 	}
 
-	ev := enterKey()
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: ' '}}
 	app.handleEvent(ev)
 
 	if ev.What != EvCommand {
-		t.Errorf("after Enter, event.What = %v, want EvCommand (%v)", ev.What, EvCommand)
+		t.Errorf("after Space, event.What = %v, want EvCommand (%v)", ev.What, EvCommand)
 	}
 	if ev.Command != CmOK {
-		t.Errorf("after Enter, event.Command = %v, want CmOK (%v)", ev.Command, CmOK)
+		t.Errorf("after Space, event.Command = %v, want CmOK (%v)", ev.Command, CmOK)
 	}
 }
 
@@ -275,11 +276,13 @@ func TestIntegrationTabWrapsAroundFromLastToFirst(t *testing.T) {
 // that a default Button (WithDefault) responds to Enter in the postprocess phase
 // even when a different (non-consuming) widget has focus.
 //
-// Spec req 6: "A default Button (WithDefault) in a Window responds to Enter in
-// the postprocess phase even when a different widget has focus — meaning Enter
-// pressed on a non-button focused view causes the default button to fire."
-func TestIntegrationDefaultButtonFiresViaPostprocessWhenOtherWidgetFocused(t *testing.T) {
-	app, _, win := appWithWindow(t, NewRect(5, 3, 40, 15), "Default")
+// Spec req 6 (updated): "A default Button (WithDefault) in a Window responds to a
+// CmDefault broadcast (sent by Dialog on Enter) even when a different widget has
+// focus — the default button fires via postprocess when CmDefault is broadcast."
+// Note: Enter handling removed from buttons in phase9; Dialog converts Enter to
+// CmDefault broadcast. This test simulates the broadcast directly on the window.
+func TestIntegrationDefaultButtonFiresViaCmDefaultBroadcast(t *testing.T) {
+	_, _, win := appWithWindow(t, NewRect(5, 3, 40, 15), "Default")
 
 	// Default button: gets OfPostProcess.
 	defBtn := NewButton(NewRect(20, 0, 12, 1), "OK", CmOK, WithDefault())
@@ -301,14 +304,21 @@ func TestIntegrationDefaultButtonFiresViaPostprocessWhenOtherWidgetFocused(t *te
 		t.Fatal("pre-condition: defBtn should have OfPostProcess")
 	}
 
-	ev := enterKey()
-	app.handleEvent(ev)
+	// defBtn retains amDefault=true because nonConsumer is a plain BaseView (not a
+	// Button) and doesn't broadcast CmGrabDefault when it gains focus.
+	if !defBtn.IsDefault() {
+		t.Fatal("pre-condition: defBtn should still be the active default (amDefault=true)")
+	}
+
+	// Simulate Dialog's Enter → CmDefault broadcast path.
+	ev := &Event{What: EvBroadcast, Command: CmDefault}
+	win.HandleEvent(ev)
 
 	if ev.What != EvCommand {
-		t.Errorf("default button did not fire via postprocess; ev.What = %v, want EvCommand", ev.What)
+		t.Errorf("default button did not fire via CmDefault broadcast; ev.What = %v, want EvCommand", ev.What)
 	}
 	if ev.Command != CmOK {
-		t.Errorf("default button postprocess fired wrong command; ev.Command = %v, want CmOK", ev.Command)
+		t.Errorf("default button CmDefault broadcast fired wrong command; ev.Command = %v, want CmOK", ev.Command)
 	}
 }
 

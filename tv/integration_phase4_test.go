@@ -663,8 +663,9 @@ func TestIntegrationPhase4AfterMenuDeactivationDesktopFunctional(t *testing.T) {
 	screen.InjectKey(tcell.KeyEscape, 0, tcell.ModNone)
 	time.Sleep(30 * time.Millisecond)
 
-	// After deactivation, Enter should reach btn2 (desktop routes events again).
-	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
+	// After deactivation, Space should reach btn2 (desktop routes events again).
+	// Note: Enter handling removed from buttons in phase9; Space fires when focused.
+	screen.InjectKey(tcell.KeyRune, ' ', tcell.ModNone)
 	time.Sleep(50 * time.Millisecond)
 
 	// Exit
@@ -672,7 +673,7 @@ func TestIntegrationPhase4AfterMenuDeactivationDesktopFunctional(t *testing.T) {
 	waitForRun(t, done)
 
 	if capturedCmd != CmOK {
-		t.Errorf("after menu deactivation, Enter did not reach button; capturedCmd = %v, want CmOK", capturedCmd)
+		t.Errorf("after menu deactivation, Space did not reach button; capturedCmd = %v, want CmOK", capturedCmd)
 	}
 
 	_ = app // suppress unused from initial creation
