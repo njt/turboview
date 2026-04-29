@@ -44,6 +44,12 @@ func WithOnCommand(fn func(CommandCode, any) bool) AppOption {
 	}
 }
 
+func WithConfigFile(path string) AppOption {
+	return func(app *Application) {
+		app.configFile = path
+	}
+}
+
 type Application struct {
 	bounds     Rect
 	screen     tcell.Screen
@@ -52,6 +58,7 @@ type Application struct {
 	statusLine *StatusLine
 	menuBar    *MenuBar
 	scheme     *theme.ColorScheme
+	configFile string
 	quit       bool
 	onCommand  func(CommandCode, any) bool
 }
@@ -74,6 +81,20 @@ func NewApplication(opts ...AppOption) (*Application, error) {
 
 	if app.scheme == nil {
 		app.scheme = theme.BorlandBlue
+	}
+
+	configPath := app.configFile
+	if configPath == "" {
+		configPath = theme.DefaultConfigPath()
+	}
+	if configPath != "" {
+		cs, err := theme.LoadConfig(configPath)
+		if err != nil {
+			return nil, err
+		}
+		if cs != nil {
+			app.scheme = cs
+		}
 	}
 
 	app.desktop = NewDesktop(NewRect(0, 0, 0, 0))
