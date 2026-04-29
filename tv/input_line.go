@@ -15,6 +15,8 @@ type InputLine struct {
 	selStart     int
 	selEnd       int
 	overwrite    bool
+	dragging     bool
+	dragAnchor   int
 }
 
 type InputLineOption func(*InputLine)
@@ -169,19 +171,43 @@ func (il *InputLine) Draw(buf *DrawBuffer) {
 func (il *InputLine) HandleEvent(event *Event) {
 	switch event.What {
 	case EvMouse:
-		if event.Mouse != nil && event.Mouse.Button&tcell.Button1 != 0 {
-			col := event.Mouse.X - il.Bounds().A.X + il.scrollOffset
-			if col < 0 {
-				col = 0
+		if event.Mouse == nil {
+			return
+		}
+		col := event.Mouse.X - il.Bounds().A.X + il.scrollOffset
+		if col < 0 {
+			col = 0
+		}
+		if col > len(il.text) {
+			col = len(il.text)
+		}
+
+		if event.Mouse.Button&tcell.Button1 != 0 {
+			if event.Mouse.ClickCount >= 2 {
+				// Double-click: select all text.
+				il.selStart = 0
+				il.selEnd = len(il.text)
+				il.cursorPos = len(il.text)
+				il.dragging = false
+				il.adjustScroll()
+				event.Clear()
+				return
 			}
-			if col > len(il.text) {
-				col = len(il.text)
+			if !il.dragging {
+				il.dragging = true
+				il.dragAnchor = col
+				il.cursorPos = col
+				il.selStart = 0
+				il.selEnd = 0
+			} else {
+				il.cursorPos = col
+				il.selStart = il.dragAnchor
+				il.selEnd = il.cursorPos
 			}
-			il.cursorPos = col
-			il.selStart = 0
-			il.selEnd = 0
 			il.adjustScroll()
 			event.Clear()
+		} else if il.dragging {
+			il.dragging = false
 		}
 
 	case EvKeyboard:
