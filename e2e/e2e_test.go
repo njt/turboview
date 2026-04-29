@@ -862,6 +862,95 @@ func TestTabFocusNavigation(t *testing.T) {
 	}
 }
 
+func TestInputLineCtrlYClear(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-ctrly"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1 so F3 (InputBox) is active
+	tmuxSendKeys(t, session, "M-1")
+
+	// Open InputBox dialog
+	tmuxSendKeys(t, session, "F3")
+	time.Sleep(500 * time.Millisecond)
+
+	// Type some text
+	tmuxType(t, session, "hello world")
+
+	// Ctrl+Y to clear the input
+	tmuxSendKeys(t, session, "C-y")
+
+	// Type new text after clearing
+	tmuxType(t, session, "cleared")
+
+	// Press Enter to confirm
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Static text should show "File: cleared" (proving Ctrl+Y cleared "hello world" before "cleared" was typed)
+	if !containsAny(lines, "File: cleared") {
+		t.Error("expected 'File: cleared' after Ctrl+Y clear then retype — Ctrl+Y may not have cleared the input")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestInputLineInsertAtStart(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-insert"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1 so F3 is active
+	tmuxSendKeys(t, session, "M-1")
+
+	// Open InputBox dialog
+	tmuxSendKeys(t, session, "F3")
+	time.Sleep(500 * time.Millisecond)
+
+	// Select all and type new text
+	tmuxSendKeys(t, session, "C-a")
+	tmuxType(t, session, "test")
+
+	// Go to Home then type prefix
+	tmuxSendKeys(t, session, "Home")
+	tmuxType(t, session, "X")
+
+	// Press Enter to confirm
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Static text should show "File: Xtest"
+	if !containsAny(lines, "File: Xtest") {
+		t.Error("expected 'File: Xtest' after Home+type — text insertion at start may not work")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func TestCheckboxFocusIndicator(t *testing.T) {
 	binPath := buildBasicApp(t)
 
