@@ -189,16 +189,9 @@ func (rbs *RadioButtons) BringToFront(v View)         { rbs.group.BringToFront(v
 
 func (rbs *RadioButtons) Draw(buf *DrawBuffer) {
 	for _, item := range rbs.items {
-		wasSelected := item.HasState(SfSelected)
-		if wasSelected {
-			item.SetState(SfSelected, false)
-		}
 		childBounds := item.Bounds()
 		sub := buf.SubBuffer(childBounds)
 		item.Draw(sub)
-		if wasSelected {
-			item.SetState(SfSelected, true)
-		}
 	}
 }
 

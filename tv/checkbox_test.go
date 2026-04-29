@@ -907,11 +907,13 @@ func TestCheckBoxesDrawRendersAllItems(t *testing.T) {
 	buf := NewDrawBuffer(20, 3)
 	cbs.Draw(buf)
 
-	// Each row should start with '[' (the CheckBox bracket).
+	// Each row should have a CheckBox bracket '[' (at position 0 or 1, depending on focus indicator).
 	for row := 0; row < 3; row++ {
-		cell := buf.GetCell(0, row)
-		if cell.Rune != '[' {
-			t.Errorf("row %d: cell(0,%d) = %q, want '[' (CheckBox bracket)", row, row, cell.Rune)
+		cell0 := buf.GetCell(0, row)
+		cell1 := buf.GetCell(1, row)
+		// Focus indicator '►' at column 0, '[' at column 1, or '[' at column 0 if not focused
+		if !((cell0.Rune == '[') || (cell0.Rune == '►' && cell1.Rune == '[')) {
+			t.Errorf("row %d: expected '[' at col 0 or 1, but got %q at col 0 and %q at col 1", row, cell0.Rune, cell1.Rune)
 		}
 	}
 }

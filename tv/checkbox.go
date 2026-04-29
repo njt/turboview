@@ -174,20 +174,10 @@ func (cbs *CheckBoxes) ExecView(v View) CommandCode { return cbs.group.ExecView(
 func (cbs *CheckBoxes) BringToFront(v View)         { cbs.group.BringToFront(v) }
 
 func (cbs *CheckBoxes) Draw(buf *DrawBuffer) {
-	// Draw checkboxes without the SfSelected focus-cursor prefix.
-	// Within a cluster, the '►' prefix is not rendered on individual items;
-	// focus is tracked internally but not shown via the per-item cursor.
 	for _, item := range cbs.items {
-		wasSelected := item.HasState(SfSelected)
-		if wasSelected {
-			item.SetState(SfSelected, false)
-		}
 		childBounds := item.Bounds()
 		sub := buf.SubBuffer(childBounds)
 		item.Draw(sub)
-		if wasSelected {
-			item.SetState(SfSelected, true)
-		}
 	}
 }
 
