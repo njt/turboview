@@ -629,34 +629,29 @@ func TestIntegrationExecViewDefaultButtonFiresViaPostprocessInsideDialog(t *test
 // ---------------------------------------------------------------------------
 
 // TestIntegrationMessageBoxYesNoReturnsYesOnEnter verifies that MessageBox called
-// with MbYes|MbNo uses ExecView and can return CmYes. MessageBox inserts Yes first
-// (with WithDefault) and No second; after insertion No has focus. Tab moves focus
-// back to Yes (wrap-around), and Enter then fires the Yes button returning CmYes.
+// with MbYes|MbNo uses ExecView and can return CmYes. MessageBox sets focus to the
+// first (default) button (Yes), so pressing Enter immediately fires CmYes.
 func TestIntegrationMessageBoxYesNoReturnsYesOnEnter(t *testing.T) {
 	app, desktop, screen := appWithDesktopAndScreen(t)
 	defer screen.Fini()
 
 	result := make(chan CommandCode, 1)
 	go func() {
-		// MessageBox calls owner.ExecView internally; owner here is the Desktop.
 		result <- MessageBox(desktop, "Question", "Delete file?", MbYes|MbNo)
 	}()
 
 	time.Sleep(50 * time.Millisecond)
 
-	// MessageBox inserts Yes (default, i=0) then No (i=1). After insertion No is
-	// focused (last selectable). Tab wraps: No → Yes. Enter then fires Yes → CmYes.
-	screen.InjectKey(tcell.KeyTab, 0, tcell.ModNone)
-	time.Sleep(20 * time.Millisecond)
+	// MessageBox sets focus to first button (Yes, default). Enter fires CmYes.
 	screen.InjectKey(tcell.KeyEnter, 0, tcell.ModNone)
 
 	select {
 	case cmd := <-result:
 		if cmd != CmYes {
-			t.Errorf("MessageBox(MbYes|MbNo) Tab+Enter = %v, want CmYes", cmd)
+			t.Errorf("MessageBox(MbYes|MbNo) Enter = %v, want CmYes", cmd)
 		}
 	case <-time.After(2 * time.Second):
-		t.Error("MessageBox did not return within 2 s after Tab+Enter")
+		t.Error("MessageBox did not return within 2 s after Enter")
 	}
 
 	_ = app

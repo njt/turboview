@@ -86,6 +86,9 @@ func (g *Group) ExecView(v View) CommandCode {
 		return CmCancel
 	}
 
+	// Draw immediately so the modal view is visible before the first event
+	app.drawAndFlush()
+
 	// Modal event loop
 	var result CommandCode
 	for {

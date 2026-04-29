@@ -101,6 +101,7 @@ func MessageBox(owner Container, title, text string, buttons MsgBoxButton) Comma
 	if startX < 0 {
 		startX = 0
 	}
+	var firstBtn *Button
 	for i, def := range defs {
 		x := startX + i*(btnW+btnGap)
 		var opts []ButtonOption
@@ -109,6 +110,12 @@ func MessageBox(owner Container, title, text string, buttons MsgBoxButton) Comma
 		}
 		btn := NewButton(NewRect(x, btnY, btnW, 2), def.label, def.cmd, opts...)
 		dlg.Insert(btn)
+		if i == 0 {
+			firstBtn = btn
+		}
+	}
+	if firstBtn != nil {
+		dlg.SetFocusedChild(firstBtn)
 	}
 
 	return owner.ExecView(dlg)
