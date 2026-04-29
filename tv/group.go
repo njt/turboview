@@ -75,8 +75,51 @@ func (g *Group) HandleEvent(event *Event) {
 	if event.IsCleared() {
 		return
 	}
-	if g.focused != nil {
+
+	// Mouse events: forward to focused child (positional routing done by caller)
+	if event.What == EvMouse {
+		if g.focused != nil {
+			g.focused.HandleEvent(event)
+		}
+		return
+	}
+
+	// Broadcast: deliver to all children
+	if event.What == EvBroadcast {
+		for _, child := range g.children {
+			if event.IsCleared() {
+				return
+			}
+			child.HandleEvent(event)
+		}
+		return
+	}
+
+	// Three-phase dispatch for keyboard and command events
+
+	// Phase 1: Preprocess
+	for _, child := range g.children {
+		if event.IsCleared() {
+			return
+		}
+		if child != g.focused && child.HasOption(OfPreProcess) {
+			child.HandleEvent(event)
+		}
+	}
+
+	// Phase 2: Focused
+	if !event.IsCleared() && g.focused != nil {
 		g.focused.HandleEvent(event)
+	}
+
+	// Phase 3: Postprocess
+	for _, child := range g.children {
+		if event.IsCleared() {
+			return
+		}
+		if child != g.focused && child.HasOption(OfPostProcess) {
+			child.HandleEvent(event)
+		}
 	}
 }
 
