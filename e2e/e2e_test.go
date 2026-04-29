@@ -9,6 +9,17 @@ import (
 	"time"
 )
 
+func containsAny(lines []string, substrs ...string) bool {
+	for _, line := range lines {
+		for _, s := range substrs {
+			if strings.Contains(line, s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func projectRoot() string {
 	_, file, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(file), "..")
@@ -221,5 +232,126 @@ func TestDialogDismissNoQuit(t *testing.T) {
 	}
 	if !exited {
 		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestMenuBarVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-menubar"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// First row should contain "File" and "Window"
+	firstRow := ""
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			firstRow = line
+			break
+		}
+	}
+	if !strings.Contains(firstRow, "File") {
+		t.Errorf("menu bar first row should contain 'File', got: %q", firstRow)
+	}
+	if !strings.Contains(firstRow, "Window") {
+		t.Errorf("menu bar first row should contain 'Window', got: %q", firstRow)
+	}
+
+	// Alt+X exits cleanly
+	tmuxSendKeys(t, session, "M-x")
+	exitedClean := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exitedClean = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exitedClean {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestMenuOpenAndSelect(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-menuopen"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens the first (File) menu
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// File menu items should be visible
+	if !containsAny(lines, "New") {
+		t.Error("menu item 'New' not found after opening File menu")
+	}
+	if !containsAny(lines, "Open...") {
+		t.Error("menu item 'Open...' not found after opening File menu")
+	}
+
+	// Escape twice to dismiss
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Desktop pattern should be visible after dismissal
+	if !containsAny(lines, "░") {
+		t.Error("desktop pattern not visible after dismissing menu — app may have crashed")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exitedMenu := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exitedMenu = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exitedMenu {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestMenuSelectExit(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-menuexit"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu, x triggers E~x~it → CmQuit
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "x")
+	time.Sleep(500 * time.Millisecond)
+
+	exitedViaMenu := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exitedViaMenu = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exitedViaMenu {
+		t.Error("app did not exit after selecting Exit from File menu")
 	}
 }
