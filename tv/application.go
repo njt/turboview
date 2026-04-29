@@ -1,6 +1,9 @@
 package tv
 
 import (
+	"sync"
+	"time"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/njt/turboview/theme"
 )
@@ -9,6 +12,12 @@ type cmdTcellEvent struct {
 	tcell.EventTime
 	cmd  CommandCode
 	info any
+}
+
+type mouseAutoEvent struct {
+	tcell.EventTime
+	x, y   int
+	button tcell.ButtonMask
 }
 
 type AppOption func(*Application)
@@ -62,6 +71,12 @@ type Application struct {
 	quit         bool
 	onCommand    func(CommandCode, any) bool
 	contextPopup *MenuPopup
+
+	mouseAutoMu   sync.Mutex
+	mouseAutoBtn  tcell.ButtonMask
+	mouseAutoX    int
+	mouseAutoY    int
+	mouseAutoChan chan struct{}
 }
 
 func NewApplication(opts ...AppOption) (*Application, error) {
@@ -142,6 +157,7 @@ func (app *Application) PollEvent() *Event {
 }
 
 func (app *Application) Run() error {
+	defer app.stopMouseAuto()
 	if app.screenOwn {
 		if err := app.screen.Init(); err != nil {
 			return err
@@ -173,6 +189,43 @@ func (app *Application) PostCommand(cmd CommandCode, info any) {
 	ev := &cmdTcellEvent{cmd: cmd, info: info}
 	ev.SetEventNow()
 	app.screen.PostEvent(ev)
+}
+
+func (app *Application) startMouseAuto(x, y int, button tcell.ButtonMask) {
+	app.stopMouseAuto()
+	app.mouseAutoMu.Lock()
+	app.mouseAutoBtn = button
+	app.mouseAutoX = x
+	app.mouseAutoY = y
+	done := make(chan struct{})
+	app.mouseAutoChan = done
+	app.mouseAutoMu.Unlock()
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				app.mouseAutoMu.Lock()
+				ev := &mouseAutoEvent{x: app.mouseAutoX, y: app.mouseAutoY, button: app.mouseAutoBtn}
+				app.mouseAutoMu.Unlock()
+				ev.SetEventNow()
+				_ = app.screen.PostEvent(ev)
+			}
+		}
+	}()
+}
+
+func (app *Application) stopMouseAuto() {
+	app.mouseAutoMu.Lock()
+	defer app.mouseAutoMu.Unlock()
+	if app.mouseAutoChan != nil {
+		close(app.mouseAutoChan)
+		app.mouseAutoChan = nil
+	}
+	app.mouseAutoBtn = 0
 }
 
 func (app *Application) Draw(buf *DrawBuffer) {
@@ -373,6 +426,7 @@ func (app *Application) routeMouseEvent(event *Event) {
 	if app.menuBar != nil && my == 0 {
 		idx := app.menuBar.menuIndexAtX(mx)
 		if idx >= 0 {
+			app.stopMouseAuto()
 			app.menuBar.ActivateAt(app, idx, true)
 		}
 		return
@@ -411,13 +465,34 @@ func (app *Application) convertEvent(tcellEv tcell.Event) *Event {
 		}
 	case *tcell.EventMouse:
 		x, y := ev.Position()
+		buttons := ev.Buttons()
+		realButtons := buttons & (tcell.Button1 | tcell.Button2 | tcell.Button3)
+		if realButtons != 0 && app.mouseAutoBtn == 0 {
+			app.startMouseAuto(x, y, realButtons)
+		} else if realButtons != 0 {
+			app.mouseAutoMu.Lock()
+			app.mouseAutoX = x
+			app.mouseAutoY = y
+			app.mouseAutoMu.Unlock()
+		} else if realButtons == 0 && app.mouseAutoBtn != 0 {
+			app.stopMouseAuto()
+		}
 		return &Event{
 			What: EvMouse,
 			Mouse: &MouseEvent{
 				X:         x,
 				Y:         y,
-				Button:    ev.Buttons(),
+				Button:    buttons,
 				Modifiers: ev.Modifiers(),
+			},
+		}
+	case *mouseAutoEvent:
+		return &Event{
+			What: EvMouse,
+			Mouse: &MouseEvent{
+				X:      ev.x,
+				Y:      ev.y,
+				Button: ev.button,
 			},
 		}
 	case *tcell.EventResize:
