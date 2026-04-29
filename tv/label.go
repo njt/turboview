@@ -14,6 +14,7 @@ type Label struct {
 	label    string
 	link     View
 	shortcut rune
+	light    bool
 }
 
 func NewLabel(bounds Rect, label string, link View) *Label {
@@ -23,7 +24,7 @@ func NewLabel(bounds Rect, label string, link View) *Label {
 	}
 	l.SetBounds(bounds)
 	l.SetState(SfVisible, true)
-	l.SetOptions(OfPreProcess, true)
+	l.SetOptions(OfPostProcess, true)
 
 	segments := ParseTildeLabel(label)
 	for _, seg := range segments {
@@ -41,7 +42,11 @@ func (l *Label) Draw(buf *DrawBuffer) {
 	normalStyle := tcell.StyleDefault
 	shortcutStyle := tcell.StyleDefault
 	if cs := l.ColorScheme(); cs != nil {
-		normalStyle = cs.LabelNormal
+		if l.light {
+			normalStyle = cs.LabelHighlight
+		} else {
+			normalStyle = cs.LabelNormal
+		}
 		shortcutStyle = cs.LabelShortcut
 	}
 
@@ -58,6 +63,30 @@ func (l *Label) Draw(buf *DrawBuffer) {
 }
 
 func (l *Label) HandleEvent(event *Event) {
+	if event.What == EvMouse && event.Mouse != nil {
+		if event.Mouse.Button&tcell.Button1 != 0 && l.link != nil {
+			if owner := l.Owner(); owner != nil {
+				owner.SetFocusedChild(l.link)
+			}
+			event.Clear()
+		}
+		return
+	}
+
+	if event.What == EvBroadcast && l.link != nil {
+		switch event.Command {
+		case CmReceivedFocus:
+			if event.Info == l.link {
+				l.light = true
+			}
+		case CmReleasedFocus:
+			if event.Info == l.link {
+				l.light = false
+			}
+		}
+		return
+	}
+
 	if l.link == nil || l.shortcut == 0 {
 		return
 	}

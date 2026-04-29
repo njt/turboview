@@ -25,6 +25,7 @@ func init() {
 		InputNormal:         s(tcell.ColorWhite, tcell.ColorBlue),
 		InputSelection:      s(tcell.ColorBlue, tcell.ColorTeal),
 		LabelNormal:         s(tcell.ColorBlack, tcell.ColorTeal),
+		LabelHighlight:      s(tcell.ColorWhite, tcell.ColorBlue),
 		LabelShortcut:       s(tcell.ColorYellow, tcell.ColorTeal),
 		CheckBoxNormal:      s(tcell.ColorBlack, tcell.ColorTeal),
 		RadioButtonNormal:   s(tcell.ColorBlack, tcell.ColorTeal),

@@ -57,13 +57,14 @@ func TestNewLabelStoresBounds(t *testing.T) {
 	}
 }
 
-// TestNewLabelSetsOfPreProcess verifies NewLabel sets the OfPreProcess option.
-// Spec: "Label sets OfPreProcess so it can intercept Alt+letter events before the focused child sees them."
-func TestNewLabelSetsOfPreProcess(t *testing.T) {
+// TestNewLabelSetsOfPostProcess verifies NewLabel sets the OfPostProcess option
+// so the focused child has priority before the label handles Alt+letter.
+// Spec: "Label sets OfPostProcess so focused view gets priority for Alt+shortcut."
+func TestNewLabelSetsOfPostProcess(t *testing.T) {
 	label := NewLabel(NewRect(0, 0, 20, 1), "~N~ame", nil)
 
-	if !label.HasOption(OfPreProcess) {
-		t.Error("NewLabel did not set OfPreProcess")
+	if !label.HasOption(OfPostProcess) {
+		t.Error("NewLabel did not set OfPostProcess")
 	}
 }
 
@@ -372,11 +373,12 @@ func TestLabelHandleEventNilLinkDoesNotClearEvent(t *testing.T) {
 	}
 }
 
-// TestLabelPreProcessInterceptsBeforeFocusedChild verifies that because Label has
-// OfPreProcess, the shortcut fires even when another child has focus.
-// Spec: "Label sets OfPreProcess so it can intercept Alt+letter events before the
-// focused child sees them."
-func TestLabelPreProcessInterceptsBeforeFocusedChild(t *testing.T) {
+// TestLabelPostProcessActivatesWhenFocusedChildDoesNotConsume verifies that
+// because Label has OfPostProcess, the shortcut fires when another child has
+// focus but does not consume the Alt+letter event.
+// Spec: "Label sets OfPostProcess so focused view gets priority for Alt+shortcut;
+// if the focused child ignores the event, the label activates."
+func TestLabelPostProcessActivatesWhenFocusedChildDoesNotConsume(t *testing.T) {
 	g := NewGroup(NewRect(0, 0, 80, 25))
 	linked := newLabelLinkedView()
 	label := NewLabel(NewRect(0, 0, 20, 1), "~N~ame", linked)
@@ -403,7 +405,7 @@ func TestLabelPreProcessInterceptsBeforeFocusedChild(t *testing.T) {
 	g.HandleEvent(ev)
 
 	if g.FocusedChild() != linked {
-		t.Errorf("FocusedChild() = %v, want linked; label with OfPreProcess must intercept before focused child", g.FocusedChild())
+		t.Errorf("FocusedChild() = %v, want linked; label post-process must activate when focused child ignores Alt+n", g.FocusedChild())
 	}
 }
 

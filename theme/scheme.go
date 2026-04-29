@@ -18,6 +18,7 @@ type ColorScheme struct {
 	InputNormal         tcell.Style
 	InputSelection      tcell.Style
 	LabelNormal         tcell.Style
+	LabelHighlight      tcell.Style
 	LabelShortcut       tcell.Style
 	CheckBoxNormal      tcell.Style
 	RadioButtonNormal   tcell.Style
