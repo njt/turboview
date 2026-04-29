@@ -604,9 +604,9 @@ func TestMultipleChildrenDifferentGrowModesCascadeIndependently(t *testing.T) {
 		t.Errorf("child1 (GfGrowLoX): A.X = %d, want 20", child1.Bounds().A.X)
 	}
 
-	// child2: GfGrowHiX, B.X should shift by 20, making it wider
-	if child2.Bounds().B.X != 30 {
-		t.Errorf("child2 (GfGrowHiX): B.X = %d, want 30 (10 + 20)", child2.Bounds().B.X)
+	// child2: GfGrowHiX, B.X should shift by 20. Original B.X=20 (10+10), new B.X=40 (20+20)
+	if child2.Bounds().B.X != 40 {
+		t.Errorf("child2 (GfGrowHiX): B.X = %d, want 40 (20 + 20)", child2.Bounds().B.X)
 	}
 
 	// child3: GfGrowLoY, A.Y should shift by 10
