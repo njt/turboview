@@ -164,6 +164,16 @@ func (w *Window) HandleEvent(event *Event) {
 		return
 	}
 
+	if event.What == EvBroadcast && event.Command == CmSelectWindowNum {
+		if n, ok := event.Info.(int); ok && n == w.number && w.HasOption(OfSelectable) {
+			if owner := w.Owner(); owner != nil {
+				owner.SetFocusedChild(w)
+			}
+			event.Clear()
+		}
+		return
+	}
+
 	// Modal window: CmClose → CmCancel
 	if event.What == EvCommand && event.Command == CmClose && w.HasState(SfModal) {
 		event.Command = CmCancel
