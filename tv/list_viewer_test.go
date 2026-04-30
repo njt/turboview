@@ -335,8 +335,8 @@ func TestSetSelectedAdjustsTopIndexDown(t *testing.T) {
 // Section 4 — OnSelect callback tests
 // ---------------------------------------------------------------------------
 
-// TestOnSelectCalledOnKeyDown verifies OnSelect fires when user presses Down arrow.
-// Spec: "Down arrow: … call OnSelect if set, consume event"
+// TestOnSelectCalledOnKeyDown verifies OnSelect does NOT fire when user presses Down arrow.
+// Spec 7.1: "Arrow key navigation changes the focused item but does NOT call OnSelect."
 func TestOnSelectCalledOnKeyDown(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c"})
 	called := false
@@ -345,13 +345,13 @@ func TestOnSelectCalledOnKeyDown(t *testing.T) {
 	ev := listKeyEv(tcell.KeyDown)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing Down arrow")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing Down arrow (spec 7.1)")
 	}
 }
 
-// TestOnSelectCalledOnKeyUp verifies OnSelect fires when user presses Up arrow.
-// Spec: "Up arrow: … call OnSelect if set, consume event"
+// TestOnSelectCalledOnKeyUp verifies OnSelect does NOT fire when user presses Up arrow.
+// Spec 7.1: "Arrow key navigation changes the focused item but does NOT call OnSelect."
 func TestOnSelectCalledOnKeyUp(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c"})
 	lv.SetSelected(2)
@@ -361,13 +361,13 @@ func TestOnSelectCalledOnKeyUp(t *testing.T) {
 	ev := listKeyEv(tcell.KeyUp)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing Up arrow")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing Up arrow (spec 7.1)")
 	}
 }
 
-// TestOnSelectCalledOnHome verifies OnSelect fires when user presses Home.
-// Spec: "Home: select first item, scroll to top, call OnSelect if set, consume event"
+// TestOnSelectCalledOnHome verifies OnSelect does NOT fire when user presses Home.
+// Spec 7.1: "Home and End change the focused item but do NOT call OnSelect."
 func TestOnSelectCalledOnHome(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c"})
 	lv.SetSelected(2)
@@ -377,13 +377,13 @@ func TestOnSelectCalledOnHome(t *testing.T) {
 	ev := listKeyEv(tcell.KeyHome)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing Home")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing Home (spec 7.1)")
 	}
 }
 
-// TestOnSelectCalledOnEnd verifies OnSelect fires when user presses End.
-// Spec: "End: select last item, scroll to show last item, call OnSelect if set, consume event"
+// TestOnSelectCalledOnEnd verifies OnSelect does NOT fire when user presses End.
+// Spec 7.1: "Home and End change the focused item but do NOT call OnSelect."
 func TestOnSelectCalledOnEnd(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c"})
 	called := false
@@ -392,13 +392,13 @@ func TestOnSelectCalledOnEnd(t *testing.T) {
 	ev := listKeyEv(tcell.KeyEnd)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing End")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing End (spec 7.1)")
 	}
 }
 
-// TestOnSelectCalledOnPgDn verifies OnSelect fires when user presses PgDn.
-// Spec: "PgDn: … call OnSelect if set, consume event"
+// TestOnSelectCalledOnPgDn verifies OnSelect does NOT fire when user presses PgDn.
+// Spec 7.1: "Page navigation (PgUp, PgDn) changes the focused item but does NOT call OnSelect."
 func TestOnSelectCalledOnPgDn(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c", "d", "e", "f", "g", "h"})
 	called := false
@@ -407,13 +407,13 @@ func TestOnSelectCalledOnPgDn(t *testing.T) {
 	ev := listKeyEv(tcell.KeyPgDn)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing PgDn")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing PgDn (spec 7.1)")
 	}
 }
 
-// TestOnSelectCalledOnPgUp verifies OnSelect fires when user presses PgUp.
-// Spec: "PgUp: … call OnSelect if set, consume event"
+// TestOnSelectCalledOnPgUp verifies OnSelect does NOT fire when user presses PgUp.
+// Spec 7.1: "Page navigation (PgUp, PgDn) changes the focused item but does NOT call OnSelect."
 func TestOnSelectCalledOnPgUp(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c", "d", "e", "f", "g", "h"})
 	lv.SetSelected(7)
@@ -423,8 +423,8 @@ func TestOnSelectCalledOnPgUp(t *testing.T) {
 	ev := listKeyEv(tcell.KeyPgUp)
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after pressing PgUp")
+	if called {
+		t.Error("OnSelect must NOT be called after pressing PgUp (spec 7.1)")
 	}
 }
 
@@ -471,18 +471,23 @@ func TestOnSelectNotCalledBySetDataSource(t *testing.T) {
 	}
 }
 
-// TestOnSelectReceivesNewIndex verifies OnSelect receives the newly selected index.
-// Spec: "OnSelect func(index int) — called when user interaction changes the selection"
+// TestOnSelectReceivesNewIndex verifies Down arrow navigates to index 1 but does NOT call OnSelect.
+// Spec 7.1: "Arrow key navigation changes the focused item but does NOT call OnSelect."
 func TestOnSelectReceivesNewIndex(t *testing.T) {
 	lv := newLVFocused([]string{"a", "b", "c"})
-	var got int
-	lv.OnSelect = func(index int) { got = index }
+	called := false
+	lv.OnSelect = func(index int) { called = true }
 
 	ev := listKeyEv(tcell.KeyDown)
 	lv.HandleEvent(ev)
 
-	if got != 1 {
-		t.Errorf("OnSelect received index %d, want 1 (moved from 0 to 1)", got)
+	// Navigation must still move the selection
+	if lv.Selected() != 1 {
+		t.Errorf("Down arrow must navigate to index 1; got Selected()=%d", lv.Selected())
+	}
+	// But OnSelect must NOT be called
+	if called {
+		t.Error("OnSelect must NOT be called by Down arrow navigation (spec 7.1)")
 	}
 }
 

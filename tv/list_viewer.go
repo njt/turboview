@@ -206,9 +206,6 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 			lv.selected++
 			lv.ensureVisible()
 			lv.syncScrollBar()
-			if lv.OnSelect != nil {
-				lv.OnSelect(lv.selected)
-			}
 		}
 		event.Clear()
 
@@ -217,9 +214,6 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 			lv.selected--
 			lv.ensureVisible()
 			lv.syncScrollBar()
-			if lv.OnSelect != nil {
-				lv.OnSelect(lv.selected)
-			}
 		}
 		event.Clear()
 
@@ -227,18 +221,12 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 		lv.selected = 0
 		lv.topIndex = 0
 		lv.syncScrollBar()
-		if lv.OnSelect != nil {
-			lv.OnSelect(lv.selected)
-		}
 		event.Clear()
 
 	case tcell.KeyEnd:
 		lv.selected = count - 1
 		lv.ensureVisible()
 		lv.syncScrollBar()
-		if lv.OnSelect != nil {
-			lv.OnSelect(lv.selected)
-		}
 		event.Clear()
 
 	case tcell.KeyPgDn:
@@ -248,9 +236,6 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 		}
 		lv.ensureVisible()
 		lv.syncScrollBar()
-		if lv.OnSelect != nil {
-			lv.OnSelect(lv.selected)
-		}
 		event.Clear()
 
 	case tcell.KeyPgUp:
@@ -260,9 +245,6 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 		}
 		lv.ensureVisible()
 		lv.syncScrollBar()
-		if lv.OnSelect != nil {
-			lv.OnSelect(lv.selected)
-		}
 		event.Clear()
 	}
 }
