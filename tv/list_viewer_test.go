@@ -428,18 +428,18 @@ func TestOnSelectCalledOnPgUp(t *testing.T) {
 	}
 }
 
-// TestOnSelectCalledOnMouseClick verifies OnSelect fires when user clicks a visible row.
-// Spec: "Click (Button1) on a visible row: select that item, call OnSelect if set, consume event"
+// TestOnSelectCalledOnMouseClick verifies OnSelect is NOT fired on single click (only focus moves).
+// Spec 7.3: "Single-click positions focus only; double-click fires OnSelect."
 func TestOnSelectCalledOnMouseClick(t *testing.T) {
 	lv := newLV([]string{"a", "b", "c"})
 	called := false
 	lv.OnSelect = func(index int) { called = true }
 
-	ev := listMouseEv(0, 1)
+	ev := listMouseEv(0, 1) // ClickCount=0, treated as single-click
 	lv.HandleEvent(ev)
 
-	if !called {
-		t.Error("OnSelect was not called after mouse click on visible row")
+	if called {
+		t.Error("OnSelect must NOT be called after single mouse click (spec 7.3)")
 	}
 }
 
@@ -491,18 +491,19 @@ func TestOnSelectReceivesNewIndex(t *testing.T) {
 	}
 }
 
-// TestOnSelectMouseClickReceivesClickedIndex verifies OnSelect receives the index of the clicked row.
-// Spec: "Click (Button1) on a visible row: select that item, call OnSelect if set"
+// TestOnSelectMouseClickReceivesClickedIndex verifies OnSelect receives the index of the double-clicked row.
+// Spec 7.3: "Double-click fires OnSelect with the clicked row's index."
 func TestOnSelectMouseClickReceivesClickedIndex(t *testing.T) {
 	lv := newLV([]string{"a", "b", "c"})
 	var got int
 	lv.OnSelect = func(index int) { got = index }
 
 	ev := listMouseEv(0, 2) // click row 2 → item 2 (topIndex=0)
+	ev.Mouse.ClickCount = 2  // double-click
 	lv.HandleEvent(ev)
 
 	if got != 2 {
-		t.Errorf("OnSelect received index %d after clicking row 2, want 2", got)
+		t.Errorf("OnSelect received index %d after double-clicking row 2, want 2", got)
 	}
 }
 

@@ -178,7 +178,7 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 				lv.selected = clickIdx
 				lv.ensureVisible()
 				lv.syncScrollBar()
-				if lv.OnSelect != nil {
+				if event.Mouse.ClickCount >= 2 && lv.OnSelect != nil {
 					lv.OnSelect(lv.selected)
 				}
 			}

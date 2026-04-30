@@ -489,8 +489,8 @@ func TestIntegrationPhase6ListMouseClickOnFirstRowSelectsFirstItem(t *testing.T)
 	}
 }
 
-// TestIntegrationPhase6ListMouseClickFiresOnSelect verifies that clicking a row
-// triggers the OnSelect callback with the correct index.
+// TestIntegrationPhase6ListMouseClickFiresOnSelect verifies that double-clicking a row
+// triggers the OnSelect callback with the correct index (spec 7.3).
 func TestIntegrationPhase6ListMouseClickFiresOnSelect(t *testing.T) {
 	items := makeItems(10)
 	win, lv, _ := makeListWindow(items)
@@ -502,17 +502,17 @@ func TestIntegrationPhase6ListMouseClickFiresOnSelect(t *testing.T) {
 		selectIdx = idx
 	}
 
-	// Click row 4: window-local (1, 5).
-	win.HandleEvent(clickEvent(1, 5, tcell.Button1))
+	// Double-click row 4: window-local (1, 5).
+	win.HandleEvent(doubleClickEvent(1, 5, tcell.Button1))
 
 	if !selectFired {
-		t.Error("OnSelect was not called after mouse click through Window dispatch chain")
+		t.Error("OnSelect was not called after mouse double-click through Window dispatch chain")
 	}
 	if selectIdx != 4 {
 		t.Errorf("OnSelect called with index %d, want 4", selectIdx)
 	}
 	if lv.Selected() != 4 {
-		t.Errorf("after click on row 4, Selected() = %d, want 4", lv.Selected())
+		t.Errorf("after double-click on row 4, Selected() = %d, want 4", lv.Selected())
 	}
 }
 
