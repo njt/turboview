@@ -170,6 +170,18 @@ func (w *Window) HandleEvent(event *Event) {
 		return
 	}
 
+	if event.What == EvCommand {
+		switch event.Command {
+		case CmZoom:
+			w.Zoom()
+			event.Clear()
+			return
+		case CmResize:
+			event.Clear()
+			return
+		}
+	}
+
 	w.group.HandleEvent(event)
 }
 
