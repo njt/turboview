@@ -894,32 +894,38 @@ func TestKeyUpConsumesEvent(t *testing.T) {
 	}
 }
 
-// TestKeyHomeSelectsFirstItem verifies Home selects item 0.
-// Spec: "Home: select first item, scroll to top, call OnSelect if set, consume event"
+// TestKeyHomeSelectsFirstItem verifies Home selects the first visible (topIndex) item.
+// Spec 7.4: "Home: select first visible item on the page (topIndex)"
 func TestKeyHomeSelectsFirstItem(t *testing.T) {
-	lv := newLVFocused([]string{"a", "b", "c", "d", "e"})
-	lv.SetSelected(4)
+	// 10 items, height=5; scroll to topIndex=3, then press Home
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	lv := newLVFocused(items)
+	lv.SetSelected(7) // forces topIndex = 7 - 5 + 1 = 3
+	lv.selected = 6   // move selection within the page (topIndex stays 3)
 
 	ev := listKeyEv(tcell.KeyHome)
 	lv.HandleEvent(ev)
 
-	if lv.Selected() != 0 {
-		t.Errorf("after Home: Selected() = %d, want 0", lv.Selected())
+	if lv.Selected() != 3 {
+		t.Errorf("after Home with topIndex=3: Selected() = %d, want 3 (topIndex)", lv.Selected())
 	}
 }
 
-// TestKeyHomeScrollsToTop verifies Home sets topIndex to 0.
-// Spec: "Home: select first item, scroll to top"
+// TestKeyHomeScrollsToTop verifies Home leaves topIndex unchanged (page-local).
+// Spec 7.4: "Home: select first visible item on the page (topIndex); topIndex unchanged"
 func TestKeyHomeScrollsToTop(t *testing.T) {
-	items := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
 	lv := newLVFocused(items)
-	lv.SetSelected(7) // force scroll
+	lv.SetSelected(7) // topIndex = 7 - 5 + 1 = 3
 
 	ev := listKeyEv(tcell.KeyHome)
 	lv.HandleEvent(ev)
 
-	if lv.TopIndex() != 0 {
-		t.Errorf("after Home: TopIndex() = %d, want 0 (scroll to top)", lv.TopIndex())
+	if lv.TopIndex() != 3 {
+		t.Errorf("after Home: TopIndex() = %d, want 3 (unchanged)", lv.TopIndex())
+	}
+	if lv.Selected() != 3 {
+		t.Errorf("after Home: Selected() = %d, want 3 (topIndex)", lv.Selected())
 	}
 }
 
@@ -935,32 +941,38 @@ func TestKeyHomeConsumesEvent(t *testing.T) {
 	}
 }
 
-// TestKeyEndSelectsLastItem verifies End selects the last item.
-// Spec: "End: select last item, scroll to show last item, call OnSelect if set, consume event"
+// TestKeyEndSelectsLastItem verifies End selects the last visible item on the page.
+// Spec 7.4: "End: select last visible item on the page (topIndex + visibleHeight - 1, clamped)"
 func TestKeyEndSelectsLastItem(t *testing.T) {
-	lv := newLVFocused([]string{"a", "b", "c", "d", "e"})
+	// 10 items, height=5, topIndex=0; End → selected = 0 + 5 - 1 = 4
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	lv := newLVFocused(items)
+	// topIndex=0 by default
 
 	ev := listKeyEv(tcell.KeyEnd)
 	lv.HandleEvent(ev)
 
 	if lv.Selected() != 4 {
-		t.Errorf("after End: Selected() = %d, want 4 (last item)", lv.Selected())
+		t.Errorf("after End with topIndex=0, height=5: Selected() = %d, want 4 (topIndex+height-1)", lv.Selected())
 	}
 }
 
-// TestKeyEndScrollsToShowLastItem verifies End adjusts topIndex to show the last item.
-// Spec: "End: select last item, scroll to show last item"
+// TestKeyEndScrollsToShowLastItem verifies End leaves topIndex unchanged (page-local).
+// Spec 7.4: "End: select last visible item on the page; topIndex unchanged"
 func TestKeyEndScrollsToShowLastItem(t *testing.T) {
-	items := []string{"a", "b", "c", "d", "e", "f", "g", "h"} // 8 items
+	// 10 items, height=5, topIndex=0; End selects item 4, topIndex stays 0
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
 	lv := newLVFocused(items)
-	// height = 5, last item = 7, visible when topIndex <= 3
+	// topIndex=0 by default
 
 	ev := listKeyEv(tcell.KeyEnd)
 	lv.HandleEvent(ev)
 
-	// topIndex should be such that item 7 is visible: topIndex = 7 - 5 + 1 = 3
-	if lv.TopIndex() != 3 {
-		t.Errorf("after End: TopIndex() = %d, want 3 (shows last item)", lv.TopIndex())
+	if lv.TopIndex() != 0 {
+		t.Errorf("after End: TopIndex() = %d, want 0 (unchanged)", lv.TopIndex())
+	}
+	if lv.Selected() != 4 {
+		t.Errorf("after End: Selected() = %d, want 4 (topIndex+height-1)", lv.Selected())
 	}
 }
 

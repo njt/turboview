@@ -219,6 +219,25 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 		return
 	}
 
+	ke := event.Key
+	if ke.Key == tcell.KeyPgUp && ke.Modifiers&tcell.ModCtrl != 0 {
+		lv.selected = 0
+		lv.topIndex = 0
+		lv.syncScrollBar()
+		event.Clear()
+		return
+	}
+	if ke.Key == tcell.KeyPgDn && ke.Modifiers&tcell.ModCtrl != 0 {
+		lv.selected = count - 1
+		if lv.selected < 0 {
+			lv.selected = 0
+		}
+		lv.ensureVisible()
+		lv.syncScrollBar()
+		event.Clear()
+		return
+	}
+
 	switch event.Key.Key {
 	case tcell.KeyDown:
 		if lv.selected < count-1 {
@@ -237,14 +256,16 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 		event.Clear()
 
 	case tcell.KeyHome:
-		lv.selected = 0
-		lv.topIndex = 0
+		lv.selected = lv.topIndex
 		lv.syncScrollBar()
 		event.Clear()
 
 	case tcell.KeyEnd:
-		lv.selected = count - 1
-		lv.ensureVisible()
+		lastVisible := lv.topIndex + lv.visibleHeight() - 1
+		if lastVisible >= count {
+			lastVisible = count - 1
+		}
+		lv.selected = lastVisible
 		lv.syncScrollBar()
 		event.Clear()
 
