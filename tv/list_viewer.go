@@ -196,6 +196,25 @@ func (lv *ListViewer) HandleEvent(event *Event) {
 	}
 
 	count := lv.dataSource.Count()
+
+	// Space to select
+	if event.Key.Key == tcell.KeyRune && event.Key.Rune == ' ' {
+		if count > 0 && lv.OnSelect != nil {
+			lv.OnSelect(lv.selected)
+		}
+		event.Clear()
+		return
+	}
+
+	// Enter to select
+	if event.Key.Key == tcell.KeyEnter {
+		if count > 0 && lv.OnSelect != nil {
+			lv.OnSelect(lv.selected)
+		}
+		event.Clear()
+		return
+	}
+
 	if count == 0 {
 		return
 	}
