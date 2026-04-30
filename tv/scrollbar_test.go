@@ -38,13 +38,13 @@ func TestNewScrollBarSetsSfVisible(t *testing.T) {
 	}
 }
 
-// TestNewScrollBarDoesNotSetOfSelectable verifies NewScrollBar does NOT set OfSelectable.
-// Spec: "does NOT set OfSelectable (scrollbars don't receive focus)"
+// TestNewScrollBarDoesNotSetOfSelectable verifies NewScrollBar sets OfSelectable.
+// Spec: "SetOptions(OfSelectable, true) in NewScrollBar so scrollbar can receive focus"
 func TestNewScrollBarDoesNotSetOfSelectable(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 
-	if sb.HasOption(OfSelectable) {
-		t.Error("NewScrollBar must not set OfSelectable (scrollbars don't receive focus)")
+	if !sb.HasOption(OfSelectable) {
+		t.Error("NewScrollBar must set OfSelectable so the scrollbar can receive focus")
 	}
 }
 

@@ -18,16 +18,21 @@ type ScrollBar struct {
 	max         int
 	value       int
 	pageSize    int
+	arStep      int
 	OnChange    func(int)
 }
 
 func NewScrollBar(bounds Rect, orientation Orientation) *ScrollBar {
-	sb := &ScrollBar{orientation: orientation}
+	sb := &ScrollBar{orientation: orientation, arStep: 1}
 	sb.SetBounds(bounds)
 	sb.SetState(SfVisible, true)
+	sb.SetOptions(OfSelectable, true)
 	sb.SetSelf(sb)
 	return sb
 }
+
+func (sb *ScrollBar) ArStep() int      { return sb.arStep }
+func (sb *ScrollBar) SetArStep(n int)  { sb.arStep = n }
 
 func (sb *ScrollBar) Min() int      { return sb.min }
 func (sb *ScrollBar) Max() int      { return sb.max }
@@ -152,6 +157,11 @@ func (sb *ScrollBar) drawHorizontal(buf *DrawBuffer, barStyle, thumbStyle tcell.
 }
 
 func (sb *ScrollBar) HandleEvent(event *Event) {
+	if event.What == EvKeyboard && event.Key != nil && sb.HasState(SfSelected) {
+		sb.handleKeyboard(event)
+		return
+	}
+
 	if event.What != EvMouse || event.Mouse == nil {
 		return
 	}
@@ -246,5 +256,79 @@ func (sb *ScrollBar) page(dir int) {
 	sb.clampValue()
 	if sb.value != old && sb.OnChange != nil {
 		sb.OnChange(sb.value)
+	}
+}
+
+func (sb *ScrollBar) goToMin() {
+	old := sb.value
+	sb.value = sb.min
+	sb.clampValue()
+	if sb.value != old && sb.OnChange != nil {
+		sb.OnChange(sb.value)
+	}
+}
+
+func (sb *ScrollBar) goToMax() {
+	old := sb.value
+	sb.value = sb.max - sb.pageSize
+	sb.clampValue()
+	if sb.value != old && sb.OnChange != nil {
+		sb.OnChange(sb.value)
+	}
+}
+
+func (sb *ScrollBar) handleKeyboard(event *Event) {
+	if sb.orientation == Vertical {
+		sb.handleVerticalKeyboard(event)
+	} else {
+		sb.handleHorizontalKeyboard(event)
+	}
+}
+
+func (sb *ScrollBar) handleVerticalKeyboard(event *Event) {
+	ke := event.Key
+	switch {
+	case ke.Key == tcell.KeyUp:
+		sb.step(-sb.arStep)
+		event.Clear()
+	case ke.Key == tcell.KeyDown:
+		sb.step(sb.arStep)
+		event.Clear()
+	case ke.Key == tcell.KeyPgUp && ke.Modifiers&tcell.ModCtrl != 0:
+		sb.goToMin()
+		event.Clear()
+	case ke.Key == tcell.KeyPgDn && ke.Modifiers&tcell.ModCtrl != 0:
+		sb.goToMax()
+		event.Clear()
+	case ke.Key == tcell.KeyPgUp:
+		sb.page(-1)
+		event.Clear()
+	case ke.Key == tcell.KeyPgDn:
+		sb.page(1)
+		event.Clear()
+	}
+}
+
+func (sb *ScrollBar) handleHorizontalKeyboard(event *Event) {
+	ke := event.Key
+	switch {
+	case ke.Key == tcell.KeyLeft && ke.Modifiers&tcell.ModCtrl != 0:
+		sb.page(-1)
+		event.Clear()
+	case ke.Key == tcell.KeyRight && ke.Modifiers&tcell.ModCtrl != 0:
+		sb.page(1)
+		event.Clear()
+	case ke.Key == tcell.KeyLeft:
+		sb.step(-sb.arStep)
+		event.Clear()
+	case ke.Key == tcell.KeyRight:
+		sb.step(sb.arStep)
+		event.Clear()
+	case ke.Key == tcell.KeyHome:
+		sb.goToMin()
+		event.Clear()
+	case ke.Key == tcell.KeyEnd:
+		sb.goToMax()
+		event.Clear()
 	}
 }
