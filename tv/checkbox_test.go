@@ -940,47 +940,45 @@ func TestCheckBoxesDrawCheckedItemShowsX(t *testing.T) {
 // Tab traversal
 // ---------------------------------------------------------------------------
 
-// TestCheckBoxesTabAdvancesFocus verifies Tab moves focus from the first to the
-// second CheckBox.
-// Spec: "The cluster's Group handles Tab/Shift+Tab between checkboxes."
-func TestCheckBoxesTabAdvancesFocus(t *testing.T) {
+// TestCheckBoxesTabDoesNotAdvanceFocus verifies Tab does NOT cycle focus within
+// the cluster. Per spec 13.3, Tab is handled by Window, not by clusters.
+func TestCheckBoxesTabDoesNotAdvanceFocus(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(0))
 
 	ev := tabKey()
 	cbs.HandleEvent(ev)
 
-	if cbs.FocusedChild() != cbs.Item(1) {
-		t.Errorf("after Tab, FocusedChild() = %v, want Item(1)", cbs.FocusedChild())
+	if cbs.FocusedChild() != cbs.Item(0) {
+		t.Errorf("after Tab, FocusedChild() = %v, want Item(0) (Tab should NOT cycle in clusters)", cbs.FocusedChild())
 	}
 }
 
-// TestCheckBoxesShiftTabMovesFocusBackward verifies Shift+Tab moves focus backward.
-// Spec: "The cluster's Group handles Tab/Shift+Tab between checkboxes."
-func TestCheckBoxesShiftTabMovesFocusBackward(t *testing.T) {
+// TestCheckBoxesShiftTabDoesNotMoveFocus verifies Shift+Tab does NOT cycle
+// focus within the cluster. Per spec 13.3, Tab is handled by Window.
+func TestCheckBoxesShiftTabDoesNotMoveFocus(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(1))
 
 	ev := shiftTabKey()
 	cbs.HandleEvent(ev)
 
-	if cbs.FocusedChild() != cbs.Item(0) {
-		t.Errorf("after Shift+Tab, FocusedChild() = %v, want Item(0)", cbs.FocusedChild())
+	if cbs.FocusedChild() != cbs.Item(1) {
+		t.Errorf("after Shift+Tab, FocusedChild() = %v, want Item(1) (Shift+Tab should NOT cycle in clusters)", cbs.FocusedChild())
 	}
 }
 
-// TestCheckBoxesTabWrapsAroundToFirst verifies Tab from the last item wraps back
-// to the first.
-// Spec: "Tab/Shift+Tab between checkboxes."
-func TestCheckBoxesTabWrapsAroundToFirst(t *testing.T) {
+// TestCheckBoxesTabDoesNotWrap verifies Tab does NOT wrap within the cluster.
+// Per spec 13.3, Tab is handled by Window, not by clusters.
+func TestCheckBoxesTabDoesNotWrap(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(2))
 
 	ev := tabKey()
 	cbs.HandleEvent(ev)
 
-	if cbs.FocusedChild() != cbs.Item(0) {
-		t.Errorf("after Tab from last, FocusedChild() = %v, want Item(0) (wrap-around)",
+	if cbs.FocusedChild() != cbs.Item(2) {
+		t.Errorf("after Tab, FocusedChild() = %v, want Item(2) (Tab should NOT wrap in clusters)",
 			cbs.FocusedChild())
 	}
 }
@@ -1303,16 +1301,16 @@ func TestCheckBoxDrawEmptyLabelStillRendersBrackets(t *testing.T) {
 	}
 }
 
-// TestCheckBoxesTabClearsEvent verifies Tab is consumed by the cluster.
-// Spec: "The cluster's Group handles Tab/Shift+Tab between checkboxes."
-func TestCheckBoxesTabClearsEvent(t *testing.T) {
+// TestCheckBoxesTabDoesNotConsumeEvent verifies Tab is NOT consumed by the
+// cluster. Per spec 13.3, Tab passes through to be handled by the parent Window.
+func TestCheckBoxesTabDoesNotConsumeEvent(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 2), []string{"A", "B"})
 
 	ev := tabKey()
 	cbs.HandleEvent(ev)
 
-	if !ev.IsCleared() {
-		t.Errorf("Tab event not consumed by CheckBoxes; ev.What = %v, want EvNothing", ev.What)
+	if ev.IsCleared() {
+		t.Errorf("Tab event consumed by CheckBoxes; clusters should NOT handle Tab (spec 13.3)")
 	}
 }
 

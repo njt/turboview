@@ -179,23 +179,28 @@ func TestGroupDoesNotHandleShiftTab(t *testing.T) {
 // 8. Desktop does NOT forward Tab to focused window
 // ---------------------------------------------------------------------------
 
-// TestDesktopDoesNotForwardTab verifies that Desktop.HandleEvent no longer
-// forwards Tab to the focused window, and thus the event is NOT consumed.
+// TestDesktopTabReachesWindowThroughGroupDispatch verifies that after removing
+// Desktop's explicit Tab forwarding, Tab still reaches the focused Window
+// through normal group dispatch and is handled there.
 // Spec: "Desktop.HandleEvent removes the Tab/Shift+Tab forwarding to focused window"
-func TestDesktopDoesNotForwardTab(t *testing.T) {
+func TestDesktopTabReachesWindowThroughGroupDispatch(t *testing.T) {
 	d := NewDesktop(NewRect(0, 0, 80, 25))
 	win := NewWindow(NewRect(0, 0, 40, 20), "Win")
 	child1 := newSelectableMockView(NewRect(0, 0, 5, 3))
 	child2 := newSelectableMockView(NewRect(5, 0, 5, 3))
 	win.Insert(child1)
 	win.Insert(child2)
+	win.SetFocusedChild(child1)
 	d.Insert(win)
 
 	ev := tabEvent()
 	d.HandleEvent(ev)
 
-	if ev.IsCleared() {
-		t.Errorf("Desktop.HandleEvent consumed Tab — Desktop should no longer forward Tab to windows")
+	if !ev.IsCleared() {
+		t.Errorf("Tab sent to Desktop was not handled — Tab should reach Window through group dispatch")
+	}
+	if win.FocusedChild() != child2 {
+		t.Errorf("Tab via Desktop: FocusedChild() = %v, want child2 (Tab should advance focus in Window)", win.FocusedChild())
 	}
 }
 

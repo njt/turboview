@@ -91,14 +91,6 @@ func (d *Desktop) HandleEvent(event *Event) {
 		return
 	}
 
-	// Tab/Shift+Tab: not handled at Desktop level. Window handles Tab for its
-	// own widget traversal. Desktop does not intercept or forward Tab.
-	if event.What == EvKeyboard && event.Key != nil {
-		if event.Key.Key == tcell.KeyTab || event.Key.Key == tcell.KeyBacktab {
-			return
-		}
-	}
-
 	// Desktop-level commands
 	if event.What == EvCommand {
 		switch event.Command {

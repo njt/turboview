@@ -221,21 +221,7 @@ func (cbs *CheckBoxes) HandleEvent(event *Event) {
 		}
 	}
 
-	// Tab/Shift+Tab focus traversal within CheckBoxes cluster
-	if event.What == EvKeyboard && event.Key != nil {
-		if event.Key.Key == tcell.KeyTab && event.Key.Modifiers == 0 {
-			cbs.group.FocusNext()
-			event.Clear()
-			return
-		}
-		if event.Key.Key == tcell.KeyBacktab {
-			cbs.group.FocusPrev()
-			event.Clear()
-			return
-		}
-	}
-
-	// Delegate to group for other events
+	// Delegate to group for Tab/Shift+Tab and other events
 	cbs.group.HandleEvent(event)
 }
 

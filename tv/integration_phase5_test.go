@@ -705,20 +705,19 @@ func TestIntegrationPhase5CheckBoxValuesReflectedAfterDialogInteraction(t *testi
 	spaceEv := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: ' '}}
 	d.HandleEvent(spaceEv)
 
-	// Tab to Item(1) inside the cluster.
-	d.HandleEvent(tabKey()) // Tab goes to next widget in Dialog — CheckBoxes stays focused
-	// Tab within CheckBoxes cluster: need to deliver to cluster directly since Dialog
-	// Tab would move to the next sibling widget. Focus is still on CheckBoxes.
-	// Let's deliver Tab directly to the cluster to advance within it.
-	cbs.HandleEvent(tabKey()) // move within cluster to Item(1)
+	// Use Down arrow to move to Item(1) inside the cluster.
+	// (Tab no longer cycles within clusters per spec 13.3 — use arrow keys instead.)
+	downEv := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
+	d.HandleEvent(downEv)
 	spaceEv2 := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: ' '}}
 	d.HandleEvent(spaceEv2)
 
-	// Item(0) should be checked (bit 0), and if Tab within cluster moved to Item(1),
-	// Item(1) should also be checked (bit 1).
-	// We use a simpler approach: just verify item(0) is checked via Values().
+	// Item(0) should be checked (bit 0), and Down+Space checked Item(1) (bit 1).
 	values := cbs.Values()
 	if values&1 == 0 {
 		t.Errorf("Values() = %b; bit 0 should be set after Space on Item(0) through Dialog", values)
+	}
+	if values&2 == 0 {
+		t.Errorf("Values() = %b; bit 1 should be set after Down+Space on Item(1)", values)
 	}
 }
