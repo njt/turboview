@@ -1,6 +1,5 @@
 package tv
 
-import "github.com/gdamore/tcell/v2"
 
 type Group struct {
 	BaseView
@@ -272,20 +271,6 @@ func (g *Group) HandleEvent(event *Event) {
 		return
 	}
 
-	// Tab/Shift+Tab focus traversal — before three-phase dispatch
-	if event.What == EvKeyboard && event.Key != nil {
-		if event.Key.Key == tcell.KeyTab && event.Key.Modifiers == 0 {
-			g.focusNext()
-			event.Clear()
-			return
-		}
-		if event.Key.Key == tcell.KeyBacktab {
-			g.focusPrev()
-			event.Clear()
-			return
-		}
-	}
-
 	// Three-phase dispatch for keyboard and command events
 
 	// Phase 1: Preprocess
@@ -361,6 +346,9 @@ func (g *Group) selectPrevious() {
 		}
 	}
 }
+
+func (g *Group) FocusNext() { g.focusNext() }
+func (g *Group) FocusPrev() { g.focusPrev() }
 
 func (g *Group) focusNext() {
 	if len(g.children) == 0 {

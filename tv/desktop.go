@@ -91,13 +91,10 @@ func (d *Desktop) HandleEvent(event *Event) {
 		return
 	}
 
+	// Tab/Shift+Tab: not handled at Desktop level. Window handles Tab for its
+	// own widget traversal. Desktop does not intercept or forward Tab.
 	if event.What == EvKeyboard && event.Key != nil {
-		// Tab/Shift+Tab: forward to focused window for widget traversal.
-		// Desktop uses CmNext/CmPrev (F6) for window cycling, not Tab.
 		if event.Key.Key == tcell.KeyTab || event.Key.Key == tcell.KeyBacktab {
-			if focused := d.group.FocusedChild(); focused != nil {
-				focused.HandleEvent(event)
-			}
 			return
 		}
 	}

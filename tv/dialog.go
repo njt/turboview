@@ -241,6 +241,20 @@ func (d *Dialog) HandleEvent(event *Event) {
 		return
 	}
 
+	// Tab/Shift+Tab focus traversal at the Dialog level
+	if event.What == EvKeyboard && event.Key != nil {
+		if event.Key.Key == tcell.KeyTab && event.Key.Modifiers == 0 {
+			d.group.FocusNext()
+			event.Clear()
+			return
+		}
+		if event.Key.Key == tcell.KeyBacktab {
+			d.group.FocusPrev()
+			event.Clear()
+			return
+		}
+	}
+
 	// Delegate to group first (keyboard, commands, broadcasts)
 	d.group.HandleEvent(event)
 

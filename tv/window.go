@@ -174,6 +174,19 @@ func (w *Window) HandleEvent(event *Event) {
 		return
 	}
 
+	if event.What == EvKeyboard && event.Key != nil {
+		if event.Key.Key == tcell.KeyTab && event.Key.Modifiers == 0 {
+			w.group.FocusNext()
+			event.Clear()
+			return
+		}
+		if event.Key.Key == tcell.KeyBacktab {
+			w.group.FocusPrev()
+			event.Clear()
+			return
+		}
+	}
+
 	// Modal window: CmClose → CmCancel
 	if event.What == EvCommand && event.Command == CmClose && w.HasState(SfModal) {
 		event.Command = CmCancel
