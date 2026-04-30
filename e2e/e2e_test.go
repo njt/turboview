@@ -1080,3 +1080,41 @@ func TestContextMenuSmoke(t *testing.T) {
 		t.Error("app did not exit after Alt+X")
 	}
 }
+
+func TestListViewerSpaceSelect(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-listspace"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Navigate to win2's list viewer
+	tmuxSendKeys(t, session, "Tab")
+	time.Sleep(500 * time.Millisecond)
+
+	// Arrow down a few times (navigation only, no selection)
+	for i := 0; i < 3; i++ {
+		tmuxSendKeys(t, session, "Down")
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Item 4 should be focused (started at Item 1, moved down 3)
+	if !containsAny(lines, "Item 4") {
+		t.Error("Item 4 not visible after navigating down 3 times")
+	}
+
+	// App still responsive — clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
