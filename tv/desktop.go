@@ -123,15 +123,7 @@ func (d *Desktop) HandleEvent(event *Event) {
 			d.SelectPrevWindow()
 			event.Clear()
 			return
-		case CmTile:
-			d.Tile()
-			event.Clear()
-			return
-		case CmCascade:
-			d.Cascade()
-			event.Clear()
-			return
-		}
+}
 	}
 
 	d.group.HandleEvent(event)

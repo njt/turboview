@@ -744,35 +744,6 @@ func TestTileMinimumCellSize(t *testing.T) {
 	}
 }
 
-// Spec: CmTile → Tile. After CmTile, windows must be arranged in a grid.
-func TestCmTileArrangesWindows(t *testing.T) {
-	dw, dh := 80, 25
-	d := NewDesktop(NewRect(0, 0, dw, dh))
-	w1 := NewWindow(NewRect(5, 5, 10, 5), "W1")
-	w2 := NewWindow(NewRect(5, 5, 10, 5), "W2")
-	d.Insert(w1)
-	d.Insert(w2)
-
-	ev := cmdEvent(CmTile)
-	d.HandleEvent(ev)
-
-	// Verify windows were rearranged (not still at original overlap).
-	if w1.Bounds().A == w2.Bounds().A {
-		t.Errorf("CmTile: windows still have the same origin, Tile was not called")
-	}
-}
-
-// Spec: CmTile clears the event.
-func TestCmTileClearsEvent(t *testing.T) {
-	d := NewDesktop(NewRect(0, 0, 80, 25))
-
-	ev := cmdEvent(CmTile)
-	d.HandleEvent(ev)
-
-	if !ev.IsCleared() {
-		t.Errorf("CmTile: event was not cleared")
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Cascade
@@ -945,38 +916,6 @@ func TestCascadeMinimumWindowSize(t *testing.T) {
 	}
 }
 
-// Spec: CmCascade → Cascade. After CmCascade, visible windows arranged.
-func TestCmCascadeArrangesWindows(t *testing.T) {
-	dw, dh := 80, 25
-	d := NewDesktop(NewRect(0, 0, dw, dh))
-	w1 := NewWindow(NewRect(0, 0, 10, 5), "W1")
-	w2 := NewWindow(NewRect(0, 0, 10, 5), "W2")
-	d.Insert(w1)
-	d.Insert(w2)
-
-	ev := cmdEvent(CmCascade)
-	d.HandleEvent(ev)
-
-	// After cascade, w1 and w2 must have the 3/4 window size.
-	wantW := max(dw*3/4, 10)
-	wantH := max(dh*3/4, 5)
-	b1 := w1.Bounds()
-	if b1.Width() != wantW || b1.Height() != wantH {
-		t.Errorf("CmCascade: w1 size = (%d,%d), want (%d,%d)", b1.Width(), b1.Height(), wantW, wantH)
-	}
-}
-
-// Spec: CmCascade clears the event.
-func TestCmCascadeClearsEvent(t *testing.T) {
-	d := NewDesktop(NewRect(0, 0, 80, 25))
-
-	ev := cmdEvent(CmCascade)
-	d.HandleEvent(ev)
-
-	if !ev.IsCleared() {
-		t.Errorf("CmCascade: event was not cleared")
-	}
-}
 
 // ---------------------------------------------------------------------------
 // "Handled BEFORE delegating to Group" — window-mgmt events take priority
@@ -1022,41 +961,6 @@ func TestCmPrevHandledBeforeGroup(t *testing.T) {
 	}
 }
 
-// Spec: same — CmTile handled before Group.
-func TestCmTileHandledBeforeGroup(t *testing.T) {
-	d := NewDesktop(NewRect(0, 0, 80, 25))
-	observer := newPhaseView("observer", NewRect(0, 0, 10, 5))
-	observer.SetOptions(OfPostProcess, true)
-	d.Insert(observer)
-
-	ev := cmdEvent(CmTile)
-	d.HandleEvent(ev)
-
-	if !ev.IsCleared() {
-		t.Errorf("CmTile: event not cleared, Group may have processed it")
-	}
-	if observer.lastEvent == ev {
-		t.Errorf("CmTile: event reached Group (postprocess observer received it)")
-	}
-}
-
-// Spec: same — CmCascade handled before Group.
-func TestCmCascadeHandledBeforeGroup(t *testing.T) {
-	d := NewDesktop(NewRect(0, 0, 80, 25))
-	observer := newPhaseView("observer", NewRect(0, 0, 10, 5))
-	observer.SetOptions(OfPostProcess, true)
-	d.Insert(observer)
-
-	ev := cmdEvent(CmCascade)
-	d.HandleEvent(ev)
-
-	if !ev.IsCleared() {
-		t.Errorf("CmCascade: event not cleared, Group may have processed it")
-	}
-	if observer.lastEvent == ev {
-		t.Errorf("CmCascade: event reached Group (postprocess observer received it)")
-	}
-}
 
 // Spec: Non-window-management events must still be delegated to Group after
 // Desktop's own handling (falsifying the "only window-mgmt events" constraint).

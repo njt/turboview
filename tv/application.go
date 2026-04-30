@@ -407,6 +407,18 @@ func (app *Application) handleEvent(event *Event) {
 func (app *Application) handleCommand(event *Event) {
 	if event.What == EvCommand {
 		switch event.Command {
+		case CmTile:
+			if app.desktop != nil {
+				app.desktop.Tile()
+			}
+			event.Clear()
+			return
+		case CmCascade:
+			if app.desktop != nil {
+				app.desktop.Cascade()
+			}
+			event.Clear()
+			return
 		case CmQuit:
 			app.quit = true
 			event.Clear()
