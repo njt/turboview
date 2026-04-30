@@ -26,6 +26,7 @@ type ListViewer struct {
 	selected   int
 	topIndex   int
 	scrollBar  *ScrollBar
+	dragging   bool
 	OnSelect   func(int)
 }
 
@@ -173,15 +174,55 @@ func (lv *ListViewer) Draw(buf *DrawBuffer) {
 func (lv *ListViewer) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
 		if event.Mouse.Button&tcell.Button1 != 0 {
-			clickIdx := lv.topIndex + event.Mouse.Y
-			if clickIdx >= 0 && clickIdx < lv.dataSource.Count() {
-				lv.selected = clickIdx
-				lv.ensureVisible()
-				lv.syncScrollBar()
-				if event.Mouse.ClickCount >= 2 && lv.OnSelect != nil {
-					lv.OnSelect(lv.selected)
+			count := lv.dataSource.Count()
+			my := event.Mouse.Y
+
+			if my < 0 {
+				// Auto-scroll up
+				if lv.topIndex > 0 {
+					lv.topIndex--
+					lv.selected = lv.topIndex
+				}
+			} else if my >= lv.visibleHeight() {
+				// Auto-scroll down
+				maxTop := count - lv.visibleHeight()
+				if maxTop < 0 {
+					maxTop = 0
+				}
+				if lv.topIndex < maxTop {
+					lv.topIndex++
+				}
+				lastVisible := lv.topIndex + lv.visibleHeight() - 1
+				if lastVisible >= count {
+					lastVisible = count - 1
+				}
+				if lastVisible >= 0 {
+					lv.selected = lastVisible
+				}
+			} else {
+				// Normal click/drag within bounds
+				clickIdx := lv.topIndex + my
+				if clickIdx >= 0 && clickIdx < count {
+					lv.selected = clickIdx
 				}
 			}
+
+			if !lv.dragging && event.Mouse.ClickCount >= 1 {
+				lv.dragging = true
+			}
+
+			lv.ensureVisible()
+			lv.syncScrollBar()
+
+			// Double-click fires OnSelect (only on in-bounds click within data range)
+			if event.Mouse.ClickCount >= 2 && my >= 0 && my < lv.visibleHeight() &&
+				lv.topIndex+my < count && lv.OnSelect != nil {
+				lv.OnSelect(lv.selected)
+			}
+
+			event.Clear()
+		} else if lv.dragging {
+			lv.dragging = false
 			event.Clear()
 		}
 		return
