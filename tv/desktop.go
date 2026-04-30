@@ -91,17 +91,7 @@ func (d *Desktop) HandleEvent(event *Event) {
 		return
 	}
 
-	// Alt+N window switching
 	if event.What == EvKeyboard && event.Key != nil {
-		if event.Key.Modifiers&tcell.ModAlt != 0 && event.Key.Key == tcell.KeyRune {
-			n := int(event.Key.Rune - '0')
-			if n >= 1 && n <= 9 {
-				if d.selectWindowByNumber(n) {
-					event.Clear()
-				}
-				return
-			}
-		}
 		// Tab/Shift+Tab: forward to focused window for widget traversal.
 		// Desktop uses CmNext/CmPrev (F6) for window cycling, not Tab.
 		if event.Key.Key == tcell.KeyTab || event.Key.Key == tcell.KeyBacktab {
@@ -123,7 +113,7 @@ func (d *Desktop) HandleEvent(event *Event) {
 			d.SelectPrevWindow()
 			event.Clear()
 			return
-}
+		}
 	}
 
 	d.group.HandleEvent(event)

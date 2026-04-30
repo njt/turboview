@@ -395,6 +395,20 @@ func (app *Application) handleEvent(event *Event) {
 		return
 	}
 
+	if !event.IsCleared() && event.What == EvKeyboard && event.Key != nil {
+		if event.Key.Modifiers&tcell.ModAlt != 0 && event.Key.Key == tcell.KeyRune {
+			n := int(event.Key.Rune - '0')
+			if n >= 1 && n <= 9 && app.desktop != nil {
+				bcast := &Event{What: EvBroadcast, Command: CmSelectWindowNum, Info: n}
+				app.desktop.HandleEvent(bcast)
+				if bcast.IsCleared() {
+					event.Clear()
+				}
+				return
+			}
+		}
+	}
+
 	if !event.IsCleared() && app.desktop != nil {
 		app.desktop.HandleEvent(event)
 	}
