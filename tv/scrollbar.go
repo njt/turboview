@@ -13,13 +13,15 @@ const (
 
 type ScrollBar struct {
 	BaseView
-	orientation Orientation
-	min         int
-	max         int
-	value       int
-	pageSize    int
-	arStep      int
-	OnChange    func(int)
+	orientation    Orientation
+	min            int
+	max            int
+	value          int
+	pageSize       int
+	arStep         int
+	thumbDragging  bool
+	thumbDragOffset int
+	OnChange       func(int)
 }
 
 func NewScrollBar(bounds Rect, orientation Orientation) *ScrollBar {
@@ -178,7 +180,7 @@ func (sb *ScrollBar) HandleEvent(event *Event) {
 		return
 	}
 
-	if event.Mouse.Button&tcell.Button1 == 0 {
+	if event.Mouse.Button&tcell.Button1 == 0 && !sb.thumbDragging {
 		return
 	}
 
@@ -193,6 +195,17 @@ func (sb *ScrollBar) handleVerticalClick(event *Event) {
 	my := event.Mouse.Y
 	h := sb.Bounds().Height()
 
+	if sb.thumbDragging {
+		if event.Mouse.Button&tcell.Button1 != 0 {
+			trackPos := my - 1 - sb.thumbDragOffset
+			sb.setValueFromTrackPos(trackPos)
+		} else {
+			sb.thumbDragging = false
+		}
+		event.Clear()
+		return
+	}
+
 	if my == 0 {
 		sb.step(-1)
 		event.Clear()
@@ -205,7 +218,14 @@ func (sb *ScrollBar) handleVerticalClick(event *Event) {
 	}
 
 	trackY := my - 1
-	thumbPos, _ := sb.thumbInfo()
+	thumbPos, thumbLen := sb.thumbInfo()
+
+	if trackY >= thumbPos && trackY < thumbPos+thumbLen {
+		sb.thumbDragging = true
+		sb.thumbDragOffset = trackY - thumbPos
+		event.Clear()
+		return
+	}
 
 	if trackY < thumbPos {
 		sb.page(-1)
@@ -219,6 +239,17 @@ func (sb *ScrollBar) handleHorizontalClick(event *Event) {
 	mx := event.Mouse.X
 	w := sb.Bounds().Width()
 
+	if sb.thumbDragging {
+		if event.Mouse.Button&tcell.Button1 != 0 {
+			trackPos := mx - 1 - sb.thumbDragOffset
+			sb.setValueFromTrackPos(trackPos)
+		} else {
+			sb.thumbDragging = false
+		}
+		event.Clear()
+		return
+	}
+
 	if mx == 0 {
 		sb.step(-1)
 		event.Clear()
@@ -231,7 +262,14 @@ func (sb *ScrollBar) handleHorizontalClick(event *Event) {
 	}
 
 	trackX := mx - 1
-	thumbPos, _ := sb.thumbInfo()
+	thumbPos, thumbLen := sb.thumbInfo()
+
+	if trackX >= thumbPos && trackX < thumbPos+thumbLen {
+		sb.thumbDragging = true
+		sb.thumbDragOffset = trackX - thumbPos
+		event.Clear()
+		return
+	}
 
 	if trackX < thumbPos {
 		sb.page(-1)
@@ -253,6 +291,31 @@ func (sb *ScrollBar) step(dir int) {
 func (sb *ScrollBar) page(dir int) {
 	old := sb.value
 	sb.value += dir * sb.pageSize
+	sb.clampValue()
+	if sb.value != old && sb.OnChange != nil {
+		sb.OnChange(sb.value)
+	}
+}
+
+func (sb *ScrollBar) setValueFromTrackPos(trackPos int) {
+	tl := sb.trackLen()
+	_, thumbLen := sb.thumbInfo()
+	scrollRange := sb.max - sb.pageSize - sb.min
+	if scrollRange <= 0 || tl <= thumbLen {
+		return
+	}
+	availableTrack := tl - thumbLen
+	if availableTrack <= 0 {
+		return
+	}
+	if trackPos < 0 {
+		trackPos = 0
+	}
+	if trackPos > availableTrack {
+		trackPos = availableTrack
+	}
+	old := sb.value
+	sb.value = sb.min + trackPos*scrollRange/availableTrack
 	sb.clampValue()
 	if sb.value != old && sb.OnChange != nil {
 		sb.OnChange(sb.value)
