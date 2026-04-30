@@ -24,6 +24,13 @@ type ScrollBar struct {
 	OnChange       func(int)
 }
 
+func (sb *ScrollBar) broadcastToOwner(cmd CommandCode) {
+	if owner := sb.Owner(); owner != nil {
+		bcast := &Event{What: EvBroadcast, Command: cmd, Info: sb}
+		owner.HandleEvent(bcast)
+	}
+}
+
 func NewScrollBar(bounds Rect, orientation Orientation) *ScrollBar {
 	sb := &ScrollBar{orientation: orientation, arStep: 1}
 	sb.SetBounds(bounds)
@@ -170,11 +177,13 @@ func (sb *ScrollBar) HandleEvent(event *Event) {
 
 	// Mouse wheel
 	if event.Mouse.Button == tcell.WheelUp {
+		sb.broadcastToOwner(CmScrollBarClicked)
 		sb.step(-3 * sb.arStep)
 		event.Clear()
 		return
 	}
 	if event.Mouse.Button == tcell.WheelDown {
+		sb.broadcastToOwner(CmScrollBarClicked)
 		sb.step(3 * sb.arStep)
 		event.Clear()
 		return
@@ -194,6 +203,10 @@ func (sb *ScrollBar) HandleEvent(event *Event) {
 func (sb *ScrollBar) handleVerticalClick(event *Event) {
 	my := event.Mouse.Y
 	h := sb.Bounds().Height()
+
+	if !sb.thumbDragging {
+		sb.broadcastToOwner(CmScrollBarClicked)
+	}
 
 	if sb.thumbDragging {
 		if event.Mouse.Button&tcell.Button1 != 0 {
@@ -239,6 +252,10 @@ func (sb *ScrollBar) handleHorizontalClick(event *Event) {
 	mx := event.Mouse.X
 	w := sb.Bounds().Width()
 
+	if !sb.thumbDragging {
+		sb.broadcastToOwner(CmScrollBarClicked)
+	}
+
 	if sb.thumbDragging {
 		if event.Mouse.Button&tcell.Button1 != 0 {
 			trackPos := mx - 1 - sb.thumbDragOffset
@@ -283,8 +300,11 @@ func (sb *ScrollBar) step(dir int) {
 	old := sb.value
 	sb.value += dir
 	sb.clampValue()
-	if sb.value != old && sb.OnChange != nil {
-		sb.OnChange(sb.value)
+	if sb.value != old {
+		if sb.OnChange != nil {
+			sb.OnChange(sb.value)
+		}
+		sb.broadcastToOwner(CmScrollBarChanged)
 	}
 }
 
@@ -292,8 +312,11 @@ func (sb *ScrollBar) page(dir int) {
 	old := sb.value
 	sb.value += dir * sb.pageSize
 	sb.clampValue()
-	if sb.value != old && sb.OnChange != nil {
-		sb.OnChange(sb.value)
+	if sb.value != old {
+		if sb.OnChange != nil {
+			sb.OnChange(sb.value)
+		}
+		sb.broadcastToOwner(CmScrollBarChanged)
 	}
 }
 
@@ -317,8 +340,11 @@ func (sb *ScrollBar) setValueFromTrackPos(trackPos int) {
 	old := sb.value
 	sb.value = sb.min + trackPos*scrollRange/availableTrack
 	sb.clampValue()
-	if sb.value != old && sb.OnChange != nil {
-		sb.OnChange(sb.value)
+	if sb.value != old {
+		if sb.OnChange != nil {
+			sb.OnChange(sb.value)
+		}
+		sb.broadcastToOwner(CmScrollBarChanged)
 	}
 }
 
@@ -326,8 +352,11 @@ func (sb *ScrollBar) goToMin() {
 	old := sb.value
 	sb.value = sb.min
 	sb.clampValue()
-	if sb.value != old && sb.OnChange != nil {
-		sb.OnChange(sb.value)
+	if sb.value != old {
+		if sb.OnChange != nil {
+			sb.OnChange(sb.value)
+		}
+		sb.broadcastToOwner(CmScrollBarChanged)
 	}
 }
 
@@ -335,12 +364,16 @@ func (sb *ScrollBar) goToMax() {
 	old := sb.value
 	sb.value = sb.max - sb.pageSize
 	sb.clampValue()
-	if sb.value != old && sb.OnChange != nil {
-		sb.OnChange(sb.value)
+	if sb.value != old {
+		if sb.OnChange != nil {
+			sb.OnChange(sb.value)
+		}
+		sb.broadcastToOwner(CmScrollBarChanged)
 	}
 }
 
 func (sb *ScrollBar) handleKeyboard(event *Event) {
+	sb.broadcastToOwner(CmScrollBarClicked)
 	if sb.orientation == Vertical {
 		sb.handleVerticalKeyboard(event)
 	} else {

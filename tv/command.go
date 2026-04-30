@@ -23,5 +23,8 @@ const (
 	CmReceivedFocus
 	CmReleasedFocus
 
+	CmScrollBarClicked
+	CmScrollBarChanged
+
 	CmUser CommandCode = 1000
 )
