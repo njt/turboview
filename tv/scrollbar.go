@@ -168,12 +168,12 @@ func (sb *ScrollBar) HandleEvent(event *Event) {
 
 	// Mouse wheel
 	if event.Mouse.Button == tcell.WheelUp {
-		sb.step(-1)
+		sb.step(-3 * sb.arStep)
 		event.Clear()
 		return
 	}
 	if event.Mouse.Button == tcell.WheelDown {
-		sb.step(1)
+		sb.step(3 * sb.arStep)
 		event.Clear()
 		return
 	}

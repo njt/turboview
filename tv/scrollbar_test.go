@@ -890,8 +890,8 @@ func TestScrollBarVerticalClickTrackBelowThumbCallsOnChange(t *testing.T) {
 	}
 }
 
-// TestScrollBarWheelUpDecrementsValue verifies WheelUp decrements value by 1.
-// Spec: "Mouse wheel up (WheelUp): decrement value by 1, clamp, call OnChange"
+// TestScrollBarWheelUpDecrementsValue verifies WheelUp decrements value by 3*arStep.
+// Spec: "Mouse wheel should scroll by 3 * arStep per wheel tick"
 func TestScrollBarWheelUpDecrementsValue(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
@@ -901,8 +901,8 @@ func TestScrollBarWheelUpDecrementsValue(t *testing.T) {
 	ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 5, Button: tcell.WheelUp}}
 	sb.HandleEvent(ev)
 
-	if sb.Value() != 49 {
-		t.Errorf("WheelUp: Value() = %d, want 49 (decremented by 1)", sb.Value())
+	if sb.Value() != 47 {
+		t.Errorf("WheelUp: Value() = %d, want 47 (decremented by 3*arStep=3)", sb.Value())
 	}
 }
 
@@ -925,8 +925,8 @@ func TestScrollBarWheelUpCallsOnChange(t *testing.T) {
 	}
 }
 
-// TestScrollBarWheelDownIncrementsValue verifies WheelDown increments value by 1.
-// Spec: "Mouse wheel down (WheelDown): increment value by 1, clamp, call OnChange"
+// TestScrollBarWheelDownIncrementsValue verifies WheelDown increments value by 3*arStep.
+// Spec: "Mouse wheel should scroll by 3 * arStep per wheel tick"
 func TestScrollBarWheelDownIncrementsValue(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
@@ -936,8 +936,8 @@ func TestScrollBarWheelDownIncrementsValue(t *testing.T) {
 	ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 5, Button: tcell.WheelDown}}
 	sb.HandleEvent(ev)
 
-	if sb.Value() != 51 {
-		t.Errorf("WheelDown: Value() = %d, want 51 (incremented by 1)", sb.Value())
+	if sb.Value() != 53 {
+		t.Errorf("WheelDown: Value() = %d, want 53 (incremented by 3*arStep=3)", sb.Value())
 	}
 }
 
@@ -1389,9 +1389,9 @@ func TestScrollBarHorizontalClickLeftArrowCallsOnChange(t *testing.T) {
 	}
 }
 
-// TestScrollBarHorizontalWheelUpDecrementsValue verifies WheelUp decrements value by 1
+// TestScrollBarHorizontalWheelUpDecrementsValue verifies WheelUp decrements value by 3*arStep
 // on a horizontal scrollbar.
-// Spec: "Mouse wheel up (WheelUp): decrement value by 1, clamp, call OnChange"
+// Spec: "Mouse wheel should scroll by 3 * arStep per wheel tick"
 func TestScrollBarHorizontalWheelUpDecrementsValue(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 12, 1), Horizontal)
 	sb.SetRange(0, 100)
@@ -1401,14 +1401,14 @@ func TestScrollBarHorizontalWheelUpDecrementsValue(t *testing.T) {
 	ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 5, Y: 0, Button: tcell.WheelUp}}
 	sb.HandleEvent(ev)
 
-	if sb.Value() != 49 {
-		t.Errorf("horizontal WheelUp: Value() = %d, want 49 (decremented by 1)", sb.Value())
+	if sb.Value() != 47 {
+		t.Errorf("horizontal WheelUp: Value() = %d, want 47 (decremented by 3*arStep=3)", sb.Value())
 	}
 }
 
-// TestScrollBarHorizontalWheelDownIncrementsValue verifies WheelDown increments value by 1
+// TestScrollBarHorizontalWheelDownIncrementsValue verifies WheelDown increments value by 3*arStep
 // on a horizontal scrollbar.
-// Spec: "Mouse wheel down (WheelDown): increment value by 1, clamp, call OnChange"
+// Spec: "Mouse wheel should scroll by 3 * arStep per wheel tick"
 func TestScrollBarHorizontalWheelDownIncrementsValue(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 12, 1), Horizontal)
 	sb.SetRange(0, 100)
@@ -1418,8 +1418,8 @@ func TestScrollBarHorizontalWheelDownIncrementsValue(t *testing.T) {
 	ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 5, Y: 0, Button: tcell.WheelDown}}
 	sb.HandleEvent(ev)
 
-	if sb.Value() != 51 {
-		t.Errorf("horizontal WheelDown: Value() = %d, want 51 (incremented by 1)", sb.Value())
+	if sb.Value() != 53 {
+		t.Errorf("horizontal WheelDown: Value() = %d, want 53 (incremented by 3*arStep=3)", sb.Value())
 	}
 }
 
