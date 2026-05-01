@@ -185,13 +185,26 @@ func (m *Memo) HandleEvent(event *Event) {
 		m.pageDown()
 		event.Clear()
 	case tcell.KeyRune:
-		// Printable character — handled in Task 5
+		m.insertChar(k.Rune)
+		event.Clear()
 	case tcell.KeyEnter:
-		// Enter — handled in Task 5
+		m.insertNewline()
+		event.Clear()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		// Backspace — handled in Task 5
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			return // Ctrl+Backspace deferred to Phase 3
+		}
+		m.backspace()
+		event.Clear()
 	case tcell.KeyDelete:
-		// Delete — handled in Task 5
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			return // Ctrl+Delete deferred to Phase 3
+		}
+		m.deleteChar()
+		event.Clear()
+	case tcell.KeyCtrlY:
+		m.deleteLine()
+		event.Clear()
 	default:
 		// Tab, F-keys, etc. — not consumed
 	}
@@ -261,6 +274,94 @@ func (m *Memo) pageDown() {
 	m.cursorRow += h - 1
 	if m.cursorRow >= len(m.lines) {
 		m.cursorRow = len(m.lines) - 1
+	}
+	m.clampCursor()
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) insertChar(ch rune) {
+	line := m.lines[m.cursorRow]
+	newLine := make([]rune, len(line)+1)
+	copy(newLine, line[:m.cursorCol])
+	newLine[m.cursorCol] = ch
+	copy(newLine[m.cursorCol+1:], line[m.cursorCol:])
+	m.lines[m.cursorRow] = newLine
+	m.cursorCol++
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) insertNewline() {
+	line := m.lines[m.cursorRow]
+	before := make([]rune, m.cursorCol)
+	copy(before, line[:m.cursorCol])
+	after := make([]rune, len(line)-m.cursorCol)
+	copy(after, line[m.cursorCol:])
+
+	var indent []rune
+	if m.autoIndent {
+		for _, r := range line {
+			if r == ' ' || r == '\t' {
+				indent = append(indent, r)
+			} else {
+				break
+			}
+		}
+	}
+
+	newAfter := make([]rune, len(indent)+len(after))
+	copy(newAfter, indent)
+	copy(newAfter[len(indent):], after)
+
+	m.lines[m.cursorRow] = before
+	newLines := make([][]rune, len(m.lines)+1)
+	copy(newLines, m.lines[:m.cursorRow+1])
+	newLines[m.cursorRow+1] = newAfter
+	copy(newLines[m.cursorRow+2:], m.lines[m.cursorRow+1:])
+	m.lines = newLines
+
+	m.cursorRow++
+	m.cursorCol = len(indent)
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) backspace() {
+	if m.cursorCol > 0 {
+		line := m.lines[m.cursorRow]
+		m.lines[m.cursorRow] = append(line[:m.cursorCol-1], line[m.cursorCol:]...)
+		m.cursorCol--
+	} else if m.cursorRow > 0 {
+		prevLine := m.lines[m.cursorRow-1]
+		curLine := m.lines[m.cursorRow]
+		joinCol := len(prevLine)
+		m.lines[m.cursorRow-1] = append(prevLine, curLine...)
+		m.lines = append(m.lines[:m.cursorRow], m.lines[m.cursorRow+1:]...)
+		m.cursorRow--
+		m.cursorCol = joinCol
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) deleteChar() {
+	line := m.lines[m.cursorRow]
+	if m.cursorCol < len(line) {
+		m.lines[m.cursorRow] = append(line[:m.cursorCol], line[m.cursorCol+1:]...)
+	} else if m.cursorRow < len(m.lines)-1 {
+		nextLine := m.lines[m.cursorRow+1]
+		m.lines[m.cursorRow] = append(line, nextLine...)
+		m.lines = append(m.lines[:m.cursorRow+1], m.lines[m.cursorRow+2:]...)
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) deleteLine() {
+	if len(m.lines) == 1 {
+		m.lines[0] = []rune{}
+		m.cursorCol = 0
+	} else {
+		m.lines = append(m.lines[:m.cursorRow], m.lines[m.cursorRow+1:]...)
+		if m.cursorRow >= len(m.lines) {
+			m.cursorRow = len(m.lines) - 1
+		}
 	}
 	m.clampCursor()
 	m.ensureCursorVisible()
