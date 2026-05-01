@@ -131,5 +131,137 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 }
 
 func (m *Memo) HandleEvent(event *Event) {
-	// Implemented in Tasks 4 and 5
+	if event.What != EvKeyboard || event.Key == nil {
+		return
+	}
+	k := event.Key
+
+	// Don't consume Alt+anything or F-keys
+	if k.Modifiers&tcell.ModAlt != 0 {
+		return
+	}
+
+	switch k.Key {
+	case tcell.KeyLeft:
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			return // Ctrl+Left deferred to Phase 3
+		}
+		m.cursorLeft()
+		event.Clear()
+	case tcell.KeyRight:
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			return // Ctrl+Right deferred to Phase 3
+		}
+		m.cursorRight()
+		event.Clear()
+	case tcell.KeyUp:
+		m.cursorUp()
+		event.Clear()
+	case tcell.KeyDown:
+		m.cursorDown()
+		event.Clear()
+	case tcell.KeyHome:
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			m.cursorRow = 0
+			m.cursorCol = 0
+		} else {
+			m.smartHome()
+		}
+		m.ensureCursorVisible()
+		event.Clear()
+	case tcell.KeyEnd:
+		if k.Modifiers&tcell.ModCtrl != 0 {
+			m.cursorRow = len(m.lines) - 1
+			m.cursorCol = len(m.lines[m.cursorRow])
+		} else {
+			m.cursorCol = len(m.lines[m.cursorRow])
+		}
+		m.ensureCursorVisible()
+		event.Clear()
+	case tcell.KeyPgUp:
+		m.pageUp()
+		event.Clear()
+	case tcell.KeyPgDn:
+		m.pageDown()
+		event.Clear()
+	case tcell.KeyRune:
+		// Printable character — handled in Task 5
+	case tcell.KeyEnter:
+		// Enter — handled in Task 5
+	case tcell.KeyBackspace, tcell.KeyBackspace2:
+		// Backspace — handled in Task 5
+	case tcell.KeyDelete:
+		// Delete — handled in Task 5
+	default:
+		// Tab, F-keys, etc. — not consumed
+	}
+}
+
+func (m *Memo) cursorLeft() {
+	if m.cursorCol > 0 {
+		m.cursorCol--
+	} else if m.cursorRow > 0 {
+		m.cursorRow--
+		m.cursorCol = len(m.lines[m.cursorRow])
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) cursorRight() {
+	if m.cursorCol < len(m.lines[m.cursorRow]) {
+		m.cursorCol++
+	} else if m.cursorRow < len(m.lines)-1 {
+		m.cursorRow++
+		m.cursorCol = 0
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) cursorUp() {
+	if m.cursorRow > 0 {
+		m.cursorRow--
+		m.clampCursor()
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) cursorDown() {
+	if m.cursorRow < len(m.lines)-1 {
+		m.cursorRow++
+		m.clampCursor()
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) smartHome() {
+	line := m.lines[m.cursorRow]
+	firstNonWS := 0
+	for firstNonWS < len(line) && (line[firstNonWS] == ' ' || line[firstNonWS] == '\t') {
+		firstNonWS++
+	}
+	if m.cursorCol == firstNonWS {
+		m.cursorCol = 0
+	} else {
+		m.cursorCol = firstNonWS
+	}
+}
+
+func (m *Memo) pageUp() {
+	h := m.Bounds().Height()
+	m.cursorRow -= h - 1
+	if m.cursorRow < 0 {
+		m.cursorRow = 0
+	}
+	m.clampCursor()
+	m.ensureCursorVisible()
+}
+
+func (m *Memo) pageDown() {
+	h := m.Bounds().Height()
+	m.cursorRow += h - 1
+	if m.cursorRow >= len(m.lines) {
+		m.cursorRow = len(m.lines) - 1
+	}
+	m.clampCursor()
+	m.ensureCursorVisible()
 }
