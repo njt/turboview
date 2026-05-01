@@ -352,7 +352,18 @@ func (m *Memo) HandleEvent(event *Event) {
 	switch k.Key {
 	case tcell.KeyLeft:
 		if k.Modifiers&tcell.ModCtrl != 0 {
-			return // Ctrl+Left deferred to Task 4
+			if shift {
+				m.startSelectionIfNone()
+			}
+			m.wordLeft()
+			if shift {
+				m.setSelectionEnd()
+			} else {
+				m.clearSelection()
+			}
+			m.ensureCursorVisible()
+			event.Clear()
+			return
 		}
 		if shift {
 			m.startSelectionIfNone()
@@ -369,7 +380,18 @@ func (m *Memo) HandleEvent(event *Event) {
 		event.Clear()
 	case tcell.KeyRight:
 		if k.Modifiers&tcell.ModCtrl != 0 {
-			return // Ctrl+Right deferred to Task 4
+			if shift {
+				m.startSelectionIfNone()
+			}
+			m.wordRight()
+			if shift {
+				m.setSelectionEnd()
+			} else {
+				m.clearSelection()
+			}
+			m.ensureCursorVisible()
+			event.Clear()
+			return
 		}
 		if shift {
 			m.startSelectionIfNone()
@@ -529,13 +551,19 @@ func (m *Memo) HandleEvent(event *Event) {
 		event.Clear()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if k.Modifiers&tcell.ModCtrl != 0 {
-			return // Ctrl+Backspace deferred to Task 4
+			m.deleteWordLeft()
+			m.ensureCursorVisible()
+			event.Clear()
+			return
 		}
 		m.backspace()
 		event.Clear()
 	case tcell.KeyDelete:
 		if k.Modifiers&tcell.ModCtrl != 0 {
-			return // Ctrl+Delete deferred to Task 4
+			m.deleteWordRight()
+			m.ensureCursorVisible()
+			event.Clear()
+			return
 		}
 		m.deleteChar()
 		event.Clear()
@@ -712,6 +740,100 @@ func (m *Memo) deleteChar() {
 		m.lines = append(m.lines[:m.cursorRow+1], m.lines[m.cursorRow+2:]...)
 	}
 	m.ensureCursorVisible()
+}
+
+// charClass classifies a rune for word-movement purposes.
+// 0 = whitespace (space, tab)
+// 1 = punctuation
+// 2 = word character (everything else: letters, digits, underscore, etc.)
+func charClass(r rune) int {
+	if r == ' ' || r == '\t' {
+		return 0
+	}
+	if strings.ContainsRune("!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~", r) {
+		return 1
+	}
+	return 2
+}
+
+func (m *Memo) wordLeft() {
+	if m.cursorCol == 0 {
+		if m.cursorRow > 0 {
+			m.cursorRow--
+			m.cursorCol = len(m.lines[m.cursorRow])
+		}
+		return
+	}
+	line := m.lines[m.cursorRow]
+	col := m.cursorCol
+	// skip whitespace
+	for col > 0 && charClass(line[col-1]) == 0 {
+		col--
+	}
+	if col == 0 {
+		m.cursorCol = 0
+		return
+	}
+	// skip current class
+	cls := charClass(line[col-1])
+	for col > 0 && charClass(line[col-1]) == cls {
+		col--
+	}
+	m.cursorCol = col
+}
+
+func (m *Memo) wordRight() {
+	line := m.lines[m.cursorRow]
+	if m.cursorCol >= len(line) {
+		if m.cursorRow < len(m.lines)-1 {
+			m.cursorRow++
+			m.cursorCol = 0
+		}
+		return
+	}
+	col := m.cursorCol
+	// skip current class
+	cls := charClass(line[col])
+	for col < len(line) && charClass(line[col]) == cls {
+		col++
+	}
+	// skip whitespace
+	for col < len(line) && charClass(line[col]) == 0 {
+		col++
+	}
+	m.cursorCol = col
+}
+
+func (m *Memo) deleteWordLeft() {
+	if m.HasSelection() {
+		m.deleteSelection()
+		return
+	}
+	endRow, endCol := m.cursorRow, m.cursorCol
+	m.wordLeft()
+	if m.cursorRow == endRow && m.cursorCol == endCol {
+		return // no movement, nothing to delete
+	}
+	// delete from (cursorRow, cursorCol) to (endRow, endCol)
+	m.selStartRow, m.selStartCol = m.cursorRow, m.cursorCol
+	m.selEndRow, m.selEndCol = endRow, endCol
+	m.deleteSelection()
+}
+
+func (m *Memo) deleteWordRight() {
+	if m.HasSelection() {
+		m.deleteSelection()
+		return
+	}
+	startRow, startCol := m.cursorRow, m.cursorCol
+	m.wordRight()
+	if m.cursorRow == startRow && m.cursorCol == startCol {
+		return
+	}
+	m.selStartRow, m.selStartCol = startRow, startCol
+	m.selEndRow, m.selEndCol = m.cursorRow, m.cursorCol
+	m.cursorRow, m.cursorCol = startRow, startCol
+	m.deleteSelection()
 }
 
 func (m *Memo) deleteLine() {
