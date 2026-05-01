@@ -251,6 +251,91 @@ func (m *Memo) trailingSelected(row, lineLen, sr, sc, er, ec int) bool {
 	return true // intermediate line: trailing is selected
 }
 
+func (m *Memo) deleteSelection() {
+	if !m.HasSelection() {
+		return
+	}
+	sr, sc, er, ec := m.normalizedSelection()
+
+	startLine := m.lines[sr]
+	endLine := m.lines[er]
+
+	merged := make([]rune, sc+len(endLine)-ec)
+	copy(merged, startLine[:sc])
+	copy(merged[sc:], endLine[ec:])
+
+	m.lines[sr] = merged
+	if er > sr {
+		m.lines = append(m.lines[:sr+1], m.lines[er+1:]...)
+	}
+
+	m.cursorRow = sr
+	m.cursorCol = sc
+	m.clearSelection()
+}
+
+func (m *Memo) selectedText() string {
+	if !m.HasSelection() {
+		return ""
+	}
+	sr, sc, er, ec := m.normalizedSelection()
+	if sr == er {
+		return string(m.lines[sr][sc:ec])
+	}
+	var sb strings.Builder
+	sb.WriteString(string(m.lines[sr][sc:]))
+	for i := sr + 1; i < er; i++ {
+		sb.WriteByte('\n')
+		sb.WriteString(string(m.lines[i]))
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(string(m.lines[er][:ec]))
+	return sb.String()
+}
+
+func (m *Memo) insertText(s string) {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	parts := strings.Split(s, "\n")
+	if len(parts) == 1 {
+		line := m.lines[m.cursorRow]
+		runes := []rune(parts[0])
+		newLine := make([]rune, len(line)+len(runes))
+		copy(newLine, line[:m.cursorCol])
+		copy(newLine[m.cursorCol:], runes)
+		copy(newLine[m.cursorCol+len(runes):], line[m.cursorCol:])
+		m.lines[m.cursorRow] = newLine
+		m.cursorCol += len(runes)
+	} else {
+		line := m.lines[m.cursorRow]
+		before := line[:m.cursorCol]
+		after := line[m.cursorCol:]
+
+		firstLine := make([]rune, len(before)+len([]rune(parts[0])))
+		copy(firstLine, before)
+		copy(firstLine[len(before):], []rune(parts[0]))
+
+		lastPart := []rune(parts[len(parts)-1])
+		lastLine := make([]rune, len(lastPart)+len(after))
+		copy(lastLine, lastPart)
+		copy(lastLine[len(lastPart):], after)
+
+		newLines := make([][]rune, 0, len(m.lines)+len(parts)-1)
+		newLines = append(newLines, m.lines[:m.cursorRow]...)
+		newLines = append(newLines, firstLine)
+		for i := 1; i < len(parts)-1; i++ {
+			newLines = append(newLines, []rune(parts[i]))
+		}
+		newLines = append(newLines, lastLine)
+		newLines = append(newLines, m.lines[m.cursorRow+1:]...)
+		m.lines = newLines
+
+		m.cursorRow += len(parts) - 1
+		m.cursorCol = len(lastPart)
+	}
+	m.clearSelection()
+	m.ensureCursorVisible()
+}
+
 func (m *Memo) HandleEvent(event *Event) {
 	if event.What != EvKeyboard || event.Key == nil {
 		return
@@ -419,6 +504,23 @@ func (m *Memo) HandleEvent(event *Event) {
 		m.setSelectionEnd()
 		m.ensureCursorVisible()
 		event.Clear()
+	case tcell.KeyCtrlC:
+		if m.HasSelection() {
+			clipboard = m.selectedText()
+		}
+		event.Clear()
+	case tcell.KeyCtrlX:
+		if m.HasSelection() {
+			clipboard = m.selectedText()
+			m.deleteSelection()
+		}
+		event.Clear()
+	case tcell.KeyCtrlV:
+		if clipboard != "" {
+			m.deleteSelection()
+			m.insertText(clipboard)
+		}
+		event.Clear()
 	case tcell.KeyRune:
 		m.insertChar(k.Rune)
 		event.Clear()
@@ -515,6 +617,9 @@ func (m *Memo) pageDown() {
 }
 
 func (m *Memo) insertChar(ch rune) {
+	if m.HasSelection() {
+		m.deleteSelection()
+	}
 	line := m.lines[m.cursorRow]
 	newLine := make([]rune, len(line)+1)
 	copy(newLine, line[:m.cursorCol])
@@ -523,9 +628,21 @@ func (m *Memo) insertChar(ch rune) {
 	m.lines[m.cursorRow] = newLine
 	m.cursorCol++
 	m.ensureCursorVisible()
+	m.clearSelection()
 }
 
 func (m *Memo) insertNewline() {
+	// If a selection exists, capture the indent from the selection start line
+	// before deleting the selection.
+	var indentSourceLine []rune
+	if m.HasSelection() {
+		sr, _, _, _ := m.normalizedSelection()
+		indentSourceLine = m.lines[sr]
+		m.deleteSelection()
+	} else {
+		indentSourceLine = m.lines[m.cursorRow]
+	}
+
 	line := m.lines[m.cursorRow]
 	before := make([]rune, m.cursorCol)
 	copy(before, line[:m.cursorCol])
@@ -534,7 +651,7 @@ func (m *Memo) insertNewline() {
 
 	var indent []rune
 	if m.autoIndent {
-		for _, r := range line {
+		for _, r := range indentSourceLine {
 			if r == ' ' || r == '\t' {
 				indent = append(indent, r)
 			} else {
@@ -557,9 +674,14 @@ func (m *Memo) insertNewline() {
 	m.cursorRow++
 	m.cursorCol = len(indent)
 	m.ensureCursorVisible()
+	m.clearSelection()
 }
 
 func (m *Memo) backspace() {
+	if m.HasSelection() {
+		m.deleteSelection()
+		return
+	}
 	if m.cursorCol > 0 {
 		line := m.lines[m.cursorRow]
 		m.lines[m.cursorRow] = append(line[:m.cursorCol-1], line[m.cursorCol:]...)
@@ -577,6 +699,10 @@ func (m *Memo) backspace() {
 }
 
 func (m *Memo) deleteChar() {
+	if m.HasSelection() {
+		m.deleteSelection()
+		return
+	}
 	line := m.lines[m.cursorRow]
 	if m.cursorCol < len(line) {
 		m.lines[m.cursorRow] = append(line[:m.cursorCol], line[m.cursorCol+1:]...)
@@ -600,4 +726,5 @@ func (m *Memo) deleteLine() {
 	}
 	m.clampCursor()
 	m.ensureCursorVisible()
+	m.clearSelection()
 }
