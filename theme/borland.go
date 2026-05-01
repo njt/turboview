@@ -28,7 +28,9 @@ func init() {
 		LabelHighlight:      s(tcell.ColorWhite, tcell.ColorBlue),
 		LabelShortcut:       s(tcell.ColorYellow, tcell.ColorTeal),
 		CheckBoxNormal:      s(tcell.ColorBlack, tcell.ColorTeal),
+		CheckBoxSelected:    s(tcell.ColorYellow, tcell.ColorTeal),
 		RadioButtonNormal:   s(tcell.ColorBlack, tcell.ColorTeal),
+		RadioButtonSelected: s(tcell.ColorYellow, tcell.ColorTeal),
 		ListNormal:          s(tcell.ColorBlack, tcell.ColorTeal),
 		ListSelected:        s(tcell.ColorWhite, tcell.ColorBlack),
 		ListFocused:         s(tcell.ColorYellow, tcell.ColorBlue),
@@ -41,6 +43,8 @@ func init() {
 		StatusNormal:        s(tcell.ColorBlack, tcell.ColorTeal),
 		StatusShortcut:      s(tcell.ColorYellow, tcell.ColorTeal),
 		StatusSelected:      s(tcell.ColorBlack, tcell.ColorWhite),
+		MemoNormal:          s(tcell.ColorYellow, tcell.ColorBlue),
+		MemoSelected:        s(tcell.ColorWhite, tcell.ColorGreen),
 	}
 
 	Register("borland-blue", BorlandBlue)

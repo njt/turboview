@@ -21,7 +21,9 @@ type ColorScheme struct {
 	LabelHighlight      tcell.Style
 	LabelShortcut       tcell.Style
 	CheckBoxNormal      tcell.Style
+	CheckBoxSelected    tcell.Style
 	RadioButtonNormal   tcell.Style
+	RadioButtonSelected tcell.Style
 	ListNormal          tcell.Style
 	ListSelected        tcell.Style
 	ListFocused         tcell.Style
@@ -34,4 +36,6 @@ type ColorScheme struct {
 	StatusNormal        tcell.Style
 	StatusShortcut      tcell.Style
 	StatusSelected      tcell.Style
+	MemoNormal          tcell.Style
+	MemoSelected        tcell.Style
 }
