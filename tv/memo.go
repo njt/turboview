@@ -1,6 +1,10 @@
 package tv
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/gdamore/tcell/v2"
+)
 
 var _ Widget = (*Memo)(nil)
 
@@ -99,7 +103,31 @@ func (m *Memo) ensureCursorVisible() {
 }
 
 func (m *Memo) Draw(buf *DrawBuffer) {
-	// Implemented in Task 3
+	cs := m.ColorScheme()
+	normalStyle := tcell.StyleDefault
+	if cs != nil {
+		normalStyle = cs.MemoNormal
+	}
+
+	h := m.Bounds().Height()
+	w := m.Bounds().Width()
+
+	for y := 0; y < h; y++ {
+		lineIdx := m.deltaY + y
+		if lineIdx >= len(m.lines) {
+			buf.Fill(NewRect(0, y, w, 1), ' ', normalStyle)
+			continue
+		}
+		line := m.lines[lineIdx]
+		x := 0
+		for col := m.deltaX; col < len(line) && x < w; col++ {
+			buf.WriteChar(x, y, line[col], normalStyle)
+			x++
+		}
+		for ; x < w; x++ {
+			buf.WriteChar(x, y, ' ', normalStyle)
+		}
+	}
 }
 
 func (m *Memo) HandleEvent(event *Event) {
