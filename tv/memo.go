@@ -148,12 +148,16 @@ func (m *Memo) ensureCursorVisible() {
 func (m *Memo) Draw(buf *DrawBuffer) {
 	cs := m.ColorScheme()
 	normalStyle := tcell.StyleDefault
+	selectedStyle := tcell.StyleDefault
 	if cs != nil {
 		normalStyle = cs.MemoNormal
+		selectedStyle = cs.MemoSelected
 	}
 
 	h := m.Bounds().Height()
 	w := m.Bounds().Width()
+
+	sr, sc, er, ec := m.normalizedSelection()
 
 	for y := 0; y < h; y++ {
 		lineIdx := m.deltaY + y
@@ -162,15 +166,89 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 			continue
 		}
 		line := m.lines[lineIdx]
+
+		// Walk runes before deltaX to compute correct visual column for tab alignment.
+		vcol := 0
+		for runeIdx := 0; runeIdx < m.deltaX && runeIdx < len(line); runeIdx++ {
+			if line[runeIdx] == '\t' {
+				vcol += 8 - (vcol % 8)
+			} else {
+				vcol++
+			}
+		}
+
+		// Render visible runes starting from deltaX.
 		x := 0
-		for col := m.deltaX; col < len(line) && x < w; col++ {
-			buf.WriteChar(x, y, line[col], normalStyle)
-			x++
+		for runeIdx := m.deltaX; runeIdx < len(line) && x < w; runeIdx++ {
+			ch := line[runeIdx]
+			inSel := m.posInSelection(lineIdx, runeIdx, sr, sc, er, ec)
+
+			style := normalStyle
+			if inSel {
+				style = selectedStyle
+			}
+
+			if ch == '\t' {
+				tabWidth := 8 - (vcol % 8)
+				for i := 0; i < tabWidth && x < w; i++ {
+					buf.WriteChar(x, y, ' ', style)
+					x++
+				}
+				vcol += tabWidth
+			} else {
+				buf.WriteChar(x, y, ch, style)
+				x++
+				vcol++
+			}
+		}
+
+		// Trailing fill.
+		trailSelected := m.trailingSelected(lineIdx, len(line), sr, sc, er, ec)
+		trailStyle := normalStyle
+		if trailSelected {
+			trailStyle = selectedStyle
 		}
 		for ; x < w; x++ {
-			buf.WriteChar(x, y, ' ', normalStyle)
+			buf.WriteChar(x, y, ' ', trailStyle)
 		}
 	}
+}
+
+// posInSelection reports whether the rune at (row, col) falls within the
+// normalized selection [sr,sc)→(er,ec).
+func (m *Memo) posInSelection(row, col, sr, sc, er, ec int) bool {
+	if sr == er && sc == ec {
+		return false // no selection
+	}
+	if row < sr || row > er {
+		return false
+	}
+	if row == sr && row == er {
+		return col >= sc && col < ec
+	}
+	if row == sr {
+		return col >= sc
+	}
+	if row == er {
+		return col < ec
+	}
+	return true // intermediate line
+}
+
+// trailingSelected reports whether the trailing fill spaces on (row) should
+// use MemoSelected style. This is true for intermediate lines of a selection
+// (the newline character is considered selected).
+func (m *Memo) trailingSelected(row, lineLen, sr, sc, er, ec int) bool {
+	if sr == er && sc == ec {
+		return false
+	}
+	if row < sr || row >= er {
+		return false
+	}
+	if row == sr {
+		return lineLen >= sc // trailing of first sel line only if sel starts before/at end
+	}
+	return true // intermediate line: trailing is selected
 }
 
 func (m *Memo) HandleEvent(event *Event) {
