@@ -1110,19 +1110,25 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 		t.Error("win2 'Editor' not visible after Tile")
 	}
 
-	// Both windows tiled side by side: their top borders appear on the same row.
-	// Active window uses ╔, inactive uses ┌ — look for a row with both frame corners.
+	// Tiled windows share rows: look for a row that contains two or more frame
+	// corner characters (active ╔ and/or inactive ┌). With 2 windows side by side
+	// we expect ╔ and ┌ on the same row; with 3 windows in a 2-column grid the
+	// two inactive windows share the top row (both ┌).
 	tiledRow := false
 	for _, line := range lines {
-		hasDouble := strings.Contains(line, "╔")
-		hasSingle := strings.Contains(line, "┌")
-		if hasDouble && hasSingle {
+		corners := strings.Count(line, "╔") + strings.Count(line, "┌")
+		if corners >= 2 {
+			tiledRow = true
+			break
+		}
+		// Also accept a row with one active (╔) and one inactive (┌) corner.
+		if strings.Contains(line, "╔") && strings.Contains(line, "┌") {
 			tiledRow = true
 			break
 		}
 	}
 	if !tiledRow {
-		t.Error("no row with both '╔' and '┌' found — windows may not be tiled side by side")
+		t.Error("no row with two or more frame corners found — windows may not be tiled side by side")
 	}
 
 	// Clean exit
@@ -1418,6 +1424,68 @@ func TestF6NextWindow(t *testing.T) {
 		t.Error("F6 did not switch focus — Editor window does not have active frame")
 	}
 
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMemoVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-memo"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// Window title "Notes" should be visible
+	if !containsAny(lines, "Notes") {
+		t.Error("window title 'Notes' not visible")
+	}
+
+	// Pre-loaded text should be visible
+	if !containsAny(lines, "Hello, World!") {
+		t.Error("memo text 'Hello, World!' not visible")
+	}
+	if !containsAny(lines, "This is a memo.") {
+		t.Error("memo text 'This is a memo.' not visible")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMemoTyping(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-memotype"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to win3 (Notes) using Alt+3
+	tmuxSendKeys(t, session, "M-3")
+
+	// Move to end of first line and type additional text
+	tmuxSendKeys(t, session, "End")
+	tmuxType(t, session, " TEST")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// The typed text should appear: "Hello, World! TEST"
+	if !containsAny(lines, "Hello, World! TEST") {
+		t.Error("typed text 'Hello, World! TEST' not visible after typing in memo")
+	}
+
+	// Clean exit
 	tmuxSendKeys(t, session, "M-x")
 	for i := 0; i < 15; i++ {
 		if !tmuxHasSession(session) {

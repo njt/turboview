@@ -99,12 +99,18 @@ func main() {
 	listBox := tv.NewStringListBox(tv.NewRect(0, 0, clientW, clientH), items)
 	win2.Insert(listBox)
 
+	win3 := tv.NewWindow(tv.NewRect(45, 1, 30, 10), "Notes", tv.WithWindowNumber(3))
+	memo := tv.NewMemo(tv.NewRect(0, 0, 28, 8))
+	memo.SetText("Hello, World!\nThis is a memo.\nLine 3\nLine 4")
+	win3.Insert(memo)
+
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)
 	win2.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 	listBox.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 
 	app.Desktop().Insert(win1)
+	app.Desktop().Insert(win3)
 	app.Desktop().Insert(win2)
 
 	if err := app.Run(); err != nil {
