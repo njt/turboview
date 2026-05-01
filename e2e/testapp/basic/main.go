@@ -88,27 +88,21 @@ func main() {
 	editorScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
 	win2.SetColorScheme(editorScheme)
 
-	// ListViewer fills client area minus scrollbar column
-	clientW := 40 - 2 // window width minus frame
-	clientH := 12 - 2 // window height minus frame
+	clientW := 40 - 2
+	clientH := 12 - 2
 
 	items := make([]string, 20)
 	for i := range items {
 		items[i] = fmt.Sprintf("Item %d", i+1)
 	}
 
-	lv := tv.NewListViewer(tv.NewRect(0, 0, clientW-1, clientH), tv.NewStringList(items))
-	sb := tv.NewScrollBar(tv.NewRect(clientW-1, 0, 1, clientH), tv.Vertical)
-	lv.SetScrollBar(sb)
-
-	win2.Insert(lv)
-	win2.Insert(sb)
+	listBox := tv.NewStringListBox(tv.NewRect(0, 0, clientW, clientH), items)
+	win2.Insert(listBox)
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)
 	win2.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
-	lv.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
-	sb.SetGrowMode(tv.GfGrowLoX | tv.GfGrowHiY)
+	listBox.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win2)

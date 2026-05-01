@@ -1426,3 +1426,60 @@ func TestF6NextWindow(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+// TestListBoxNavigation verifies the ListBox widget in the Editor window:
+// initial items are visible, and arrow key navigation moves the selection.
+func TestListBoxNavigation(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-listbox"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// win2 (Editor) is focused on startup — it contains the ListBox
+	lines := tmuxCapture(t, session)
+
+	// Items 1 through 10 should be visible in the initial view
+	for _, item := range []string{"Item 1", "Item 2", "Item 3", "Item 4", "Item 5",
+		"Item 6", "Item 7", "Item 8", "Item 9", "Item 10"} {
+		if !containsAny(lines, item) {
+			t.Errorf("ListBox: %q not visible on initial render", item)
+		}
+	}
+
+	// Scrollbar arrows should be visible (ListBox includes a ScrollBar)
+	if !containsAny(lines, "▲", "▼") {
+		t.Error("ListBox: scrollbar arrow characters '▲' or '▼' not visible")
+	}
+
+	// Press Down 4 times — selection should move from Item 1 to Item 5
+	for i := 0; i < 4; i++ {
+		tmuxSendKeys(t, session, "Down")
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// After navigating down 4 times, Item 5 should be visible
+	if !containsAny(lines, "Item 5") {
+		t.Error("ListBox: Item 5 not visible after pressing Down 4 times — navigation may not work")
+	}
+
+	// Item 1 should still be visible (only 4 rows down, well within the 10-row viewport)
+	if !containsAny(lines, "Item 1") {
+		t.Error("ListBox: Item 1no longer visible after Down x4 — unexpected scrolling")
+	}
+
+	// Alt+X to exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
