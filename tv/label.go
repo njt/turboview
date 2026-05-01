@@ -71,8 +71,10 @@ func (l *Label) Draw(buf *DrawBuffer) {
 func (l *Label) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
 		if event.Mouse.Button&tcell.Button1 != 0 && l.link != nil {
-			if owner := l.Owner(); owner != nil {
-				owner.SetFocusedChild(l.link)
+			if l.link.HasOption(OfSelectable) {
+				if owner := l.Owner(); owner != nil {
+					owner.SetFocusedChild(l.link)
+				}
 			}
 			event.Clear()
 		}
@@ -101,8 +103,10 @@ func (l *Label) HandleEvent(event *Event) {
 	}
 	if event.Key.Modifiers&tcell.ModAlt != 0 && event.Key.Key == tcell.KeyRune {
 		if unicode.ToLower(event.Key.Rune) == unicode.ToLower(l.shortcut) {
-			if owner := l.Owner(); owner != nil {
-				owner.SetFocusedChild(l.link)
+			if l.link.HasOption(OfSelectable) {
+				if owner := l.Owner(); owner != nil {
+					owner.SetFocusedChild(l.link)
+				}
 			}
 			event.Clear()
 		}
