@@ -92,9 +92,9 @@ func TestLabelDrawNormalSegmentUsesLabelNormalStyle(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	label.Draw(buf)
 
-	cell := buf.GetCell(0, 0)
+	cell := buf.GetCell(1, 0)
 	if cell.Style != scheme.LabelNormal {
-		t.Errorf("normal segment cell(0,0) style = %v, want LabelNormal %v", cell.Style, scheme.LabelNormal)
+		t.Errorf("normal segment cell(1,0) style = %v, want LabelNormal %v", cell.Style, scheme.LabelNormal)
 	}
 }
 
@@ -110,9 +110,9 @@ func TestLabelDrawShortcutSegmentUsesLabelShortcutStyle(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	label.Draw(buf)
 
-	cell := buf.GetCell(0, 0)
+	cell := buf.GetCell(1, 0)
 	if cell.Style != scheme.LabelShortcut {
-		t.Errorf("shortcut segment cell(0,0) style = %v, want LabelShortcut %v", cell.Style, scheme.LabelShortcut)
+		t.Errorf("shortcut segment cell(1,0) style = %v, want LabelShortcut %v", cell.Style, scheme.LabelShortcut)
 	}
 }
 
@@ -128,17 +128,17 @@ func TestLabelDrawNormalSegmentAfterShortcut(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	label.Draw(buf)
 
-	// Column 1 is the start of "ame" — a normal segment.
-	cell := buf.GetCell(1, 0)
+	// Column 2 is the start of "ame" — a normal segment.
+	cell := buf.GetCell(2, 0)
 	if cell.Style != scheme.LabelNormal {
-		t.Errorf("normal segment after shortcut cell(1,0) style = %v, want LabelNormal %v", cell.Style, scheme.LabelNormal)
+		t.Errorf("normal segment after shortcut cell(2,0) style = %v, want LabelNormal %v", cell.Style, scheme.LabelNormal)
 	}
 }
 
 // TestLabelDrawRendersCorrectRunes verifies the runes appear at the correct positions.
 // Spec: "renders the label text … Uses ParseTildeLabel."
 func TestLabelDrawRendersCorrectRunes(t *testing.T) {
-	// "~N~ame" → 'N' at col 0, 'a' at col 1, 'm' at col 2, 'e' at col 3.
+	// "~N~ame" → 'N' at col 1, 'a' at col 2, 'm' at col 3, 'e' at col 4.
 	label := NewLabel(NewRect(0, 0, 20, 1), "~N~ame", nil)
 	label.scheme = theme.BorlandBlue
 
@@ -147,9 +147,9 @@ func TestLabelDrawRendersCorrectRunes(t *testing.T) {
 
 	expected := []rune{'N', 'a', 'm', 'e'}
 	for i, want := range expected {
-		got := buf.GetCell(i, 0).Rune
+		got := buf.GetCell(i+1, 0).Rune
 		if got != want {
-			t.Errorf("cell(%d,0) rune = %q, want %q", i, got, want)
+			t.Errorf("cell(%d,0) rune = %q, want %q", i+1, got, want)
 		}
 	}
 }
@@ -165,11 +165,11 @@ func TestLabelDrawNoTildeRendersEntireTextAsNormal(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	label.Draw(buf)
 
-	// All four characters must use LabelNormal style.
+	// All four characters must use LabelNormal style (text starts at col 1).
 	for i := range "Open" {
-		cell := buf.GetCell(i, 0)
+		cell := buf.GetCell(i+1, 0)
 		if cell.Style != scheme.LabelNormal {
-			t.Errorf("no-tilde label cell(%d,0) style = %v, want LabelNormal", i, cell.Style)
+			t.Errorf("no-tilde label cell(%d,0) style = %v, want LabelNormal", i+1, cell.Style)
 		}
 	}
 }
@@ -188,8 +188,8 @@ func TestLabelDrawShortcutStyleDiffersFromNormal(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	label.Draw(buf)
 
-	shortcutCell := buf.GetCell(0, 0) // 'N' — shortcut segment
-	normalCell := buf.GetCell(1, 0)   // 'a' — normal segment
+	shortcutCell := buf.GetCell(1, 0) // 'N' — shortcut segment
+	normalCell := buf.GetCell(2, 0)   // 'a' — normal segment
 
 	if shortcutCell.Style == normalCell.Style {
 		t.Errorf("shortcut and normal segments have the same style %v; expected different styles", shortcutCell.Style)

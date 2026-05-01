@@ -92,13 +92,12 @@ func (g *Group) Insert(v View) {
 	v.SetOwner(owner)
 	g.children = append(g.children, v)
 	if v.HasOption(OfSelectable) {
-		g.setFocusSilent(v)
+		g.selectChild(v)
 	}
 }
 
 // setFocusSilent updates focused and SfSelected flags without broadcasting.
-// Used by Insert so that construction-time focus changes do not emit focus
-// events to partially-built child lists.
+// Used internally when a broadcast-free focus update is needed.
 func (g *Group) setFocusSilent(v View) {
 	if g.focused == v {
 		return

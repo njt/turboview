@@ -51,7 +51,12 @@ func (l *Label) Draw(buf *DrawBuffer) {
 		shortcutStyle = cs.LabelShortcut
 	}
 
-	x := 0
+	// Background fill: entire bounds width with normal/highlight style
+	b := l.Bounds()
+	buf.Fill(NewRect(0, 0, b.Width(), 1), ' ', normalStyle)
+
+	// Text starts at column 1 (column 0 is monochrome marker margin)
+	x := 1
 	segments := ParseTildeLabel(l.label)
 	for _, seg := range segments {
 		style := normalStyle
