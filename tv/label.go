@@ -24,6 +24,7 @@ func NewLabel(bounds Rect, label string, link View) *Label {
 	}
 	l.SetBounds(bounds)
 	l.SetState(SfVisible, true)
+	l.SetOptions(OfPreProcess, true)
 	l.SetOptions(OfPostProcess, true)
 
 	segments := ParseTildeLabel(label)
