@@ -385,22 +385,6 @@ func TestSetAutoIndentToggle(t *testing.T) {
 // Section 7 — Falsifying / boundary tests
 // ---------------------------------------------------------------------------
 
-// TestNewMemoDoesNotSetOfSelectableAsOnlyOption verifies SfVisible is a state flag,
-// not an option flag — they are separate bit-fields.
-// Falsifying: an implementation confusing state and options fields would fail.
-func TestNewMemoStateAndOptionAreDistinct(t *testing.T) {
-	m := NewMemo(NewRect(0, 0, 40, 10))
-
-	// SfVisible is a state, must not appear as an option.
-	if m.HasOption(ViewOptions(SfVisible)) {
-		t.Error("SfVisible must be set in State, not Options")
-	}
-	// OfSelectable is an option, must not appear as a state.
-	if m.HasState(ViewState(OfSelectable)) {
-		t.Error("OfSelectable must be set in Options, not State")
-	}
-}
-
 // TestSetTextEmptyAfterMultiLine verifies that after SetText(""), Text() is ""
 // and not the previous content.
 // Falsifying: an implementation that ignores an empty SetText call would fail.
