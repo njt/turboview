@@ -72,6 +72,10 @@ func main() {
 	win1.Insert(checkBoxes)
 	radioButtons := tv.NewRadioButtons(tv.NewRect(1, 9, 25, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
 	win1.Insert(radioButtons)
+	inputLine := tv.NewInputLine(tv.NewRect(11, 12, 20, 1), 40)
+	win1.Insert(inputLine)
+	nameLabel := tv.NewLabel(tv.NewRect(1, 12, 10, 1), "~N~ame:", inputLine)
+	win1.Insert(nameLabel)
 
 	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
 

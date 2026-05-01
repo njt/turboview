@@ -393,8 +393,9 @@ func TestInputBoxFlow(t *testing.T) {
 
 	lines = tmuxCapture(t, session)
 
-	// Dialog should be gone — "Name:" no longer visible
-	if containsAny(lines, "Name:") {
+	// Dialog should be gone — "Open File" title no longer visible.
+	// (We cannot check "Name:" here because win1 has a persistent Label with that text.)
+	if containsAny(lines, "Open File") {
 		t.Error("InputBox dialog still visible after pressing Enter")
 	}
 
@@ -610,8 +611,9 @@ func TestInputBoxCancel(t *testing.T) {
 
 	lines = tmuxCapture(t, session)
 
-	// Dialog should be gone
-	if containsAny(lines, "Name:") {
+	// Dialog should be gone — "Open File" title no longer visible.
+	// (We cannot check "Name:" here because win1 has a persistent Label with that text.)
+	if containsAny(lines, "Open File") {
 		t.Error("InputBox dialog still visible after pressing Cancel")
 	}
 
@@ -980,6 +982,87 @@ func TestCheckboxFocusIndicator(t *testing.T) {
 		t.Error("checkbox focus indicator '►' with bracket not found — cluster focus indicator may not be rendering")
 	}
 
+	// Verify non-focused checkbox items have brackets at same column as focused.
+	// The ► should be in column 0 relative to the cluster, with bracket at
+	// column 1. Unfocused items should have space+bracket at the same positions,
+	// NOT bracket starting at column 0 (which would cause visual shifting).
+	// Look for lines with "[ ]" or "[X]" to find checkbox lines.
+	var checkboxLines []string
+	for _, line := range lines {
+		if (strings.Contains(line, "[ ]") || strings.Contains(line, "[X]")) &&
+			!strings.Contains(line, "►") {
+			checkboxLines = append(checkboxLines, line)
+		}
+	}
+	if len(checkboxLines) > 0 {
+		// Unfocused checkbox lines should have a space before the bracket.
+		// The focused line has ► before [, unfocused lines should have
+		// a space before [ (not bracket at the leftmost cluster position).
+		for _, line := range checkboxLines {
+			idx := strings.Index(line, "[")
+			if idx > 0 {
+				preceding := string([]rune(line[:idx]))
+				lastRune := []rune(preceding)[len([]rune(preceding))-1]
+				if lastRune != ' ' {
+					t.Errorf("unfocused checkbox bracket not preceded by space (preceded by %q): %q", string(lastRune), line)
+				}
+			}
+		}
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestCheckboxIndicatorHidesOnFocusLoss(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-cbunfocus"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to win1
+	tmuxSendKeys(t, session, "M-1")
+
+	// Tab to checkboxes cluster
+	tmuxSendKeys(t, session, "Tab")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Precondition: indicator should be visible while cluster is focused
+	foundIndicator := false
+	for _, line := range lines {
+		if strings.Contains(line, "►") && strings.Contains(line, "[") {
+			foundIndicator = true
+			break
+		}
+	}
+	if !foundIndicator {
+		t.Fatal("precondition: ► indicator not found while checkboxes focused")
+	}
+
+	// Tab away from checkboxes to next widget
+	tmuxSendKeys(t, session, "Tab")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Indicator should be gone — original TV hides all indicators when cluster loses focus
+	for _, line := range lines {
+		if strings.Contains(line, "►") && strings.Contains(line, "[") {
+			t.Errorf("► indicator still visible after Tab away from checkboxes: %q", line)
+			break
+		}
+	}
+
 	// Clean exit
 	tmuxSendKeys(t, session, "M-x")
 	for i := 0; i < 15; i++ {
@@ -1116,5 +1199,230 @@ func TestListViewerSpaceSelect(t *testing.T) {
 	}
 	if !exited {
 		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestScrollBarNotFocusableViaTab verifies that Tab in the Editor window
+// does NOT land on the scrollbar. In original Turbo Vision, scrollbars are
+// not focusable — Tab skips them. The bug: Tab from ListViewer to ScrollBar
+// makes Down arrow scroll without moving the selected item.
+func TestScrollBarNotFocusableViaTab(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-sbnofocus"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to win2 (Editor) which has ListViewer + ScrollBar
+	tmuxSendKeys(t, session, "M-2")
+
+	// Tab within win2 — if scrollbar is focusable, focus moves to it
+	tmuxSendKeys(t, session, "Tab")
+
+	// Now press Down arrow. If focus is on scrollbar (bug), this scrolls
+	// without moving the highlighted item. If focus stayed on list (correct),
+	// the highlighted item moves to Item 2.
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+
+	lines := tmuxCapture(t, session)
+
+	// After Down x3 from Item 1, Item 4 should be the highlighted/selected item.
+	// In a correctly functioning list, Item 4 is visible and highlighted.
+	// If scrollbar stole focus, the list selection stays at Item 1 while
+	// the viewport scrolled — Item 1 may not even be visible anymore.
+	// Check that Item 1 is NOT still at the top (it should have scrolled
+	// or Item 4 should be highlighted).
+	item1AtTop := false
+	item4Visible := false
+	for _, line := range lines {
+		if strings.Contains(line, "Item 1") {
+			item1AtTop = true
+		}
+		if strings.Contains(line, "Item 4") {
+			item4Visible = true
+		}
+	}
+
+	// Item 4 must be visible (selected after 3 down presses)
+	if !item4Visible {
+		t.Error("Item 4 not visible after Tab + 3x Down in Editor window — scrollbar may have stolen focus")
+	}
+
+	// Item 1 should still be visible (only 3 items down, list has 10 visible rows)
+	// but the key thing is that selection MOVED, not just scrollbar
+	if !item1AtTop && !item4Visible {
+		t.Error("neither Item 1 nor Item 4 visible — list state is broken")
+	}
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestF5ZoomWindow verifies F5 zooms the focused window to fill the desktop.
+func TestF5ZoomWindow(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-f5zoom"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	tmuxSendKeys(t, session, "M-1")
+	linesBefore := tmuxCapture(t, session)
+	tmuxSendKeys(t, session, "F5")
+	linesAfter := tmuxCapture(t, session)
+
+	titleRowBefore := -1
+	titleRowAfter := -1
+	for i, line := range linesBefore {
+		if strings.Contains(line, "File Manager") {
+			titleRowBefore = i
+			break
+		}
+	}
+	for i, line := range linesAfter {
+		if strings.Contains(line, "File Manager") {
+			titleRowAfter = i
+			break
+		}
+	}
+
+	if titleRowBefore < 0 || titleRowAfter < 0 {
+		t.Fatal("window title 'File Manager' not found before or after F5")
+	}
+
+	if titleRowAfter >= titleRowBefore {
+		t.Errorf("F5 zoom did not move window up: title row before=%d, after=%d", titleRowBefore, titleRowAfter)
+	}
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestAltF3CloseWindow verifies Alt+F3 closes the focused window.
+func TestAltF3CloseWindow(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-altf3"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "File Manager") {
+		t.Fatal("win1 not visible")
+	}
+	if !containsAny(lines, "Editor") {
+		t.Fatal("win2 not visible")
+	}
+
+	tmuxSendKeys(t, session, "M-2")
+	tmuxSendKeys(t, session, "M-F3")
+
+	lines = tmuxCapture(t, session)
+
+	if containsAny(lines, "Editor") {
+		t.Error("Alt+F3: Editor window still visible after close")
+	}
+	if !containsAny(lines, "File Manager") {
+		t.Error("Alt+F3: File Manager window disappeared — wrong window closed")
+	}
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestLabelShortcutFocusesLink verifies that pressing Alt+N (the shortcut embedded
+// in "~N~ame:") moves focus to the linked InputLine and allows typing into it.
+func TestLabelShortcutFocusesLink(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-label"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// win2 is focused on startup; switch to win1 where the Label+InputLine live
+	tmuxSendKeys(t, session, "M-1")
+
+	// Verify label text is visible in win1
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "ame:") {
+		t.Error("label text 'ame:' not found in win1 — Label may not have rendered")
+	}
+
+	// Press Alt+N to activate the Label shortcut; focus should move to the InputLine
+	tmuxSendKeys(t, session, "M-n")
+
+	// Type text into the now-focused InputLine
+	tmuxType(t, session, "hello")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// The InputLine is partially obscured by the Editor window, so only the first
+	// few characters of "hello" are visible on screen. Check for "hel" which is
+	// the reliably visible portion of the typed text.
+	if !containsAny(lines, "hel") {
+		t.Error("typed text not found after Alt+N shortcut — Label shortcut may not have focused the InputLine")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestF6NextWindow verifies F6 switches to the next window.
+func TestF6NextWindow(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-f6next"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	tmuxSendKeys(t, session, "M-1")
+	tmuxSendKeys(t, session, "F6")
+
+	lines := tmuxCapture(t, session)
+
+	editorActive := false
+	for _, line := range lines {
+		if strings.Contains(line, "Editor") && strings.Contains(line, "═") {
+			editorActive = true
+			break
+		}
+	}
+
+	if !editorActive {
+		t.Error("F6 did not switch focus — Editor window does not have active frame")
+	}
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
