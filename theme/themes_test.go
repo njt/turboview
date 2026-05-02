@@ -41,8 +41,8 @@ func TestBorlandCyanAllFieldsSet(t *testing.T) {
 	}
 
 	nonZeroCount := countNonZeroFields(BorlandCyan)
-	if nonZeroCount != 33 {
-		t.Errorf("BorlandCyan: expected 33 non-zero fields, got %d", nonZeroCount)
+	if nonZeroCount != 35 {
+		t.Errorf("BorlandCyan: expected 35 non-zero fields, got %d", nonZeroCount)
 	}
 }
 
@@ -78,8 +78,8 @@ func TestBorlandGrayAllFieldsSet(t *testing.T) {
 	}
 
 	nonZeroCount := countNonZeroFields(BorlandGray)
-	if nonZeroCount != 33 {
-		t.Errorf("BorlandGray: expected 33 non-zero fields, got %d", nonZeroCount)
+	if nonZeroCount != 35 {
+		t.Errorf("BorlandGray: expected 35 non-zero fields, got %d", nonZeroCount)
 	}
 }
 
@@ -115,8 +115,8 @@ func TestMatrixAllFieldsSet(t *testing.T) {
 	}
 
 	nonZeroCount := countNonZeroFields(Matrix)
-	if nonZeroCount != 33 {
-		t.Errorf("Matrix: expected 33 non-zero fields, got %d", nonZeroCount)
+	if nonZeroCount != 35 {
+		t.Errorf("Matrix: expected 35 non-zero fields, got %d", nonZeroCount)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestC64AllFieldsSet(t *testing.T) {
 	}
 
 	nonZeroCount := countNonZeroFields(C64)
-	if nonZeroCount != 33 {
-		t.Errorf("C64: expected 33 non-zero fields, got %d", nonZeroCount)
+	if nonZeroCount != 35 {
+		t.Errorf("C64: expected 35 non-zero fields, got %d", nonZeroCount)
 	}
 }
 

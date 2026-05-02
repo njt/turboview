@@ -27,6 +27,7 @@ const (
 	CmScrollBarChanged
 
 	CmSelectWindowNum
+	CmRecordHistory
 
 	CmUser CommandCode = 1000
 )

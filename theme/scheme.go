@@ -38,4 +38,6 @@ type ColorScheme struct {
 	StatusSelected      tcell.Style
 	MemoNormal          tcell.Style
 	MemoSelected        tcell.Style
+	HistoryArrow        tcell.Style
+	HistorySides        tcell.Style
 }

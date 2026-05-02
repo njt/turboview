@@ -43,6 +43,8 @@ func init() {
 		StatusShortcut:      s(tcell.ColorYellow, tcell.ColorMaroon),
 		MemoNormal:          s(tcell.ColorWhite, tcell.ColorNavy),
 		MemoSelected:        s(tcell.ColorWhite, tcell.ColorBlue),
+		HistoryArrow:        s(tcell.ColorLightBlue, tcell.ColorBlue),
+		HistorySides:        s(tcell.ColorBlue, tcell.ColorLightBlue),
 	}
 
 	Register("c64", C64)

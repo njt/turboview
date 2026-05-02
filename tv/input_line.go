@@ -38,6 +38,12 @@ func (il *InputLine) CursorPos() int        { return il.cursorPos }
 func (il *InputLine) Selection() (int, int) { return il.selStart, il.selEnd }
 func (il *InputLine) Overwrite() bool       { return il.overwrite }
 
+func (il *InputLine) SelectAll() {
+	il.selStart = 0
+	il.selEnd = len(il.text)
+	il.cursorPos = len(il.text)
+}
+
 func (il *InputLine) SetText(s string) {
 	runes := []rune(s)
 	if il.maxLen > 0 && len(runes) > il.maxLen {

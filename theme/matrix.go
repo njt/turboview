@@ -43,6 +43,8 @@ func init() {
 		StatusShortcut:      s(tcell.ColorLime, tcell.ColorGreen),
 		MemoNormal:          s(tcell.ColorGreen, tcell.ColorBlack),
 		MemoSelected:        s(tcell.ColorBlack, tcell.ColorGreen),
+		HistoryArrow:        s(tcell.ColorWhite, tcell.ColorDarkGreen),
+		HistorySides:        s(tcell.ColorGreen, tcell.ColorBlack),
 	}
 
 	Register("matrix", Matrix)

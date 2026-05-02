@@ -43,6 +43,8 @@ func init() {
 		StatusShortcut:      s(tcell.ColorYellow, tcell.ColorSilver),
 		MemoNormal:          s(tcell.ColorBlack, tcell.ColorWhite),
 		MemoSelected:        s(tcell.ColorWhite, tcell.ColorDarkGray),
+		HistoryArrow:        s(tcell.ColorDarkGray, tcell.ColorWhite),
+		HistorySides:        s(tcell.ColorWhite, tcell.ColorDarkGray),
 	}
 
 	Register("borland-gray", BorlandGray)
