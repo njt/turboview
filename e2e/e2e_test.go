@@ -1509,6 +1509,109 @@ func TestMemoTyping(t *testing.T) {
 	}
 }
 
+// TestMemoScrollbarVisible verifies that after adding a vertical scrollbar to the
+// Notes window's Memo, the scrollbar arrow characters are visible on screen.
+func TestMemoScrollbarVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-memoscrollbar"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus the Notes window (win3)
+	tmuxSendKeys(t, session, "M-3")
+
+	lines := tmuxCapture(t, session)
+
+	// Scrollbar arrow characters should be visible within the Notes window area
+	if !containsAny(lines, "▲", "▼") {
+		t.Error("scrollbar arrow characters '▲' or '▼' not visible in Notes window")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestMemoTypingAdvanced verifies typing works in the scrollbar-enabled Memo.
+func TestMemoTypingAdvanced(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-memotypadv"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus the Notes window (win3)
+	tmuxSendKeys(t, session, "M-3")
+
+	// Move to end of first line and type additional text
+	tmuxSendKeys(t, session, "End")
+	tmuxType(t, session, " ADV")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// The typed text should appear: "Hello, World! ADV"
+	if !containsAny(lines, "Hello, World! ADV") {
+		t.Error("typed text 'Hello, World! ADV' not visible after typing in scrollbar-enabled memo")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestMemoScroll verifies that PgDn scrolls the Memo content, bringing later
+// lines into view and pushing earlier lines out.
+func TestMemoScroll(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-memoscroll"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus the Notes window (win3)
+	tmuxSendKeys(t, session, "M-3")
+
+	// Precondition: "Hello, World!" should be visible before scrolling
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Hello, World!") {
+		t.Fatal("precondition: 'Hello, World!' not visible before PgDn")
+	}
+
+	// Press PgDn to scroll down (NPage is tmux's key name for Page Down)
+	tmuxSendKeys(t, session, "NPage")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Later lines should now be visible (PgDn scrolls by viewport height; Lines 6+ appear)
+	if !containsAny(lines, "Line 6", "Line 7", "Line 8", "Line 9", "Line 10") {
+		t.Error("later lines (Line 6+) not visible after PgDn — scroll may not have worked")
+	}
+
+	// Earlier content should have scrolled out of view
+	if containsAny(lines, "Hello, World!") {
+		t.Error("'Hello, World!' still visible after PgDn — memo did not scroll")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // TestListBoxNavigation verifies the ListBox widget in the Editor window:
 // initial items are visible, and arrow key navigation moves the selection.
 func TestListBoxNavigation(t *testing.T) {

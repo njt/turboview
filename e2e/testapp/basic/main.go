@@ -99,10 +99,12 @@ func main() {
 	listBox := tv.NewStringListBox(tv.NewRect(0, 0, clientW, clientH), items)
 	win2.Insert(listBox)
 
-	win3 := tv.NewWindow(tv.NewRect(45, 1, 30, 10), "Notes", tv.WithWindowNumber(3))
-	memo := tv.NewMemo(tv.NewRect(0, 0, 28, 8))
-	memo.SetText("Hello, World!\nThis is a memo.\nLine 3\nLine 4")
+	win3 := tv.NewWindow(tv.NewRect(45, 1, 30, 12), "Notes", tv.WithWindowNumber(3))
+	vScroll := tv.NewScrollBar(tv.NewRect(28, 0, 1, 10), tv.Vertical)
+	memo := tv.NewMemo(tv.NewRect(0, 0, 27, 10), tv.WithScrollBars(nil, vScroll))
+	memo.SetText("Hello, World!\nThis is a memo.\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\nLine 12\nLine 13\nLine 14\nLine 15")
 	win3.Insert(memo)
+	win3.Insert(vScroll)
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)
