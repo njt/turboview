@@ -16,16 +16,19 @@ func WithAutoIndent(enabled bool) MemoOption {
 
 type Memo struct {
 	BaseView
-	lines       [][]rune
-	cursorRow   int
-	cursorCol   int
-	deltaX      int
-	deltaY      int
-	autoIndent  bool
-	selStartRow int
-	selStartCol int
-	selEndRow   int
-	selEndCol   int
+	lines         [][]rune
+	cursorRow     int
+	cursorCol     int
+	deltaX        int
+	deltaY        int
+	autoIndent    bool
+	selStartRow   int
+	selStartCol   int
+	selEndRow     int
+	selEndCol     int
+	dragging      bool
+	dragAnchorRow int
+	dragAnchorCol int
 }
 
 func NewMemo(bounds Rect, opts ...MemoOption) *Memo {
@@ -336,7 +339,134 @@ func (m *Memo) insertText(s string) {
 	m.ensureCursorVisible()
 }
 
+// mouseToPos converts screen coordinates (relative to the Memo's top-left corner)
+// to a (row, col) buffer position, accounting for tab expansion and viewport offsets.
+func (m *Memo) mouseToPos(mx, my int) (int, int) {
+	row := m.deltaY + my
+	if row < 0 {
+		row = 0
+	}
+	if row >= len(m.lines) {
+		row = len(m.lines) - 1
+	}
+
+	line := m.lines[row]
+
+	// Compute the visual column at deltaX (the left edge of the viewport).
+	vcolAtDeltaX := 0
+	for i := 0; i < m.deltaX && i < len(line); i++ {
+		if line[i] == '\t' {
+			vcolAtDeltaX += 8 - (vcolAtDeltaX % 8)
+		} else {
+			vcolAtDeltaX++
+		}
+	}
+
+	targetVcol := vcolAtDeltaX + mx
+
+	// Walk from start to find the rune at targetVcol.
+	vcol := 0
+	runeIdx := 0
+	for runeIdx < len(line) && vcol < targetVcol {
+		if line[runeIdx] == '\t' {
+			tw := 8 - (vcol % 8)
+			if vcol+tw > targetVcol {
+				break // inside tab span — land on the tab rune
+			}
+			vcol += tw
+		} else {
+			vcol++
+		}
+		runeIdx++
+	}
+
+	if runeIdx > len(line) {
+		runeIdx = len(line)
+	}
+	return row, runeIdx
+}
+
+// selectWordAtCursor selects the word (or whitespace/punctuation run) under the cursor.
+func (m *Memo) selectWordAtCursor() {
+	line := m.lines[m.cursorRow]
+	if len(line) == 0 || m.cursorCol >= len(line) {
+		return
+	}
+	cls := charClass(line[m.cursorCol])
+	start := m.cursorCol
+	for start > 0 && charClass(line[start-1]) == cls {
+		start--
+	}
+	end := m.cursorCol
+	for end < len(line) && charClass(line[end]) == cls {
+		end++
+	}
+	m.selStartRow = m.cursorRow
+	m.selStartCol = start
+	m.cursorCol = end
+	m.setSelectionEnd()
+	m.ensureCursorVisible()
+}
+
+// selectLineAtCursor selects the entire current line.
+func (m *Memo) selectLineAtCursor() {
+	m.selStartRow = m.cursorRow
+	m.selStartCol = 0
+	m.cursorCol = len(m.lines[m.cursorRow])
+	m.setSelectionEnd()
+	m.ensureCursorVisible()
+}
+
 func (m *Memo) HandleEvent(event *Event) {
+	// Handle mouse events before keyboard events.
+	if event.What == EvMouse && event.Mouse != nil {
+		me := event.Mouse
+		if me.Button&tcell.Button1 != 0 {
+			if m.dragging {
+				// Continued drag (motion with button held).
+				row, col := m.mouseToPos(me.X, me.Y)
+				m.cursorRow = row
+				m.cursorCol = col
+				m.selStartRow = m.dragAnchorRow
+				m.selStartCol = m.dragAnchorCol
+				m.setSelectionEnd()
+				m.ensureCursorVisible()
+				event.Clear()
+			} else {
+				// Initial press — dispatch on click count.
+				switch me.ClickCount {
+				case 1:
+					row, col := m.mouseToPos(me.X, me.Y)
+					m.cursorRow = row
+					m.cursorCol = col
+					m.clearSelection()
+					m.dragging = true
+					m.dragAnchorRow = row
+					m.dragAnchorCol = col
+					m.ensureCursorVisible()
+					event.Clear()
+				case 2:
+					row, col := m.mouseToPos(me.X, me.Y)
+					m.cursorRow = row
+					m.cursorCol = col
+					m.selectWordAtCursor()
+					event.Clear()
+				case 3:
+					row, col := m.mouseToPos(me.X, me.Y)
+					m.cursorRow = row
+					m.cursorCol = col
+					m.selectLineAtCursor()
+					event.Clear()
+				}
+			}
+		} else if me.Button == tcell.ButtonNone && m.dragging {
+			// Button released — stop dragging.
+			m.dragging = false
+			event.Clear()
+		}
+		return // mouse events don't fall through to keyboard handling
+	}
+
 	if event.What != EvKeyboard || event.Key == nil {
 		return
 	}
