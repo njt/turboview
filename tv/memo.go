@@ -29,6 +29,8 @@ type Memo struct {
 	dragging      bool
 	dragAnchorRow int
 	dragAnchorCol int
+	hScrollBar    *ScrollBar
+	vScrollBar    *ScrollBar
 }
 
 func NewMemo(bounds Rect, opts ...MemoOption) *Memo {
@@ -75,11 +77,76 @@ func (m *Memo) SetText(s string) {
 	m.selStartCol = 0
 	m.selEndRow = 0
 	m.selEndCol = 0
+	m.syncScrollBars()
 }
 
 func (m *Memo) CursorPos() (int, int)      { return m.cursorRow, m.cursorCol }
 func (m *Memo) AutoIndent() bool           { return m.autoIndent }
 func (m *Memo) SetAutoIndent(enabled bool) { m.autoIndent = enabled }
+
+func (m *Memo) SetVScrollBar(sb *ScrollBar) {
+	if m.vScrollBar != nil {
+		m.vScrollBar.OnChange = nil
+	}
+	m.vScrollBar = sb
+	if sb != nil {
+		sb.OnChange = func(val int) {
+			m.deltaY = val
+		}
+		m.syncScrollBars()
+	}
+}
+
+func (m *Memo) SetHScrollBar(sb *ScrollBar) {
+	if m.hScrollBar != nil {
+		m.hScrollBar.OnChange = nil
+	}
+	m.hScrollBar = sb
+	if sb != nil {
+		sb.OnChange = func(val int) {
+			m.deltaX = val
+		}
+		m.syncScrollBars()
+	}
+}
+
+func WithScrollBars(h, v *ScrollBar) MemoOption {
+	return func(m *Memo) {
+		m.SetHScrollBar(h)
+		m.SetVScrollBar(v)
+	}
+}
+
+func (m *Memo) syncScrollBars() {
+	if m.vScrollBar != nil {
+		m.vScrollBar.SetRange(0, len(m.lines)-1)
+		m.vScrollBar.SetPageSize(m.Bounds().Height() - 1)
+		m.vScrollBar.SetValue(m.deltaY)
+	}
+	if m.hScrollBar != nil {
+		maxWidth := 0
+		for _, line := range m.lines {
+			if len(line) > maxWidth {
+				maxWidth = len(line)
+			}
+		}
+		m.hScrollBar.SetRange(0, maxWidth)
+		m.hScrollBar.SetPageSize(m.Bounds().Width() / 2)
+		m.hScrollBar.SetValue(m.deltaX)
+	}
+}
+
+func (m *Memo) SetState(flag ViewState, on bool) {
+	m.BaseView.SetState(flag, on)
+	if flag&SfSelected != 0 {
+		if m.vScrollBar != nil {
+			m.vScrollBar.SetState(SfVisible, on)
+		}
+		if m.hScrollBar != nil {
+			m.hScrollBar.SetState(SfVisible, on)
+		}
+	}
+}
 
 func (m *Memo) Selection() (int, int, int, int) {
 	return m.selStartRow, m.selStartCol, m.selEndRow, m.selEndCol
@@ -275,6 +342,7 @@ func (m *Memo) deleteSelection() {
 	m.cursorRow = sr
 	m.cursorCol = sc
 	m.clearSelection()
+	m.syncScrollBars()
 }
 
 func (m *Memo) selectedText() string {
@@ -337,6 +405,7 @@ func (m *Memo) insertText(s string) {
 	}
 	m.clearSelection()
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 // mouseToPos converts screen coordinates (relative to the Memo's top-left corner)
@@ -431,6 +500,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.selStartCol = m.dragAnchorCol
 				m.setSelectionEnd()
 				m.ensureCursorVisible()
+				m.syncScrollBars()
 				event.Clear()
 			} else {
 				// Initial press — dispatch on click count.
@@ -444,24 +514,28 @@ func (m *Memo) HandleEvent(event *Event) {
 					m.dragAnchorRow = row
 					m.dragAnchorCol = col
 					m.ensureCursorVisible()
+					m.syncScrollBars()
 					event.Clear()
 				case 2:
 					row, col := m.mouseToPos(me.X, me.Y)
 					m.cursorRow = row
 					m.cursorCol = col
 					m.selectWordAtCursor()
+					m.syncScrollBars()
 					event.Clear()
 				case 3:
 					row, col := m.mouseToPos(me.X, me.Y)
 					m.cursorRow = row
 					m.cursorCol = col
 					m.selectLineAtCursor()
+					m.syncScrollBars()
 					event.Clear()
 				}
 			}
 		} else if me.Button == tcell.ButtonNone && m.dragging {
 			// Button released — stop dragging.
 			m.dragging = false
+			m.syncScrollBars()
 			event.Clear()
 		}
 		return // mouse events don't fall through to keyboard handling
@@ -492,6 +566,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 			m.ensureCursorVisible()
+			m.syncScrollBars()
 			event.Clear()
 			return
 		}
@@ -507,6 +582,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyRight:
 		if k.Modifiers&tcell.ModCtrl != 0 {
@@ -520,6 +596,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 			m.ensureCursorVisible()
+			m.syncScrollBars()
 			event.Clear()
 			return
 		}
@@ -535,6 +612,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyUp:
 		if shift {
@@ -555,6 +633,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyDown:
 		if shift {
@@ -575,6 +654,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyHome:
 		if shift {
@@ -597,6 +677,7 @@ func (m *Memo) HandleEvent(event *Event) {
 			m.ensureCursorVisible()
 			m.clearSelection()
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyEnd:
 		if shift {
@@ -619,6 +700,7 @@ func (m *Memo) HandleEvent(event *Event) {
 			m.ensureCursorVisible()
 			m.clearSelection()
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyPgUp:
 		if shift {
@@ -633,6 +715,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyPgDn:
 		if shift {
@@ -647,6 +730,7 @@ func (m *Memo) HandleEvent(event *Event) {
 				m.clearSelection()
 			}
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyCtrlA:
 		m.selStartRow = 0
@@ -655,50 +739,61 @@ func (m *Memo) HandleEvent(event *Event) {
 		m.cursorCol = len(m.lines[m.cursorRow])
 		m.setSelectionEnd()
 		m.ensureCursorVisible()
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyCtrlC:
 		if m.HasSelection() {
 			clipboard = m.selectedText()
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyCtrlX:
 		if m.HasSelection() {
 			clipboard = m.selectedText()
 			m.deleteSelection()
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyCtrlV:
 		if clipboard != "" {
 			m.deleteSelection()
 			m.insertText(clipboard)
 		}
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyRune:
 		m.insertChar(k.Rune)
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyEnter:
 		m.insertNewline()
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if k.Modifiers&tcell.ModCtrl != 0 {
 			m.deleteWordLeft()
 			m.ensureCursorVisible()
+			m.syncScrollBars()
 			event.Clear()
 			return
 		}
 		m.backspace()
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyDelete:
 		if k.Modifiers&tcell.ModCtrl != 0 {
 			m.deleteWordRight()
 			m.ensureCursorVisible()
+			m.syncScrollBars()
 			event.Clear()
 			return
 		}
 		m.deleteChar()
+		m.syncScrollBars()
 		event.Clear()
 	case tcell.KeyCtrlY:
 		m.deleteLine()
+		m.syncScrollBars()
 		event.Clear()
 	default:
 		// Tab, F-keys, etc. — not consumed
@@ -713,6 +808,7 @@ func (m *Memo) cursorLeft() {
 		m.cursorCol = len(m.lines[m.cursorRow])
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) cursorRight() {
@@ -723,6 +819,7 @@ func (m *Memo) cursorRight() {
 		m.cursorCol = 0
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) cursorUp() {
@@ -731,6 +828,7 @@ func (m *Memo) cursorUp() {
 		m.clampCursor()
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) cursorDown() {
@@ -739,6 +837,7 @@ func (m *Memo) cursorDown() {
 		m.clampCursor()
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) smartHome() {
@@ -752,26 +851,41 @@ func (m *Memo) smartHome() {
 	} else {
 		m.cursorCol = firstNonWS
 	}
+	m.syncScrollBars()
 }
 
 func (m *Memo) pageUp() {
 	h := m.Bounds().Height()
+	m.deltaY -= h - 1
+	if m.deltaY < 0 {
+		m.deltaY = 0
+	}
 	m.cursorRow -= h - 1
 	if m.cursorRow < 0 {
 		m.cursorRow = 0
 	}
 	m.clampCursor()
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) pageDown() {
 	h := m.Bounds().Height()
+	m.deltaY += h - 1
+	maxDeltaY := len(m.lines) - h
+	if maxDeltaY < 0 {
+		maxDeltaY = 0
+	}
+	if m.deltaY > maxDeltaY {
+		m.deltaY = maxDeltaY
+	}
 	m.cursorRow += h - 1
 	if m.cursorRow >= len(m.lines) {
 		m.cursorRow = len(m.lines) - 1
 	}
 	m.clampCursor()
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) insertChar(ch rune) {
@@ -787,6 +901,7 @@ func (m *Memo) insertChar(ch rune) {
 	m.cursorCol++
 	m.ensureCursorVisible()
 	m.clearSelection()
+	m.syncScrollBars()
 }
 
 func (m *Memo) insertNewline() {
@@ -833,6 +948,7 @@ func (m *Memo) insertNewline() {
 	m.cursorCol = len(indent)
 	m.ensureCursorVisible()
 	m.clearSelection()
+	m.syncScrollBars()
 }
 
 func (m *Memo) backspace() {
@@ -854,6 +970,7 @@ func (m *Memo) backspace() {
 		m.cursorCol = joinCol
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 func (m *Memo) deleteChar() {
@@ -870,6 +987,7 @@ func (m *Memo) deleteChar() {
 		m.lines = append(m.lines[:m.cursorRow+1], m.lines[m.cursorRow+2:]...)
 	}
 	m.ensureCursorVisible()
+	m.syncScrollBars()
 }
 
 // charClass classifies a rune for word-movement purposes.
@@ -902,6 +1020,7 @@ func (m *Memo) wordLeft() {
 	}
 	if col == 0 {
 		m.cursorCol = 0
+		m.syncScrollBars()
 		return
 	}
 	// skip current class
@@ -910,6 +1029,7 @@ func (m *Memo) wordLeft() {
 		col--
 	}
 	m.cursorCol = col
+	m.syncScrollBars()
 }
 
 func (m *Memo) wordRight() {
@@ -932,6 +1052,7 @@ func (m *Memo) wordRight() {
 		col++
 	}
 	m.cursorCol = col
+	m.syncScrollBars()
 }
 
 func (m *Memo) deleteWordLeft() {
@@ -948,6 +1069,7 @@ func (m *Memo) deleteWordLeft() {
 	m.selStartRow, m.selStartCol = m.cursorRow, m.cursorCol
 	m.selEndRow, m.selEndCol = endRow, endCol
 	m.deleteSelection()
+	m.syncScrollBars()
 }
 
 func (m *Memo) deleteWordRight() {
@@ -964,6 +1086,7 @@ func (m *Memo) deleteWordRight() {
 	m.selEndRow, m.selEndCol = m.cursorRow, m.cursorCol
 	m.cursorRow, m.cursorCol = startRow, startCol
 	m.deleteSelection()
+	m.syncScrollBars()
 }
 
 func (m *Memo) deleteLine() {
@@ -979,4 +1102,5 @@ func (m *Memo) deleteLine() {
 	m.clampCursor()
 	m.ensureCursorVisible()
 	m.clearSelection()
+	m.syncScrollBars()
 }
