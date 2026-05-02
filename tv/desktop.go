@@ -30,6 +30,8 @@ func (d *Desktop) SetBounds(r Rect) {
 	}
 }
 
+func (d *Desktop) App() *Application           { return d.app }
+
 func (d *Desktop) Insert(v View)               { d.group.Insert(v) }
 func (d *Desktop) Remove(v View)               { d.group.Remove(v) }
 func (d *Desktop) Children() []View            { return d.group.Children() }
