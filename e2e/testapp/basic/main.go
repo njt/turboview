@@ -74,6 +74,8 @@ func main() {
 	win1.Insert(radioButtons)
 	inputLine := tv.NewInputLine(tv.NewRect(11, 12, 20, 1), 40)
 	win1.Insert(inputLine)
+	history := tv.NewHistory(tv.NewRect(31, 12, 3, 1), inputLine, 1)
+	win1.Insert(history)
 	nameLabel := tv.NewLabel(tv.NewRect(1, 12, 10, 1), "~N~ame:", inputLine)
 	win1.Insert(nameLabel)
 

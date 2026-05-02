@@ -47,40 +47,44 @@ func (rb *RadioButton) Shortcut() rune      { return rb.shortcut }
 func (rb *RadioButton) Draw(buf *DrawBuffer) {
 	cs := rb.ColorScheme()
 	normalStyle := tcell.StyleDefault
+	selectedStyle := tcell.StyleDefault
 	shortcutStyle := tcell.StyleDefault
 	if cs != nil {
 		normalStyle = cs.RadioButtonNormal
+		selectedStyle = cs.RadioButtonSelected
 		shortcutStyle = cs.LabelShortcut
 	}
 
-	x := 0
-
-	// Focus cursor prefix
-	if rb.HasState(SfSelected) {
-		buf.WriteChar(x, 0, '►', normalStyle)
-		x++
+	clusterFocused := rb.Owner() == nil || rb.Owner().HasState(SfSelected)
+	focused := rb.HasState(SfSelected) && clusterFocused
+	itemStyle := normalStyle
+	if focused {
+		itemStyle = selectedStyle
 	}
 
-	// Paren + mark
-	buf.WriteChar(x, 0, '(', normalStyle)
-	x++
-	if rb.selected {
-		buf.WriteChar(x, 0, '*', normalStyle)
+	if focused {
+		buf.WriteChar(0, 0, '►', itemStyle)
 	} else {
-		buf.WriteChar(x, 0, ' ', normalStyle)
+		buf.WriteChar(0, 0, ' ', normalStyle)
 	}
-	x++
-	buf.WriteChar(x, 0, ')', normalStyle)
-	x++
 
-	// Space before label
-	buf.WriteChar(x, 0, ' ', normalStyle)
-	x++
+	// Paren + mark always at columns 1-3
+	buf.WriteChar(1, 0, '(', itemStyle)
+	if rb.selected {
+		buf.WriteChar(2, 0, '*', itemStyle)
+	} else {
+		buf.WriteChar(2, 0, ' ', itemStyle)
+	}
+	buf.WriteChar(3, 0, ')', itemStyle)
 
-	// Label text with tilde parsing
+	// Space before label at column 4
+	buf.WriteChar(4, 0, ' ', itemStyle)
+
+	// Label text starts at column 5
+	x := 5
 	segments := ParseTildeLabel(rb.label)
 	for _, seg := range segments {
-		style := normalStyle
+		style := itemStyle
 		if seg.Shortcut {
 			style = shortcutStyle
 		}
@@ -223,8 +227,11 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 		}
 	}
 
-	// Handle Up/Down arrow for selection (not just focus)
-	if event.What == EvKeyboard && event.Key != nil {
+	// Handle Up/Down/Right/Left arrow for selection (not just focus).
+	// Only consume these keys when RadioButtons itself has focus (SfSelected=true);
+	// otherwise OfPostProcess siblings (e.g. History) would never see Down/Up
+	// because RadioButtons runs in Phase1 (OfPreProcess) before them.
+	if event.What == EvKeyboard && event.Key != nil && rbs.HasState(SfSelected) {
 		switch event.Key.Key {
 		case tcell.KeyDown, tcell.KeyRight:
 			rbs.moveSelection(1)

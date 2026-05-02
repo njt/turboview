@@ -48,40 +48,44 @@ func (cb *CheckBox) Shortcut() rune         { return cb.shortcut }
 func (cb *CheckBox) Draw(buf *DrawBuffer) {
 	cs := cb.ColorScheme()
 	normalStyle := tcell.StyleDefault
+	selectedStyle := tcell.StyleDefault
 	shortcutStyle := tcell.StyleDefault
 	if cs != nil {
 		normalStyle = cs.CheckBoxNormal
+		selectedStyle = cs.CheckBoxSelected
 		shortcutStyle = cs.LabelShortcut
 	}
 
-	x := 0
-
-	// Focus cursor prefix
-	if cb.HasState(SfSelected) {
-		buf.WriteChar(x, 0, '►', normalStyle)
-		x++
+	clusterFocused := cb.Owner() == nil || cb.Owner().HasState(SfSelected)
+	focused := cb.HasState(SfSelected) && clusterFocused
+	itemStyle := normalStyle
+	if focused {
+		itemStyle = selectedStyle
 	}
 
-	// Bracket + mark
-	buf.WriteChar(x, 0, '[', normalStyle)
-	x++
-	if cb.checked {
-		buf.WriteChar(x, 0, 'X', normalStyle)
+	if focused {
+		buf.WriteChar(0, 0, '►', itemStyle)
 	} else {
-		buf.WriteChar(x, 0, ' ', normalStyle)
+		buf.WriteChar(0, 0, ' ', normalStyle)
 	}
-	x++
-	buf.WriteChar(x, 0, ']', normalStyle)
-	x++
 
-	// Space before label
-	buf.WriteChar(x, 0, ' ', normalStyle)
-	x++
+	// Bracket + mark always at columns 1-3
+	buf.WriteChar(1, 0, '[', itemStyle)
+	if cb.checked {
+		buf.WriteChar(2, 0, 'X', itemStyle)
+	} else {
+		buf.WriteChar(2, 0, ' ', itemStyle)
+	}
+	buf.WriteChar(3, 0, ']', itemStyle)
 
-	// Label text with tilde parsing
+	// Space before label at column 4
+	buf.WriteChar(4, 0, ' ', itemStyle)
+
+	// Label text starts at column 5
+	x := 5
 	segments := ParseTildeLabel(cb.label)
 	for _, seg := range segments {
-		style := normalStyle
+		style := itemStyle
 		if seg.Shortcut {
 			style = shortcutStyle
 		}
@@ -207,8 +211,11 @@ func (cbs *CheckBoxes) HandleEvent(event *Event) {
 		}
 	}
 
-	// Handle Up/Down arrow for focus navigation (does NOT toggle)
-	if event.What == EvKeyboard && event.Key != nil {
+	// Handle Up/Down arrow for focus navigation (does NOT toggle).
+	// Only consume these keys when CheckBoxes itself has focus (SfSelected=true);
+	// otherwise OfPostProcess siblings (e.g. History) would never see Down/Up
+	// because CheckBoxes runs in Phase1 (OfPreProcess) before them.
+	if event.What == EvKeyboard && event.Key != nil && cbs.HasState(SfSelected) {
 		switch event.Key.Key {
 		case tcell.KeyDown:
 			cbs.moveNavigation(1)

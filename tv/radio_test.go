@@ -409,8 +409,8 @@ func TestRadioButtonDrawShortcutStyleDiffersFromNormal(t *testing.T) {
 	}
 }
 
-// TestRadioButtonDrawWidth verifies the rendered width equals 4 + tildeTextLen(label).
-// Spec: "Total rendered width: 4 + tildeTextLen(label)."
+// TestRadioButtonDrawWidth verifies the rendered width equals 5 + tildeTextLen(label).
+// Spec: "Total rendered width: 5 + tildeTextLen(label)" (1 for focus indicator + 4 prefix + label).
 func TestRadioButtonDrawWidth(t *testing.T) {
 	label := "~T~est" // tildeTextLen = 4 ("Test")
 	rb := NewRadioButton(NewRect(0, 0, 20, 1), label)
@@ -419,9 +419,8 @@ func TestRadioButtonDrawWidth(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	rb.Draw(buf)
 
-	// "( ) Test" — 4 prefix chars + 4 label chars = 8 total.
-	// Characters at positions 0..7 should be non-space; position 8 onwards should be untouched.
-	expectedWidth := 4 + tildeTextLen(label) // 8
+	// " ( ) Test" — 1 focus indicator + 3 bracket/mark chars + 1 space + 4 label chars = 9 total.
+	expectedWidth := 5 + tildeTextLen(label) // 9
 	// Check that content ends exactly where expected.
 	// Position expectedWidth should not be part of the widget rendering.
 	// We verify by checking the rendered runes fill exactly expectedWidth columns.
@@ -454,9 +453,9 @@ func TestRadioButtonDrawFocusCursorWhenSfSelected(t *testing.T) {
 	}
 }
 
-// TestRadioButtonDrawNoCursorWhenNotSfSelected verifies '►' does NOT appear at x=0
+// TestRadioButtonDrawNoCursorWhenNotSfSelected verifies col 0 is a space (not '►')
 // when SfSelected is not set.
-// Spec: "When SfSelected (has focus), a '►' prefix is rendered."
+// Spec: "When SfSelected (has focus), a '►' prefix is rendered." — unfocused has space.
 func TestRadioButtonDrawNoCursorWhenNotSfSelected(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 15, 1), "Item")
 	rb.scheme = theme.BorlandBlue
@@ -466,15 +465,14 @@ func TestRadioButtonDrawNoCursorWhenNotSfSelected(t *testing.T) {
 	rb.Draw(buf)
 
 	cell := buf.GetCell(0, 0)
-	if cell.Rune == '►' {
-		t.Error("unfocused RadioButton cell(0,0) = '►'; cursor must only appear when SfSelected is set")
+	if cell.Rune != ' ' {
+		t.Errorf("unfocused RadioButton cell(0,0) = %q, want ' ' (space when not SfSelected)", cell.Rune)
 	}
 }
 
-// TestRadioButtonDrawFocusCursorShiftsParensRight verifies the '(' appears at x=1
-// (not x=0) when SfSelected is set.
-// Spec: "shifting them right by 1."
-func TestRadioButtonDrawFocusCursorShiftsParensRight(t *testing.T) {
+// TestRadioButtonDrawParenAlwaysAtColumn1 verifies '(' is always at col 1, whether
+// focused (► at col 0) or unfocused (space at col 0).
+func TestRadioButtonDrawParenAlwaysAtColumn1(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 15, 1), "Item")
 	rb.scheme = theme.BorlandBlue
 	rb.SetState(SfSelected, true)
@@ -484,14 +482,13 @@ func TestRadioButtonDrawFocusCursorShiftsParensRight(t *testing.T) {
 
 	cell := buf.GetCell(1, 0)
 	if cell.Rune != '(' {
-		t.Errorf("focused RadioButton cell(1,0) = %q, want '(' (shifted right by focus cursor)", cell.Rune)
+		t.Errorf("focused RadioButton cell(1,0) = %q, want '('", cell.Rune)
 	}
 }
 
-// TestRadioButtonDrawUnfocusedParensAtColumnZero verifies '(' is at x=0 when
-// SfSelected is not set (no shift).
-// Spec: (implied) without SfSelected, no shift occurs.
-func TestRadioButtonDrawUnfocusedParensAtColumnZero(t *testing.T) {
+// TestRadioButtonDrawUnfocusedParenAtColumnOne verifies '(' is at x=1 when
+// SfSelected is not set (col 0 is a space for the focus indicator).
+func TestRadioButtonDrawUnfocusedParenAtColumnOne(t *testing.T) {
 	rb := NewRadioButton(NewRect(0, 0, 15, 1), "Item")
 	rb.scheme = theme.BorlandBlue
 	rb.SetState(SfSelected, false)
@@ -499,9 +496,9 @@ func TestRadioButtonDrawUnfocusedParensAtColumnZero(t *testing.T) {
 	buf := NewDrawBuffer(15, 1)
 	rb.Draw(buf)
 
-	cell := buf.GetCell(0, 0)
+	cell := buf.GetCell(1, 0)
 	if cell.Rune != '(' {
-		t.Errorf("unfocused RadioButton cell(0,0) = %q, want '('", cell.Rune)
+		t.Errorf("unfocused RadioButton cell(1,0) = %q, want '('", cell.Rune)
 	}
 }
 
@@ -1023,6 +1020,7 @@ func TestRadioButtonsWrongAltShortcutDoesNotSelect(t *testing.T) {
 func TestRadioButtonsDownArrowMovesToNextAndSelects(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	// Item(0) is selected and focused by default.
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1038,6 +1036,7 @@ func TestRadioButtonsDownArrowMovesToNextAndSelects(t *testing.T) {
 func TestRadioButtonsDownArrowDeselectsPrevious(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	// Item(0) is selected by default.
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1051,6 +1050,7 @@ func TestRadioButtonsDownArrowDeselectsPrevious(t *testing.T) {
 // Spec: "Up/Down events are consumed."
 func TestRadioButtonsDownArrowConsumesEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1067,6 +1067,7 @@ func TestRadioButtonsUpArrowMovesToPreviousAndSelects(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(2) // start at Item(2)
 	rbs.SetFocusedChild(rbs.Item(2))
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	rbs.HandleEvent(ev)
@@ -1082,6 +1083,7 @@ func TestRadioButtonsUpArrowConsumesEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(1)
 	rbs.SetFocusedChild(rbs.Item(1))
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	rbs.HandleEvent(ev)
@@ -1098,6 +1100,7 @@ func TestRadioButtonsDownArrowAtLastItemIsNoOp(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(2)
 	rbs.SetFocusedChild(rbs.Item(2))
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1118,6 +1121,7 @@ func TestRadioButtonsDownArrowAtLastItemConsumesEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(2)
 	rbs.SetFocusedChild(rbs.Item(2))
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1133,6 +1137,7 @@ func TestRadioButtonsDownArrowAtLastItemConsumesEvent(t *testing.T) {
 func TestRadioButtonsUpArrowAtFirstItemIsNoOp(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	// Item(0) is selected and focused by default.
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	rbs.HandleEvent(ev)
@@ -1151,6 +1156,7 @@ func TestRadioButtonsUpArrowAtFirstItemIsNoOp(t *testing.T) {
 // Spec: "Up at first item is no-op; Up/Down events are consumed."
 func TestRadioButtonsUpArrowAtFirstItemConsumesEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	rbs.HandleEvent(ev)
@@ -1165,6 +1171,7 @@ func TestRadioButtonsUpArrowAtFirstItemConsumesEvent(t *testing.T) {
 // Spec: "unlike checkboxes where arrows just move focus" — arrows select.
 func TestRadioButtonsDownArrowSelectsNotJustFocuses(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	rbs.HandleEvent(ev)
@@ -1315,6 +1322,7 @@ func TestRadioButtonsValueConsistentAfterMultipleSetValues(t *testing.T) {
 // Spec: "only one in a cluster can be selected."
 func TestRadioButtonsOnlyOneSelectedAfterUpDownSequence(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	down := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	up := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}

@@ -7,6 +7,10 @@ package tv
 // At the first item, Up does nothing (no wrap).
 // At the last item, Down does nothing (no wrap).
 // Arrow keys clear the event after handling.
+//
+// Note: CheckBoxes only handles arrow keys when SfSelected=true (it is the
+// focused widget in its parent group). This prevents CheckBoxes from stealing
+// Down/Up events from OfPostProcess siblings like History when it is not focused.
 
 import (
 	"testing"
@@ -20,6 +24,7 @@ import (
 func TestCheckBoxArrowsDownMovesFocusToNextItem(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(0))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	cbs.HandleEvent(ev)
@@ -35,6 +40,7 @@ func TestCheckBoxArrowsDownMovesFocusToNextItem(t *testing.T) {
 func TestCheckBoxArrowsDownDoesNotToggle(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(0))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	cbs.HandleEvent(ev)
@@ -52,6 +58,7 @@ func TestCheckBoxArrowsDownDoesNotToggle(t *testing.T) {
 func TestCheckBoxArrowsUpMovesFocusToPreviousItem(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(2))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	cbs.HandleEvent(ev)
@@ -67,6 +74,7 @@ func TestCheckBoxArrowsUpMovesFocusToPreviousItem(t *testing.T) {
 func TestCheckBoxArrowsUpAtFirstItemDoesNothing(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(0))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	cbs.HandleEvent(ev)
@@ -82,6 +90,7 @@ func TestCheckBoxArrowsUpAtFirstItemDoesNothing(t *testing.T) {
 func TestCheckBoxArrowsDownAtLastItemDoesNothing(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(2))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	cbs.HandleEvent(ev)
@@ -91,11 +100,13 @@ func TestCheckBoxArrowsDownAtLastItemDoesNothing(t *testing.T) {
 	}
 }
 
-// TestCheckBoxArrowsDownClearsEvent verifies Down arrow clears (consumes) the event.
+// TestCheckBoxArrowsDownClearsEvent verifies Down arrow clears (consumes) the event
+// when CheckBoxes is focused.
 // Spec: "Arrow keys clear the event after handling."
 func TestCheckBoxArrowsDownClearsEvent(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(0))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}}
 	cbs.HandleEvent(ev)
@@ -105,11 +116,13 @@ func TestCheckBoxArrowsDownClearsEvent(t *testing.T) {
 	}
 }
 
-// TestCheckBoxArrowsUpClearsEvent verifies Up arrow clears (consumes) the event.
+// TestCheckBoxArrowsUpClearsEvent verifies Up arrow clears (consumes) the event
+// when CheckBoxes is focused.
 // Spec: "Arrow keys clear the event after handling."
 func TestCheckBoxArrowsUpClearsEvent(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	cbs.SetFocusedChild(cbs.Item(2))
+	cbs.SetState(SfSelected, true) // CheckBoxes must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyUp}}
 	cbs.HandleEvent(ev)

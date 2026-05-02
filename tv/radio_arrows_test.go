@@ -18,6 +18,7 @@ import (
 func TestRadioArrowsRightMovesToNextAndSelects(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	// Item(0) selected by default.
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRight}}
 	rbs.HandleEvent(ev)
@@ -32,6 +33,7 @@ func TestRadioArrowsRightMovesToNextAndSelects(t *testing.T) {
 // Spec: "Right arrow behaves like Down (moves selection to next)."
 func TestRadioArrowsRightDeselectsPrevious(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRight}}
 	rbs.HandleEvent(ev)
@@ -48,6 +50,7 @@ func TestRadioArrowsLeftMovesToPreviousAndSelects(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(2)
 	rbs.SetFocusedChild(rbs.Item(2))
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyLeft}}
 	rbs.HandleEvent(ev)
@@ -98,6 +101,7 @@ func TestRadioArrowsLeftAtFirstItemIsNoOp(t *testing.T) {
 // Spec: "At boundaries, no wrap (same as existing Up/Down behavior)" — events consumed.
 func TestRadioArrowsRightClearsEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRight}}
 	rbs.HandleEvent(ev)
@@ -112,6 +116,7 @@ func TestRadioArrowsRightClearsEvent(t *testing.T) {
 func TestRadioArrowsLeftClearsEvent(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
 	rbs.SetValue(1)
+	rbs.SetState(SfSelected, true) // RadioButtons must be focused to handle arrow keys
 
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyLeft}}
 	rbs.HandleEvent(ev)

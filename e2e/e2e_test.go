@@ -1612,6 +1612,116 @@ func TestMemoScroll(t *testing.T) {
 	}
 }
 
+// TestHistoryIconVisible verifies that the History widget renders its ↓ arrow icon
+// in win1 next to the InputLine. win2 (Editor) overlaps the History position, so
+// we close win2 first to expose win1's full client area.
+func TestHistoryIconVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-history-icon"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Close win2 (Editor) which overlaps the History widget position in win1.
+	// Focus win2 then Alt+F3 closes it.
+	tmuxSendKeys(t, session, "M-2")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "M-F3")
+	time.Sleep(300 * time.Millisecond)
+
+	// Focus win1 (File Manager)
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// The History widget renders ↓ as its arrow icon
+	if !containsAny(lines, "↓") {
+		t.Error("History arrow icon '↓' not visible in win1 — History widget may not have rendered")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestHistoryDropdown verifies that typing into the InputLine, tabbing away to
+// record the history, then pressing Down opens a dropdown showing the recorded entry.
+func TestHistoryDropdown(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-history"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus win1 (File Manager)
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	// Tab to the InputLine: (no initial focus) → OK → Close → CheckBoxes → RadioButtons → InputLine (5 tabs)
+	for i := 0; i < 5; i++ {
+		tmuxSendKeys(t, session, "Tab")
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	// Type some text into the InputLine
+	tmuxType(t, session, "test1")
+	time.Sleep(300 * time.Millisecond)
+
+	// Tab away to trigger CmReleasedFocus which records the text in history.
+	// One tab wraps back to OK.
+	tmuxSendKeys(t, session, "Tab")
+	time.Sleep(300 * time.Millisecond)
+
+	// Tab back to the InputLine (OK → Close → CheckBoxes → RadioButtons → InputLine = 4 tabs)
+	for i := 0; i < 4; i++ {
+		tmuxSendKeys(t, session, "Tab")
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	// Press Down arrow to open the history dropdown
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// The dropdown should show the previously entered "test1"
+	if !containsAny(lines, "test1") {
+		t.Error("history dropdown entry 'test1' not visible after pressing Down — history dropdown may not have opened")
+	}
+
+	// Dismiss with Escape
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	// App should still be running
+	if !tmuxHasSession(session) {
+		t.Error("app exited unexpectedly after pressing Escape on history dropdown")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
 // TestListBoxNavigation verifies the ListBox widget in the Editor window:
 // initial items are visible, and arrow key navigation moves the selection.
 func TestListBoxNavigation(t *testing.T) {
