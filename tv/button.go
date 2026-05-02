@@ -201,6 +201,7 @@ func (b *Button) HandleEvent(event *Event) {
 }
 
 func (b *Button) press(event *Event) {
+	b.broadcastToOwner(CmRecordHistory)
 	event.What = EvCommand
 	event.Command = b.command
 	event.Key = nil
