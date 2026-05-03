@@ -39,9 +39,12 @@ func TestRadioButtonsSetBoundsResizesItems(t *testing.T) {
 
 	rbs.SetBounds(NewRect(0, 0, 30, 3))
 
+	// Multi-column layout: single-column since height(3) >= numItems(3).
+	// Column width = tildeTextLen("A") + 6 = 1 + 6 = 7.
+	want := tildeTextLen("A") + 6
 	for i, item := range rbs.items {
-		if item.Bounds().Width() != 30 {
-			t.Errorf("radio button %d width should be 30 after resize, got %d", i, item.Bounds().Width())
+		if item.Bounds().Width() != want {
+			t.Errorf("radio button %d width should be %d after resize, got %d", i, want, item.Bounds().Width())
 		}
 	}
 }

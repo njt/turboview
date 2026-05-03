@@ -214,12 +214,15 @@ func TestIntegrationPhase10Batch1DownArrowCheckedCheckBoxNotToggled(t *testing.T
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase10Batch1RightArrowInDialogRadioButtonsChangesSelection verifies
-// that pressing Right in a RadioButtons cluster inside a Dialog changes the selected
-// radio button to the next one (same as Down), exercised through the Dialog dispatch chain.
+// that pressing Right in a RadioButtons cluster inside a Dialog moves selection to
+// the item in the next column, exercised through the Dialog dispatch chain.
+// Right/Left perform column navigation (delta = height).
 func TestIntegrationPhase10Batch1RightArrowInDialogRadioButtonsChangesSelection(t *testing.T) {
-	dlg := NewDialog(NewRect(0, 0, 30, 10), "RadioButtons Right")
+	dlg := NewDialog(NewRect(0, 0, 50, 10), "RadioButtons Right")
 
-	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"X", "Y", "Z"})
+	// height=1 → 3 columns: item 0 in col0, item 1 in col1, item 2 in col2.
+	// Right from item 0 (delta=height=1) → item 1.
+	rbs := NewRadioButtons(NewRect(0, 0, 45, 1), []string{"X", "Y", "Z"})
 	dlg.Insert(rbs)
 	dlg.SetFocusedChild(rbs)
 
@@ -244,12 +247,15 @@ func TestIntegrationPhase10Batch1RightArrowInDialogRadioButtonsChangesSelection(
 }
 
 // TestIntegrationPhase10Batch1LeftArrowInDialogRadioButtonsChangesSelection verifies
-// that pressing Left in a RadioButtons cluster inside a Dialog changes selection to
-// the previous item (same as Up), exercised through the Dialog dispatch chain.
+// that pressing Left in a RadioButtons cluster inside a Dialog moves selection to
+// the item in the previous column, exercised through the Dialog dispatch chain.
+// Right/Left perform column navigation (delta = height).
 func TestIntegrationPhase10Batch1LeftArrowInDialogRadioButtonsChangesSelection(t *testing.T) {
-	dlg := NewDialog(NewRect(0, 0, 30, 10), "RadioButtons Left")
+	dlg := NewDialog(NewRect(0, 0, 50, 10), "RadioButtons Left")
 
-	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"X", "Y", "Z"})
+	// height=1 → 3 columns: item 0 in col0, item 1 in col1, item 2 in col2.
+	// Left from item 2 (delta=height=1) → item 1.
+	rbs := NewRadioButtons(NewRect(0, 0, 45, 1), []string{"X", "Y", "Z"})
 	dlg.Insert(rbs)
 	dlg.SetFocusedChild(rbs)
 

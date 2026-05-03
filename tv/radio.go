@@ -19,6 +19,7 @@ type RadioButton struct {
 	label    string
 	shortcut rune
 	selected bool
+	disabled bool
 }
 
 func NewRadioButton(bounds Rect, label string) *RadioButton {
@@ -39,10 +40,10 @@ func NewRadioButton(bounds Rect, label string) *RadioButton {
 	return rb
 }
 
-func (rb *RadioButton) Selected() bool      { return rb.selected }
-func (rb *RadioButton) SetSelected(v bool)  { rb.selected = v }
-func (rb *RadioButton) Label() string       { return rb.label }
-func (rb *RadioButton) Shortcut() rune      { return rb.shortcut }
+func (rb *RadioButton) Selected() bool     { return rb.selected }
+func (rb *RadioButton) SetSelected(v bool) { rb.selected = v }
+func (rb *RadioButton) Label() string      { return rb.label }
+func (rb *RadioButton) Shortcut() rune     { return rb.shortcut }
 
 func (rb *RadioButton) Draw(buf *DrawBuffer) {
 	cs := rb.ColorScheme()
@@ -53,6 +54,30 @@ func (rb *RadioButton) Draw(buf *DrawBuffer) {
 		normalStyle = cs.RadioButtonNormal
 		selectedStyle = cs.RadioButtonSelected
 		shortcutStyle = cs.LabelShortcut
+	}
+
+	if rb.disabled {
+		disabledStyle := tcell.StyleDefault
+		if cs != nil {
+			disabledStyle = cs.ClusterDisabled
+		}
+		// Disabled: never show ►, use disabledStyle for all rendering.
+		buf.WriteChar(0, 0, ' ', disabledStyle)
+		buf.WriteChar(1, 0, '(', disabledStyle)
+		if rb.selected {
+			buf.WriteChar(2, 0, '*', disabledStyle)
+		} else {
+			buf.WriteChar(2, 0, ' ', disabledStyle)
+		}
+		buf.WriteChar(3, 0, ')', disabledStyle)
+		buf.WriteChar(4, 0, ' ', disabledStyle)
+		x := 5
+		segments := ParseTildeLabel(rb.label)
+		for _, seg := range segments {
+			buf.WriteStr(x, 0, seg.Text, disabledStyle)
+			x += utf8.RuneCountInString(seg.Text)
+		}
+		return
 	}
 
 	clusterFocused := rb.Owner() == nil || rb.Owner().HasState(SfSelected)
@@ -94,6 +119,10 @@ func (rb *RadioButton) Draw(buf *DrawBuffer) {
 }
 
 func (rb *RadioButton) HandleEvent(event *Event) {
+	if rb.disabled {
+		return
+	}
+
 	if event.What == EvMouse && event.Mouse != nil {
 		rb.BaseView.HandleEvent(event)
 		if event.IsCleared() {
@@ -131,23 +160,24 @@ func (rb *RadioButton) selectInCluster() {
 
 type RadioButtons struct {
 	BaseView
-	group *Group
-	items []*RadioButton
+	group      *Group
+	items      []*RadioButton
+	enableMask uint32
 }
 
 func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 	rbs := &RadioButtons{}
+	rbs.enableMask = ^uint32(0)
 	rbs.SetBounds(bounds)
 	rbs.SetState(SfVisible, true)
 	rbs.SetOptions(OfSelectable|OfFirstClick, true)
-	rbs.SetOptions(OfPreProcess, true)
+	rbs.SetOptions(OfPreProcess|OfPostProcess, true)
 
 	rbs.group = NewGroup(bounds)
 	rbs.group.SetFacade(rbs)
 
-	for i, label := range labels {
-		rb := NewRadioButton(NewRect(0, i, bounds.Width(), 1), label)
-		rb.SetGrowMode(GfGrowHiX)
+	for _, label := range labels {
+		rb := NewRadioButton(NewRect(0, 0, bounds.Width(), 1), label)
 		rbs.items = append(rbs.items, rb)
 		rbs.group.Insert(rb)
 	}
@@ -157,15 +187,74 @@ func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 		rbs.items[0].selected = true
 	}
 
+	rbs.relayoutItems()
+
 	rbs.SetSelf(rbs)
 	return rbs
+}
+
+func (rbs *RadioButtons) relayoutItems() {
+	h := rbs.Bounds().Height()
+	if h <= 0 {
+		h = len(rbs.items)
+	}
+	if h <= 0 {
+		return
+	}
+	numCols := (len(rbs.items) + h - 1) / h
+	colWidths := make([]int, numCols)
+	for i, item := range rbs.items {
+		col := i / h
+		w := labelDisplayWidth(item.label) + 6
+		if w > colWidths[col] {
+			colWidths[col] = w
+		}
+	}
+	lastCol := numCols - 1
+	for i, item := range rbs.items {
+		col := i / h
+		row := i % h
+		colX := 0
+		for c := 0; c < col; c++ {
+			colX += colWidths[c]
+		}
+		item.SetBounds(NewRect(colX, row, colWidths[col], 1))
+		if col == lastCol {
+			item.SetGrowMode(GfGrowHiX)
+		} else {
+			item.SetGrowMode(0)
+		}
+	}
 }
 
 func (rbs *RadioButtons) SetBounds(r Rect) {
 	rbs.BaseView.SetBounds(r)
 	if rbs.group != nil {
 		rbs.group.SetBounds(NewRect(0, 0, r.Width(), r.Height()))
+		rbs.relayoutItems()
 	}
+}
+
+func (rbs *RadioButtons) SetEnabled(index int, enabled bool) {
+	if index < 0 || index >= len(rbs.items) {
+		return
+	}
+	if enabled {
+		rbs.enableMask |= 1 << uint(index)
+	} else {
+		rbs.enableMask &^= 1 << uint(index)
+	}
+	// Keep item.disabled in sync so HandleEvent guards work without requiring Draw first.
+	rbs.items[index].disabled = !enabled
+	anyEnabled := rbs.enableMask&((1<<uint(len(rbs.items)))-1) != 0
+	rbs.SetOptions(OfSelectable, anyEnabled)
+}
+
+func (rbs *RadioButtons) IsEnabled(index int) bool {
+	if index < 0 || index >= len(rbs.items) {
+		return false
+	}
+	return rbs.enableMask&(1<<uint(index)) != 0
 }
 
 func (rbs *RadioButtons) Value() int {
@@ -198,7 +287,8 @@ func (rbs *RadioButtons) ExecView(v View) CommandCode { return rbs.group.ExecVie
 func (rbs *RadioButtons) BringToFront(v View)         { rbs.group.BringToFront(v) }
 
 func (rbs *RadioButtons) Draw(buf *DrawBuffer) {
-	for _, item := range rbs.items {
+	for i, item := range rbs.items {
+		item.disabled = !rbs.IsEnabled(i)
 		childBounds := item.Bounds()
 		sub := buf.SubBuffer(childBounds)
 		item.Draw(sub)
@@ -213,8 +303,12 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 			return
 		}
 		mx, my := event.Mouse.X, event.Mouse.Y
-		for _, item := range rbs.items {
+		for i, item := range rbs.items {
 			if item.Bounds().Contains(NewPoint(mx, my)) {
+				if !rbs.IsEnabled(i) {
+					event.Clear()
+					return
+				}
 				// Adjust coordinates to child-local space and forward.
 				origX, origY := event.Mouse.X, event.Mouse.Y
 				event.Mouse.X -= item.Bounds().A.X
@@ -227,6 +321,26 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 		return
 	}
 
+	// Plain-letter shortcut matching (before SfSelected guard).
+	if event.What == EvKeyboard && event.Key != nil &&
+		event.Key.Key == tcell.KeyRune && event.Key.Modifiers == 0 {
+		r := unicode.ToLower(event.Key.Rune)
+		for i, item := range rbs.items {
+			if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
+				if !rbs.IsEnabled(i) {
+					continue
+				}
+				if owner, ok := rbs.Owner().(Container); ok && !rbs.HasState(SfSelected) {
+					owner.SetFocusedChild(rbs)
+				}
+				rbs.group.SetFocusedChild(item)
+				rbs.SetValue(i)
+				event.Clear()
+				return
+			}
+		}
+	}
+
 	// Handle Alt+shortcut to focus and select matching radio button
 	if event.What == EvKeyboard && event.Key != nil &&
 		event.Key.Key == tcell.KeyRune &&
@@ -235,6 +349,9 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 		r := unicode.ToLower(event.Key.Rune)
 		for i, item := range rbs.items {
 			if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
+				if !rbs.IsEnabled(i) {
+					continue
+				}
 				rbs.group.SetFocusedChild(item)
 				rbs.SetValue(i)
 				event.Clear()
@@ -249,18 +366,34 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 	// because RadioButtons runs in Phase1 (OfPreProcess) before them.
 	if event.What == EvKeyboard && event.Key != nil && rbs.HasState(SfSelected) {
 		switch event.Key.Key {
-		case tcell.KeyDown, tcell.KeyRight:
+		case tcell.KeyDown:
 			rbs.moveSelection(1)
 			event.Clear()
 			return
-		case tcell.KeyUp, tcell.KeyLeft:
+		case tcell.KeyUp:
 			rbs.moveSelection(-1)
+			event.Clear()
+			return
+		case tcell.KeyRight:
+			h := rbs.Bounds().Height()
+			if h <= 0 {
+				h = len(rbs.items)
+			}
+			rbs.moveSelection(h)
+			event.Clear()
+			return
+		case tcell.KeyLeft:
+			h := rbs.Bounds().Height()
+			if h <= 0 {
+				h = len(rbs.items)
+			}
+			rbs.moveSelection(-h)
 			event.Clear()
 			return
 		}
 	}
 
-	// Delegate to group only when focused — prevents PreProcess from
+	// Delegate to group only when focused — prevents PostProcess from
 	// forwarding Space/etc. to the internal RadioButton items.
 	if rbs.HasState(SfSelected) {
 		rbs.group.HandleEvent(event)
@@ -273,6 +406,9 @@ func (rbs *RadioButtons) moveSelection(delta int) {
 		current = 0
 	}
 	next := current + delta
+	for next >= 0 && next < len(rbs.items) && !rbs.IsEnabled(next) {
+		next += delta
+	}
 	if next < 0 || next >= len(rbs.items) {
 		return
 	}
