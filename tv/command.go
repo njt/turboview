@@ -29,5 +29,10 @@ const (
 	CmSelectWindowNum
 	CmRecordHistory
 
+	CmFind
+	CmReplace
+	CmSearchAgain
+	CmIndicatorUpdate
+
 	CmUser CommandCode = 1000
 )
