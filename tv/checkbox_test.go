@@ -152,7 +152,7 @@ func TestCheckBoxShortcutReturnsZeroForNoTilde(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCheckBoxDrawUncheckedShowsOpenBracketSpaceCloseBracket verifies an unchecked
-// CheckBox renders "[ ]" as the mark.
+// CheckBox renders "[ ]" as the mark, with a leading space for the focus indicator.
 // Spec: "Renders as [ ] Label when unchecked."
 func TestCheckBoxDrawUncheckedShowsOpenBracketSpaceCloseBracket(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
@@ -161,20 +161,20 @@ func TestCheckBoxDrawUncheckedShowsOpenBracketSpaceCloseBracket(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// Layout: '[', ' ', ']', ' ', 'O', 'K'  — unchecked has space at col 1
-	if buf.GetCell(0, 0).Rune != '[' {
-		t.Errorf("unchecked cell(0,0) = %q, want '['", buf.GetCell(0, 0).Rune)
+	// Layout: ' '(focus), '[', ' ', ']', ' ', 'O', 'K'  — col 0 is focus indicator (space when unfocused)
+	if buf.GetCell(1, 0).Rune != '[' {
+		t.Errorf("unchecked cell(1,0) = %q, want '['", buf.GetCell(1, 0).Rune)
 	}
-	if buf.GetCell(1, 0).Rune != ' ' {
-		t.Errorf("unchecked cell(1,0) = %q, want ' ' (space for unchecked)", buf.GetCell(1, 0).Rune)
+	if buf.GetCell(2, 0).Rune != ' ' {
+		t.Errorf("unchecked cell(2,0) = %q, want ' ' (space for unchecked)", buf.GetCell(2, 0).Rune)
 	}
-	if buf.GetCell(2, 0).Rune != ']' {
-		t.Errorf("unchecked cell(2,0) = %q, want ']'", buf.GetCell(2, 0).Rune)
+	if buf.GetCell(3, 0).Rune != ']' {
+		t.Errorf("unchecked cell(3,0) = %q, want ']'", buf.GetCell(3, 0).Rune)
 	}
 }
 
-// TestCheckBoxDrawUncheckedHasSpaceAtMarkPosition verifies the mark position holds
-// a space when unchecked, not 'X'.
+// TestCheckBoxDrawUncheckedHasSpaceAtMarkPosition verifies the mark position (col 2)
+// holds a space when unchecked, not 'X'.
 // Spec: "Renders as [ ] Label when unchecked."
 func TestCheckBoxDrawUncheckedHasSpaceAtMarkPosition(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
@@ -183,9 +183,9 @@ func TestCheckBoxDrawUncheckedHasSpaceAtMarkPosition(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	mark := buf.GetCell(1, 0).Rune
+	mark := buf.GetCell(2, 0).Rune
 	if mark == 'X' || mark == 'x' {
-		t.Errorf("unchecked CheckBox mark at col 1 = %q, want ' ' (no X when unchecked)", mark)
+		t.Errorf("unchecked CheckBox mark at col 2 = %q, want ' ' (no X when unchecked)", mark)
 	}
 }
 
@@ -203,9 +203,9 @@ func TestCheckBoxDrawCheckedShowsX(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// '[' at 0, 'X' at 1, ']' at 2
-	if buf.GetCell(1, 0).Rune != 'X' {
-		t.Errorf("checked CheckBox mark at col 1 = %q, want 'X'", buf.GetCell(1, 0).Rune)
+	// ' '(focus) at 0, '[' at 1, 'X' at 2, ']' at 3
+	if buf.GetCell(2, 0).Rune != 'X' {
+		t.Errorf("checked CheckBox mark at col 2 = %q, want 'X'", buf.GetCell(2, 0).Rune)
 	}
 }
 
@@ -219,11 +219,11 @@ func TestCheckBoxDrawCheckedBracketsPresent(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	if buf.GetCell(0, 0).Rune != '[' {
-		t.Errorf("checked: cell(0,0) = %q, want '['", buf.GetCell(0, 0).Rune)
+	if buf.GetCell(1, 0).Rune != '[' {
+		t.Errorf("checked: cell(1,0) = %q, want '['", buf.GetCell(1, 0).Rune)
 	}
-	if buf.GetCell(2, 0).Rune != ']' {
-		t.Errorf("checked: cell(2,0) = %q, want ']'", buf.GetCell(2, 0).Rune)
+	if buf.GetCell(3, 0).Rune != ']' {
+		t.Errorf("checked: cell(3,0) = %q, want ']'", buf.GetCell(3, 0).Rune)
 	}
 }
 
@@ -232,25 +232,25 @@ func TestCheckBoxDrawCheckedBracketsPresent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCheckBoxDrawLabelAppearsAfterBrackets verifies the label text starts at
-// column 4 (after "[ ] ").
-// Spec: "Total rendered width: 4 + tildeTextLen(label)"
+// column 5 (after " [ ] " — focus indicator, bracket, mark, bracket, space).
+// Spec: "Total rendered width: 5 + tildeTextLen(label)"
 func TestCheckBoxDrawLabelAppearsAfterBrackets(t *testing.T) {
-	// Label "OK" (2 runes, no tilde). Starts at col 4: "[", " "/" X", "]", " ", label...
+	// Label "OK" (2 runes, no tilde). Layout: ' '(focus), '[', ' '/' X', ']', ' ', label...
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 	cb.scheme = theme.BorlandBlue
 
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// Col 3 is space after ']', col 4 is 'O', col 5 is 'K'.
-	if buf.GetCell(3, 0).Rune != ' ' {
-		t.Errorf("cell(3,0) = %q, want ' ' (space between bracket and label)", buf.GetCell(3, 0).Rune)
+	// Col 4 is space after ']', col 5 is 'O', col 6 is 'K'.
+	if buf.GetCell(4, 0).Rune != ' ' {
+		t.Errorf("cell(4,0) = %q, want ' ' (space between bracket and label)", buf.GetCell(4, 0).Rune)
 	}
-	if buf.GetCell(4, 0).Rune != 'O' {
-		t.Errorf("label first char: cell(4,0) = %q, want 'O'", buf.GetCell(4, 0).Rune)
+	if buf.GetCell(5, 0).Rune != 'O' {
+		t.Errorf("label first char: cell(5,0) = %q, want 'O'", buf.GetCell(5, 0).Rune)
 	}
-	if buf.GetCell(5, 0).Rune != 'K' {
-		t.Errorf("label second char: cell(5,0) = %q, want 'K'", buf.GetCell(5, 0).Rune)
+	if buf.GetCell(6, 0).Rune != 'K' {
+		t.Errorf("label second char: cell(6,0) = %q, want 'K'", buf.GetCell(6, 0).Rune)
 	}
 }
 
@@ -264,10 +264,10 @@ func TestCheckBoxDrawLabelUsesCheckBoxNormalStyle(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// 'O' at col 4 is a normal (non-shortcut) char — must use CheckBoxNormal.
-	cell := buf.GetCell(4, 0)
+	// 'O' at col 5 is a normal (non-shortcut) char — must use CheckBoxNormal.
+	cell := buf.GetCell(5, 0)
 	if cell.Style != theme.BorlandBlue.CheckBoxNormal {
-		t.Errorf("normal label char at cell(4,0) style = %v, want CheckBoxNormal %v",
+		t.Errorf("normal label char at cell(5,0) style = %v, want CheckBoxNormal %v",
 			cell.Style, theme.BorlandBlue.CheckBoxNormal)
 	}
 }
@@ -282,9 +282,9 @@ func TestCheckBoxDrawBracketUsesCheckBoxNormalStyle(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	cell := buf.GetCell(0, 0) // '[' character
+	cell := buf.GetCell(1, 0) // '[' character at col 1 (col 0 is focus indicator)
 	if cell.Style != theme.BorlandBlue.CheckBoxNormal {
-		t.Errorf("'[' bracket at cell(0,0) style = %v, want CheckBoxNormal %v",
+		t.Errorf("'[' bracket at cell(1,0) style = %v, want CheckBoxNormal %v",
 			cell.Style, theme.BorlandBlue.CheckBoxNormal)
 	}
 }
@@ -293,18 +293,18 @@ func TestCheckBoxDrawBracketUsesCheckBoxNormalStyle(t *testing.T) {
 // character in the label uses LabelShortcut style.
 // Spec: "LabelShortcut style for tilde-shortcut characters in the label."
 func TestCheckBoxDrawShortcutLabelCharUsesLabelShortcutStyle(t *testing.T) {
-	// "~S~ave": 'S' is the shortcut char; it sits at col 4.
+	// "~S~ave": 'S' is the shortcut char; it sits at col 5.
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "~S~ave")
 	cb.scheme = theme.BorlandBlue
 
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// tildeTextLen("~S~ave") = 4. Layout: [ ] ~S~ave
-	// '[' at 0, ' ' at 1, ']' at 2, ' ' at 3, 'S'(shortcut) at 4
-	cell := buf.GetCell(4, 0)
+	// tildeTextLen("~S~ave") = 4. Layout: ' '(focus) [ ] ~S~ave
+	// ' ' at 0, '[' at 1, ' ' at 2, ']' at 3, ' ' at 4, 'S'(shortcut) at 5
+	cell := buf.GetCell(5, 0)
 	if cell.Style != theme.BorlandBlue.LabelShortcut {
-		t.Errorf("shortcut char 'S' at cell(4,0) style = %v, want LabelShortcut %v",
+		t.Errorf("shortcut char 'S' at cell(5,0) style = %v, want LabelShortcut %v",
 			cell.Style, theme.BorlandBlue.LabelShortcut)
 	}
 }
@@ -320,29 +320,29 @@ func TestCheckBoxDrawNonShortcutLabelAfterShortcutIsNormal(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// 'a' is at col 5.
-	cell := buf.GetCell(5, 0)
+	// 'a' is at col 6.
+	cell := buf.GetCell(6, 0)
 	if cell.Style != theme.BorlandBlue.CheckBoxNormal {
-		t.Errorf("non-shortcut label char at cell(5,0) style = %v, want CheckBoxNormal %v",
+		t.Errorf("non-shortcut label char at cell(6,0) style = %v, want CheckBoxNormal %v",
 			cell.Style, theme.BorlandBlue.CheckBoxNormal)
 	}
 }
 
-// TestCheckBoxDrawTotalWidthIs4PlusTildeTextLen verifies the last label char is at
-// column 3 + tildeTextLen(label).
-// Spec: "Total rendered width: 4 + tildeTextLen(label)."
-func TestCheckBoxDrawTotalWidthIs4PlusTildeTextLen(t *testing.T) {
+// TestCheckBoxDrawTotalWidthIs5PlusTildeTextLen verifies the last label char is at
+// column 4 + tildeTextLen(label).
+// Spec: "Total rendered width: 5 + tildeTextLen(label)."
+func TestCheckBoxDrawTotalWidthIs5PlusTildeTextLen(t *testing.T) {
 	label := "Save"
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), label)
 	cb.scheme = theme.BorlandBlue
 
 	textLen := tildeTextLen(label) // 4 for "Save"
-	expectedLastCol := 3 + textLen // cols 4..3+textLen = 4..7 for "Save"
+	expectedLastCol := 4 + textLen // cols 5..4+textLen = 5..8 for "Save"
 
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	// The cell just past the label (col 4+textLen = 8) should not be part of the label text.
+	// The cell just past the label (col 5+textLen = 9) should not be part of the label text.
 	// We can verify the last label char is at the expected column.
 	runes := []rune("Save")
 	lastRune := runes[len(runes)-1]
@@ -374,9 +374,9 @@ func TestCheckBoxDrawFocusCursorWhenSelected(t *testing.T) {
 	}
 }
 
-// TestCheckBoxDrawNoCursorWhenNotSelected verifies no '►' appears at col 0 when
+// TestCheckBoxDrawNoCursorWhenNotSelected verifies col 0 is a space (not '►') when
 // the CheckBox does not have SfSelected.
-// Spec: "When SfSelected, a ► prefix is rendered…" — by contrapositive.
+// Spec: "When SfSelected, a ► prefix is rendered…" — by contrapositive, unfocused has space.
 func TestCheckBoxDrawNoCursorWhenNotSelected(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 	cb.scheme = theme.BorlandBlue
@@ -386,15 +386,14 @@ func TestCheckBoxDrawNoCursorWhenNotSelected(t *testing.T) {
 	cb.Draw(buf)
 
 	cell := buf.GetCell(0, 0)
-	if cell.Rune == '►' {
-		t.Errorf("unfocused CheckBox cell(0,0) = '►'; cursor must only appear when SfSelected")
+	if cell.Rune != ' ' {
+		t.Errorf("unfocused CheckBox cell(0,0) = %q, want ' ' (space when not SfSelected)", cell.Rune)
 	}
 }
 
-// TestCheckBoxDrawSelectedShiftsOpenBracketRight verifies '[' moves to col 1 when
-// SfSelected is set (the '►' prefix occupies col 0).
-// Spec: "shifting the bracket/label right by 1."
-func TestCheckBoxDrawSelectedShiftsOpenBracketRight(t *testing.T) {
+// TestCheckBoxDrawBracketAlwaysAtColumn1 verifies '[' is always at col 1, whether
+// focused (► at col 0) or unfocused (space at col 0).
+func TestCheckBoxDrawBracketAlwaysAtColumn1(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 	cb.scheme = theme.BorlandBlue
 	cb.SetState(SfSelected, true)
@@ -403,7 +402,7 @@ func TestCheckBoxDrawSelectedShiftsOpenBracketRight(t *testing.T) {
 	cb.Draw(buf)
 
 	if buf.GetCell(1, 0).Rune != '[' {
-		t.Errorf("selected CheckBox: cell(1,0) = %q, want '[' (shifted right by focus cursor)",
+		t.Errorf("selected CheckBox: cell(1,0) = %q, want '['",
 			buf.GetCell(1, 0).Rune)
 	}
 }
@@ -908,13 +907,11 @@ func TestCheckBoxesDrawRendersAllItems(t *testing.T) {
 	buf := NewDrawBuffer(20, 3)
 	cbs.Draw(buf)
 
-	// Each row should have a CheckBox bracket '[' (at position 0 or 1, depending on focus indicator).
+	// Each row should have '[' at column 1 (col 0 is focus indicator: space or ►).
 	for row := 0; row < 3; row++ {
-		cell0 := buf.GetCell(0, row)
 		cell1 := buf.GetCell(1, row)
-		// Focus indicator '►' at column 0, '[' at column 1, or '[' at column 0 if not focused
-		if !((cell0.Rune == '[') || (cell0.Rune == '►' && cell1.Rune == '[')) {
-			t.Errorf("row %d: expected '[' at col 0 or 1, but got %q at col 0 and %q at col 1", row, cell0.Rune, cell1.Rune)
+		if cell1.Rune != '[' {
+			t.Errorf("row %d: expected '[' at col 1, got %q", row, cell1.Rune)
 		}
 	}
 }
@@ -930,9 +927,9 @@ func TestCheckBoxesDrawCheckedItemShowsX(t *testing.T) {
 	buf := NewDrawBuffer(20, 2)
 	cbs.Draw(buf)
 
-	// Row 0, col 1 should be 'X'.
-	if buf.GetCell(1, 0).Rune != 'X' {
-		t.Errorf("checked item row 0: cell(1,0) = %q, want 'X'", buf.GetCell(1, 0).Rune)
+	// Row 0, col 2 should be 'X' (col 0 = focus indicator, col 1 = '[', col 2 = mark).
+	if buf.GetCell(2, 0).Rune != 'X' {
+		t.Errorf("checked item row 0: cell(2,0) = %q, want 'X'", buf.GetCell(2, 0).Rune)
 	}
 }
 
@@ -1111,10 +1108,10 @@ func TestCheckBoxCheckedAndUncheckedAreDifferentStates(t *testing.T) {
 	unchecked.Draw(bufU)
 	checked.Draw(bufC)
 
-	// Col 1 should differ: ' ' vs 'X'.
-	if bufU.GetCell(1, 0).Rune == bufC.GetCell(1, 0).Rune {
-		t.Errorf("checked and unchecked render same rune %q at col 1; '[X]' and '[ ]' must differ",
-			bufU.GetCell(1, 0).Rune)
+	// Col 2 (mark position) should differ: ' ' vs 'X'.
+	if bufU.GetCell(2, 0).Rune == bufC.GetCell(2, 0).Rune {
+		t.Errorf("checked and unchecked render same rune %q at col 2; '[X]' and '[ ]' must differ",
+			bufU.GetCell(2, 0).Rune)
 	}
 }
 
@@ -1132,8 +1129,8 @@ func TestCheckBoxLabelShortcutStyleDiffersFromNormal(t *testing.T) {
 	buf := NewDrawBuffer(20, 1)
 	cb.Draw(buf)
 
-	shortcutCell := buf.GetCell(4, 0) // 'S' — shortcut
-	normalCell := buf.GetCell(5, 0)   // 'a' — normal
+	shortcutCell := buf.GetCell(5, 0) // 'S' — shortcut
+	normalCell := buf.GetCell(6, 0)   // 'a' — normal
 
 	if shortcutCell.Style == normalCell.Style {
 		t.Errorf("shortcut and normal label chars have same style %v; expected different styles",
@@ -1154,7 +1151,7 @@ func TestCheckBoxSelectedAndUnselectedRenderDifferently(t *testing.T) {
 	focused.Draw(bufF)
 
 	if bufN.GetCell(0, 0).Rune == bufF.GetCell(0, 0).Rune {
-		t.Errorf("focused and unfocused render same rune %q at col 0; '►' vs '[' must differ",
+		t.Errorf("focused and unfocused render same rune %q at col 0; '►' vs ' ' must differ",
 			bufN.GetCell(0, 0).Rune)
 	}
 }
@@ -1232,11 +1229,11 @@ func TestCheckBoxShortcutDifferentLabels(t *testing.T) {
 	}
 }
 
-// TestCheckBoxDrawLabelAfterSelectedPrefix verifies the label appears shifted by 1
-// when SfSelected is set (the '►' occupies col 0).
-// Spec: "shifting the bracket/label right by 1."
+// TestCheckBoxDrawLabelAfterSelectedPrefix verifies the label is at col 5 when
+// SfSelected is set (► at col 0, [ at col 1, mark at col 2, ] at col 3, space at col 4).
+// The label position is the same whether focused or unfocused.
 func TestCheckBoxDrawLabelAfterSelectedPrefix(t *testing.T) {
-	// Label "OK": without selected, 'O' is at col 4. With selected, 'O' shifts to col 5.
+	// Label "OK": 'O' is always at col 5, whether focused or unfocused.
 	cb := NewCheckBox(NewRect(0, 0, 20, 1), "OK")
 	cb.scheme = theme.BorlandBlue
 	cb.SetState(SfSelected, true)
@@ -1246,7 +1243,7 @@ func TestCheckBoxDrawLabelAfterSelectedPrefix(t *testing.T) {
 
 	// ► at 0, [ at 1, mark at 2, ] at 3, space at 4, 'O' at 5
 	if buf.GetCell(5, 0).Rune != 'O' {
-		t.Errorf("selected CheckBox: 'O' not at col 5; cell(5,0) = %q (label shifts right by 1 for '►')",
+		t.Errorf("selected CheckBox: 'O' not at col 5; cell(5,0) = %q",
 			buf.GetCell(5, 0).Rune)
 	}
 }
@@ -1284,8 +1281,8 @@ func TestCheckBoxesExecViewIsCallable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCheckBoxDrawEmptyLabelStillRendersBrackets verifies an empty label still
-// renders the "[ ]" portion.
-// Spec: "Total rendered width: 4 + tildeTextLen(label)" — 4 when label is "".
+// renders the "[ ]" portion (with focus indicator at col 0).
+// Spec: "Total rendered width: 5 + tildeTextLen(label)" — 5 when label is "".
 func TestCheckBoxDrawEmptyLabelStillRendersBrackets(t *testing.T) {
 	cb := NewCheckBox(NewRect(0, 0, 10, 1), "")
 	cb.scheme = theme.BorlandBlue
@@ -1293,11 +1290,11 @@ func TestCheckBoxDrawEmptyLabelStillRendersBrackets(t *testing.T) {
 	buf := NewDrawBuffer(10, 1)
 	cb.Draw(buf)
 
-	if buf.GetCell(0, 0).Rune != '[' {
-		t.Errorf("empty label: cell(0,0) = %q, want '['", buf.GetCell(0, 0).Rune)
+	if buf.GetCell(1, 0).Rune != '[' {
+		t.Errorf("empty label: cell(1,0) = %q, want '['", buf.GetCell(1, 0).Rune)
 	}
-	if buf.GetCell(2, 0).Rune != ']' {
-		t.Errorf("empty label: cell(2,0) = %q, want ']'", buf.GetCell(2, 0).Rune)
+	if buf.GetCell(3, 0).Rune != ']' {
+		t.Errorf("empty label: cell(3,0) = %q, want ']'", buf.GetCell(3, 0).Rune)
 	}
 }
 
@@ -1342,10 +1339,10 @@ func TestCheckBoxDrawTildeTextLenMatchesRenderedLabelWidth(t *testing.T) {
 	buf := NewDrawBuffer(30, 1)
 	cb.Draw(buf)
 
-	// Verify the rune count of rendered label chars at cols 4..3+expected.
-	// Col 4 = 'S', col 5 = 'a', col 6 = 'v', col 7 = 'e'.
+	// Verify the rune count of rendered label chars at cols 5..4+expected.
+	// Col 5 = 'S', col 6 = 'a', col 7 = 'v', col 8 = 'e'.
 	rendered := 0
-	for col := 4; col < 4+expected; col++ {
+	for col := 5; col < 5+expected; col++ {
 		r := buf.GetCell(col, 0).Rune
 		rendered += utf8.RuneLen(r)
 	}

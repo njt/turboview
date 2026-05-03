@@ -35,7 +35,6 @@ func NewScrollBar(bounds Rect, orientation Orientation) *ScrollBar {
 	sb := &ScrollBar{orientation: orientation, arStep: 1}
 	sb.SetBounds(bounds)
 	sb.SetState(SfVisible, true)
-	sb.SetOptions(OfSelectable, true)
 	sb.SetSelf(sb)
 	return sb
 }

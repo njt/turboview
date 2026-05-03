@@ -38,13 +38,13 @@ func TestNewScrollBarSetsSfVisible(t *testing.T) {
 	}
 }
 
-// TestNewScrollBarDoesNotSetOfSelectable verifies NewScrollBar sets OfSelectable.
-// Spec: "SetOptions(OfSelectable, true) in NewScrollBar so scrollbar can receive focus"
-func TestNewScrollBarDoesNotSetOfSelectable(t *testing.T) {
+// TestNewScrollBarNotSelectable verifies NewScrollBar does NOT set OfSelectable.
+// Original TV: scrollbars are passive widgets, not focusable via Tab.
+func TestNewScrollBarNotSelectable(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 
-	if !sb.HasOption(OfSelectable) {
-		t.Error("NewScrollBar must set OfSelectable so the scrollbar can receive focus")
+	if sb.HasOption(OfSelectable) {
+		t.Error("NewScrollBar must NOT set OfSelectable — scrollbars are not focusable")
 	}
 }
 

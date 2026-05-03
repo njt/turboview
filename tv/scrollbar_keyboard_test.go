@@ -29,24 +29,23 @@ import (
 // Section 1 — OfSelectable set by NewScrollBar
 // ---------------------------------------------------------------------------
 
-// TestNewScrollBarSetsOfSelectable verifies NewScrollBar sets OfSelectable so the
-// scrollbar can receive focus.
-// Spec: "SetOptions(OfSelectable, true) in NewScrollBar so scrollbar can receive focus"
-func TestNewScrollBarSetsOfSelectable(t *testing.T) {
+// TestNewScrollBarDoesNotSetOfSelectable verifies NewScrollBar does NOT set
+// OfSelectable, matching original Turbo Vision behavior where scrollbars
+// are passive widgets that cannot receive focus via Tab.
+func TestNewScrollBarDoesNotSetOfSelectable(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 
-	if !sb.HasOption(OfSelectable) {
-		t.Error("NewScrollBar must set OfSelectable so the scrollbar can receive focus")
+	if sb.HasOption(OfSelectable) {
+		t.Error("NewScrollBar must NOT set OfSelectable — scrollbars are not focusable (original TV behavior)")
 	}
 }
 
-// TestNewScrollBarSetsOfSelectableHorizontal verifies the same for horizontal orientation.
-// Spec: "SetOptions(OfSelectable, true) in NewScrollBar so scrollbar can receive focus"
-func TestNewScrollBarSetsOfSelectableHorizontal(t *testing.T) {
+// TestNewScrollBarDoesNotSetOfSelectableHorizontal verifies the same for horizontal.
+func TestNewScrollBarDoesNotSetOfSelectableHorizontal(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 10, 1), Horizontal)
 
-	if !sb.HasOption(OfSelectable) {
-		t.Error("NewScrollBar (horizontal) must set OfSelectable so the scrollbar can receive focus")
+	if sb.HasOption(OfSelectable) {
+		t.Error("NewScrollBar (horizontal) must NOT set OfSelectable")
 	}
 }
 

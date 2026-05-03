@@ -407,6 +407,18 @@ func (app *Application) handleEvent(event *Event) {
 				return
 			}
 		}
+
+		if cmd := app.windowKeyCommand(event.Key); cmd != 0 {
+			cmdEvent := &Event{What: EvCommand, Command: cmd}
+			if app.desktop != nil {
+				app.desktop.HandleEvent(cmdEvent)
+			}
+			if !cmdEvent.IsCleared() {
+				app.handleCommand(cmdEvent)
+			}
+			event.Clear()
+			return
+		}
 	}
 
 	if !event.IsCleared() && app.desktop != nil {
@@ -444,6 +456,26 @@ func (app *Application) handleCommand(event *Event) {
 			}
 		}
 	}
+}
+
+func (app *Application) windowKeyCommand(ke *KeyEvent) CommandCode {
+	switch ke.Key {
+	case tcell.KeyF5:
+		if ke.Modifiers&tcell.ModCtrl != 0 {
+			return CmResize
+		}
+		return CmZoom
+	case tcell.KeyF6:
+		if ke.Modifiers&tcell.ModShift != 0 {
+			return CmPrev
+		}
+		return CmNext
+	case tcell.KeyF3:
+		if ke.Modifiers&tcell.ModAlt != 0 {
+			return CmClose
+		}
+	}
+	return 0
 }
 
 func (app *Application) routeMouseEvent(event *Event) {
