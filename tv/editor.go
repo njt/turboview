@@ -1,6 +1,11 @@
 package tv
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"os"
+	"strings"
+
+	"github.com/gdamore/tcell/v2"
+)
 
 type undoState struct {
 	lines                                          [][]rune
@@ -177,4 +182,36 @@ func (e *Editor) broadcastIndicator() {
 	for _, child := range owner.Children() {
 		child.HandleEvent(ev)
 	}
+}
+
+func (e *Editor) FileName() string { return e.filename }
+
+func (e *Editor) LoadFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	content := string(data)
+	if strings.Contains(content, "\r\n") {
+		e.lineEnding = "\r\n"
+	} else {
+		e.lineEnding = "\n"
+	}
+	e.SetText(content)
+	e.filename = path
+	return nil
+}
+
+func (e *Editor) SaveFile(path string) error {
+	text := e.Text()
+	if e.lineEnding == "\r\n" {
+		text = strings.ReplaceAll(text, "\n", "\r\n")
+	}
+	err := os.WriteFile(path, []byte(text), 0644)
+	if err != nil {
+		return err
+	}
+	e.filename = path
+	e.modified = false
+	return nil
 }
