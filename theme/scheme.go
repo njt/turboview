@@ -24,6 +24,7 @@ type ColorScheme struct {
 	CheckBoxSelected    tcell.Style
 	RadioButtonNormal   tcell.Style
 	RadioButtonSelected tcell.Style
+	ClusterDisabled     tcell.Style
 	ListNormal          tcell.Style
 	ListSelected        tcell.Style
 	ListFocused         tcell.Style

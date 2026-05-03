@@ -31,6 +31,7 @@ func init() {
 		CheckBoxSelected:    s(tcell.ColorYellow, tcell.ColorTeal),
 		RadioButtonNormal:   s(tcell.ColorBlack, tcell.ColorTeal),
 		RadioButtonSelected: s(tcell.ColorYellow, tcell.ColorTeal),
+		ClusterDisabled:     s(tcell.ColorDarkGray, tcell.ColorTeal),
 		ListNormal:          s(tcell.ColorBlack, tcell.ColorTeal),
 		ListSelected:        s(tcell.ColorWhite, tcell.ColorBlack),
 		ListFocused:         s(tcell.ColorYellow, tcell.ColorBlue),
