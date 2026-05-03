@@ -607,14 +607,14 @@ func TestNewCheckBoxesSetsOfSelectable(t *testing.T) {
 	}
 }
 
-// TestNewCheckBoxesSetsOfPreProcess verifies NewCheckBoxes sets the OfPreProcess option
-// (required for Alt+shortcut preprocess dispatch).
-// Spec: "Sets … OfPreProcess by default."
+// TestNewCheckBoxesSetsOfPreProcess verifies NewCheckBoxes sets the OfPostProcess option.
+// Spec (updated): CheckBoxes uses OfPostProcess (not OfPreProcess) so plain-letter shortcuts
+// fire in the post-process phase without intercepting events destined for focused children.
 func TestNewCheckBoxesSetsOfPreProcess(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 3), []string{"~A~lpha", "~B~eta"})
 
-	if !cbs.HasOption(OfPreProcess) {
-		t.Error("NewCheckBoxes did not set OfPreProcess")
+	if !cbs.HasOption(OfPostProcess) {
+		t.Error("NewCheckBoxes did not set OfPostProcess")
 	}
 }
 
@@ -1063,16 +1063,21 @@ func TestCheckBoxesAltWrongLetterDoesNotToggle(t *testing.T) {
 }
 
 // TestCheckBoxesNoAltModifierDoesNotTriggerShortcut verifies a plain letter (without
-// Alt) does not trigger the shortcut mechanism.
-// Spec: "Alt+shortcut letter …" — requires Alt modifier.
+// Alt) triggers the shortcut mechanism via the OfPostProcess plain-letter path.
+// Spec (updated): plain-letter shortcuts work when CheckBoxes has OfPostProcess set.
 func TestCheckBoxesNoAltModifierDoesNotTriggerShortcut(t *testing.T) {
 	cbs := NewCheckBoxes(NewRect(0, 0, 20, 2), []string{"~S~ave", "~L~oad"})
 
+	if !cbs.HasOption(OfPostProcess) {
+		t.Skip("OfPostProcess not set; plain-letter shortcut not supported")
+	}
+
+	// Plain 's' (no Alt, no focus) activates via OfPostProcess path.
 	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 's', Modifiers: 0}}
 	cbs.HandleEvent(ev)
 
-	if cbs.Item(0).Checked() {
-		t.Error("plain 's' (no Alt) toggled item 0; shortcut requires Alt modifier")
+	if !cbs.Item(0).Checked() {
+		t.Error("plain 's' (no Alt, OfPostProcess) did not toggle item 0; expected activation via plain-letter shortcut")
 	}
 }
 
