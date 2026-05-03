@@ -962,3 +962,406 @@ func TestStringLookupValidatorLargeList(t *testing.T) {
 		t.Error("IsValid(\"item_1000\") should return false")
 	}
 }
+
+// PictureValidator tests
+
+// TestPictureValidatorImplementsValidator verifies:
+// NewPictureValidator returns a value that implements Validator
+func TestPictureValidatorImplementsValidator(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	var _ Validator = v
+}
+
+// TestPictureValidatorImplementsValidatorWithAutoFill verifies:
+// NewPictureValidator returns a value that implements ValidatorWithAutoFill
+func TestPictureValidatorImplementsValidatorWithAutoFill(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	var _ ValidatorWithAutoFill = v
+}
+
+// TestPictureValidatorDigitPatternPartialOnedigit verifies:
+// IsValidInput("1", false) returns true for picture "###" (one digit, partial match)
+func TestPictureValidatorDigitPatternPartialOnedigit(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if !v.IsValidInput("1", false) {
+		t.Error("IsValidInput(\"1\", false) should return true for picture \"###\" — partial match is accepted")
+	}
+}
+
+// TestPictureValidatorDigitPatternPartialTwodigits verifies:
+// IsValidInput("12", false) returns true for picture "###" (two digits, partial match)
+func TestPictureValidatorDigitPatternPartialTwodigits(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if !v.IsValidInput("12", false) {
+		t.Error("IsValidInput(\"12\", false) should return true for picture \"###\" — partial match is accepted")
+	}
+}
+
+// TestPictureValidatorDigitPatternFullMatch verifies:
+// IsValidInput("123", false) returns true for picture "###" (full match)
+func TestPictureValidatorDigitPatternFullMatch(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if !v.IsValidInput("123", false) {
+		t.Error("IsValidInput(\"123\", false) should return true for picture \"###\" — full match")
+	}
+}
+
+// TestPictureValidatorDigitPatternExceedsPattern verifies:
+// IsValidInput("1234", false) returns false for picture "###" (too many characters)
+func TestPictureValidatorDigitPatternExceedsPattern(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if v.IsValidInput("1234", false) {
+		t.Error("IsValidInput(\"1234\", false) should return false for picture \"###\" — exceeds pattern length")
+	}
+}
+
+// TestPictureValidatorDigitPatternRejectsLetter verifies:
+// IsValidInput("a", false) returns false for picture "###" (letter does not match digit slot)
+func TestPictureValidatorDigitPatternRejectsLetter(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if v.IsValidInput("a", false) {
+		t.Error("IsValidInput(\"a\", false) should return false for picture \"###\" — letter does not satisfy '#'")
+	}
+}
+
+// TestPictureValidatorDigitPatternIsValidComplete verifies:
+// IsValid("123") returns true for picture "###" (fully matches)
+func TestPictureValidatorDigitPatternIsValidComplete(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if !v.IsValid("123") {
+		t.Error("IsValid(\"123\") should return true for picture \"###\" — complete match")
+	}
+}
+
+// TestPictureValidatorDigitPatternIsValidIncomplete verifies:
+// IsValid("12") returns false for picture "###" (incomplete — not all positions filled)
+func TestPictureValidatorDigitPatternIsValidIncomplete(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if v.IsValid("12") {
+		t.Error("IsValid(\"12\") should return false for picture \"###\" — incomplete input is not fully valid")
+	}
+}
+
+// TestPictureValidatorDigitPatternIsValidEmptyString verifies:
+// IsValid("") returns false for picture "###" (empty is incomplete)
+func TestPictureValidatorDigitPatternIsValidEmptyString(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	if v.IsValid("") {
+		t.Error("IsValid(\"\") should return false for picture \"###\" — pattern requires digits")
+	}
+}
+
+// TestPictureValidatorLetterPatternAcceptsLetter verifies:
+// IsValidInput("a", false) returns true for picture "???" (letter matches '?')
+func TestPictureValidatorLetterPatternAcceptsLetter(t *testing.T) {
+	v := NewPictureValidator("???", false)
+	if !v.IsValidInput("a", false) {
+		t.Error("IsValidInput(\"a\", false) should return true for picture \"???\" — letter satisfies '?'")
+	}
+}
+
+// TestPictureValidatorLetterPatternRejectsDigit verifies:
+// IsValidInput("1", false) returns false for picture "???" (digit does not match '?')
+func TestPictureValidatorLetterPatternRejectsDigit(t *testing.T) {
+	v := NewPictureValidator("???", false)
+	if v.IsValidInput("1", false) {
+		t.Error("IsValidInput(\"1\", false) should return false for picture \"???\" — digit does not satisfy '?'")
+	}
+}
+
+// TestPictureValidatorLetterPatternFullMatch verifies:
+// IsValidInput("abc", false) returns true for picture "???" (full letter match)
+func TestPictureValidatorLetterPatternFullMatch(t *testing.T) {
+	v := NewPictureValidator("???", false)
+	if !v.IsValidInput("abc", false) {
+		t.Error("IsValidInput(\"abc\", false) should return true for picture \"???\" — full letter match")
+	}
+}
+
+// TestPictureValidatorLetterPatternIsValidComplete verifies:
+// IsValid("abc") returns true for picture "???" (fully matches)
+func TestPictureValidatorLetterPatternIsValidComplete(t *testing.T) {
+	v := NewPictureValidator("???", false)
+	if !v.IsValid("abc") {
+		t.Error("IsValid(\"abc\") should return true for picture \"???\" — complete match")
+	}
+}
+
+// TestPictureValidatorAutoUppercaseAcceptsLowercase verifies:
+// IsValidInput("abc", false) returns true for picture "&&&"
+func TestPictureValidatorAutoUppercaseAcceptsLowercase(t *testing.T) {
+	v := NewPictureValidator("&&&", false)
+	if !v.IsValidInput("abc", false) {
+		t.Error("IsValidInput(\"abc\", false) should return true for picture \"&&&\" — letters satisfy '&'")
+	}
+}
+
+// TestPictureValidatorAutoUppercaseRejectsDigit verifies:
+// IsValidInput("1", false) returns false for picture "&&&" (digit does not match '&')
+func TestPictureValidatorAutoUppercaseRejectsDigit(t *testing.T) {
+	v := NewPictureValidator("&&&", false)
+	if v.IsValidInput("1", false) {
+		t.Error("IsValidInput(\"1\", false) should return false for picture \"&&&\" — digit does not satisfy '&'")
+	}
+}
+
+// TestPictureValidatorAutoUppercaseModifiesInput verifies:
+// '&' auto-uppercases letters — IsValidInputAutoFill("abc") mutates to "ABC"
+func TestPictureValidatorAutoUppercaseModifiesInput(t *testing.T) {
+	v := NewPictureValidator("&&&", false)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "abc"
+	if !vaf.IsValidInputAutoFill(&s, false) {
+		t.Error("IsValidInputAutoFill should return true for \"abc\" with picture \"&&&\"")
+	}
+	if s != "ABC" {
+		t.Errorf("IsValidInputAutoFill should uppercase the input: got %q, want \"ABC\"", s)
+	}
+}
+
+// TestPictureValidatorAutoUppercaseNoAutoFillSkipsMutation verifies:
+// when noAutoFill=true, auto-uppercase does not modify the string
+func TestPictureValidatorAutoUppercaseNoAutoFillSkipsMutation(t *testing.T) {
+	v := NewPictureValidator("&&&", false)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "abc"
+	result := vaf.IsValidInputAutoFill(&s, true)
+	// Must still validate (letters satisfy '&'), but must NOT uppercase
+	if !result {
+		t.Error("IsValidInputAutoFill should still return true with noAutoFill=true")
+	}
+	if s != "abc" {
+		t.Errorf("IsValidInputAutoFill must not modify string when noAutoFill=true: got %q", s)
+	}
+}
+
+// TestPictureValidatorAnyCharAcceptsAnything verifies:
+// '@' matches any character as-is
+func TestPictureValidatorAnyCharAcceptsAnything(t *testing.T) {
+	v := NewPictureValidator("@@@", false)
+	inputs := []string{"abc", "123", "!@#"}
+	for _, input := range inputs {
+		s := input
+		if !v.IsValidInput(s, false) {
+			t.Errorf("IsValidInput(%q, false) should return true for picture \"@@@\" — '@' accepts any char", s)
+		}
+	}
+}
+
+// TestPictureValidatorAnyCharDoesNotUppercase verifies:
+// '@' does not uppercase — lowercase stays lowercase
+func TestPictureValidatorAnyCharDoesNotUppercase(t *testing.T) {
+	v := NewPictureValidator("@@@", false)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "abc"
+	vaf.IsValidInputAutoFill(&s, false)
+	if s != "abc" {
+		t.Errorf("'@' should not uppercase: got %q, want \"abc\"", s)
+	}
+}
+
+// TestPictureValidatorBangAcceptsAnything verifies:
+// '!' matches any character
+func TestPictureValidatorBangAcceptsAnything(t *testing.T) {
+	v := NewPictureValidator("!!!", false)
+	inputs := []string{"abc", "123", "A!z"}
+	for _, input := range inputs {
+		if !v.IsValidInput(input, false) {
+			t.Errorf("IsValidInput(%q, false) should return true for picture \"!!!\" — '!' accepts any char", input)
+		}
+	}
+}
+
+// TestPictureValidatorBangAutoUppercase verifies:
+// '!' auto-uppercases letters (any char, but uppercased)
+func TestPictureValidatorBangAutoUppercase(t *testing.T) {
+	v := NewPictureValidator("!!!", false)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "abc"
+	if !vaf.IsValidInputAutoFill(&s, false) {
+		t.Error("IsValidInputAutoFill should return true for \"abc\" with picture \"!!!\"")
+	}
+	if s != "ABC" {
+		t.Errorf("'!' should uppercase letters: got %q, want \"ABC\"", s)
+	}
+}
+
+// TestPictureValidatorEscapeRequiresLiteralHash verifies:
+// ";#" requires a literal '#' character, not a digit
+func TestPictureValidatorEscapeRequiresLiteralHash(t *testing.T) {
+	v := NewPictureValidator(";#", false)
+	if !v.IsValidInput("#", false) {
+		t.Error("IsValidInput(\"#\", false) should return true for picture \";#\" — semicolon escapes '#' as literal")
+	}
+}
+
+// TestPictureValidatorEscapeRejectsDigitWhenLiteralExpected verifies:
+// ";#" rejects a digit — only a literal '#' is accepted
+func TestPictureValidatorEscapeRejectsDigitWhenLiteralExpected(t *testing.T) {
+	v := NewPictureValidator(";#", false)
+	if v.IsValidInput("5", false) {
+		t.Error("IsValidInput(\"5\", false) should return false for picture \";#\" — '5' does not match literal '#'")
+	}
+}
+
+// TestPictureValidatorEscapeIsValidLiteralHash verifies:
+// IsValid("#") returns true for picture ";#"
+func TestPictureValidatorEscapeIsValidLiteralHash(t *testing.T) {
+	v := NewPictureValidator(";#", false)
+	if !v.IsValid("#") {
+		t.Error("IsValid(\"#\") should return true for picture \";#\" — literal '#' fully matches")
+	}
+}
+
+// TestPictureValidatorOptionalGroupEmptyIsValid verifies:
+// IsValid("") returns true for picture "[###]" (all content is optional)
+func TestPictureValidatorOptionalGroupEmptyIsValid(t *testing.T) {
+	v := NewPictureValidator("[###]", false)
+	if !v.IsValid("") {
+		t.Error("IsValid(\"\") should return true for picture \"[###]\" — optional group allows empty input")
+	}
+}
+
+// TestPictureValidatorOptionalGroupPartialIsValid verifies:
+// IsValid("123") returns true for picture "###[#]" (3 required + 1 optional filled)
+func TestPictureValidatorOptionalGroupPartialIsValid(t *testing.T) {
+	v := NewPictureValidator("###[#]", false)
+	if !v.IsValid("123") {
+		t.Error("IsValid(\"123\") should return true for picture \"###[#]\" — required digits filled, optional absent")
+	}
+}
+
+// TestPictureValidatorOptionalGroupFullIsValid verifies:
+// IsValid("1234") returns true for picture "###[#]" (all positions filled)
+func TestPictureValidatorOptionalGroupFullIsValid(t *testing.T) {
+	v := NewPictureValidator("###[#]", false)
+	if !v.IsValid("1234") {
+		t.Error("IsValid(\"1234\") should return true for picture \"###[#]\" — all positions filled")
+	}
+}
+
+// TestPictureValidatorOptionalGroupExceedsIsInvalid verifies:
+// IsValidInput("12345", false) returns false for picture "###[#]" (too many chars)
+func TestPictureValidatorOptionalGroupExceedsIsInvalid(t *testing.T) {
+	v := NewPictureValidator("###[#]", false)
+	if v.IsValidInput("12345", false) {
+		t.Error("IsValidInput(\"12345\", false) should return false for picture \"###[#]\" — exceeds pattern")
+	}
+}
+
+// TestPictureValidatorRequiredGroupBehavesLikeNoGrouping verifies:
+// "{###}" behaves the same as "###" for validation
+func TestPictureValidatorRequiredGroupBehavesLikeNoGrouping(t *testing.T) {
+	vGroup := NewPictureValidator("{###}", false)
+	vPlain := NewPictureValidator("###", false)
+
+	tests := []string{"", "1", "12", "123", "1234", "abc"}
+	for _, s := range tests {
+		if vGroup.IsValidInput(s, false) != vPlain.IsValidInput(s, false) {
+			t.Errorf("IsValidInput(%q) differs between \"{###}\" and \"###\": got %v vs %v",
+				s, vGroup.IsValidInput(s, false), vPlain.IsValidInput(s, false))
+		}
+		if vGroup.IsValid(s) != vPlain.IsValid(s) {
+			t.Errorf("IsValid(%q) differs between \"{###}\" and \"###\": got %v vs %v",
+				s, vGroup.IsValid(s), vPlain.IsValid(s))
+		}
+	}
+}
+
+// TestPictureValidatorAutoFillLiterals verifies:
+// literal characters in the picture are auto-filled into the string
+// Picture "(###) ###-####" with input "123" — parenthesis and space are auto-inserted
+func TestPictureValidatorAutoFillLiterals(t *testing.T) {
+	v := NewPictureValidator("(###) ###-####", true)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "123"
+	result := vaf.IsValidInputAutoFill(&s, false)
+	if !result {
+		t.Error("IsValidInputAutoFill should return true for \"123\" with phone picture")
+	}
+	// After auto-fill, leading literal '(' should be present in the string
+	if len(s) == 0 || s[0] != '(' {
+		t.Errorf("Auto-fill should insert leading '(' literal: got %q", s)
+	}
+}
+
+// TestPictureValidatorAutoFillDisabledWhenNoAutoFill verifies:
+// when noAutoFill=true, literals are not auto-inserted
+func TestPictureValidatorAutoFillDisabledWhenNoAutoFill(t *testing.T) {
+	v := NewPictureValidator("(###) ###-####", true)
+	vaf, ok := v.(ValidatorWithAutoFill)
+	if !ok {
+		t.Fatal("PictureValidator must implement ValidatorWithAutoFill")
+	}
+	s := "123"
+	vaf.IsValidInputAutoFill(&s, true)
+	// With noAutoFill=true, the string must not have literals auto-inserted
+	if len(s) > 0 && s[0] == '(' {
+		t.Errorf("Auto-fill should NOT insert literals when noAutoFill=true: got %q", s)
+	}
+}
+
+// TestPictureValidatorErrorCallable verifies:
+// Error() is callable without panic
+func TestPictureValidatorErrorCallable(t *testing.T) {
+	v := NewPictureValidator("###", false)
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Error() should not panic, but recovered: %v", r)
+		}
+	}()
+	v.Error()
+}
+
+// TestPictureValidatorMultipleInstancesIndependent verifies:
+// multiple PictureValidator instances are independent
+func TestPictureValidatorMultipleInstancesIndependent(t *testing.T) {
+	vDigits := NewPictureValidator("###", false)
+	vLetters := NewPictureValidator("???", false)
+
+	if !vDigits.IsValidInput("123", false) {
+		t.Error("vDigits.IsValidInput(\"123\") should return true")
+	}
+	if vDigits.IsValidInput("abc", false) {
+		t.Error("vDigits.IsValidInput(\"abc\") should return false")
+	}
+	if !vLetters.IsValidInput("abc", false) {
+		t.Error("vLetters.IsValidInput(\"abc\") should return true")
+	}
+	if vLetters.IsValidInput("123", false) {
+		t.Error("vLetters.IsValidInput(\"123\") should return false")
+	}
+}
+
+// TestPictureValidatorEmptyPatternEmptyInput verifies:
+// empty picture with empty input — empty input is fully valid
+func TestPictureValidatorEmptyPatternEmptyInput(t *testing.T) {
+	v := NewPictureValidator("", false)
+	if !v.IsValid("") {
+		t.Error("IsValid(\"\") should return true for empty picture — no pattern requirements")
+	}
+}
+
+// TestPictureValidatorEmptyPatternNonEmptyInput verifies:
+// empty picture rejects non-empty input (no slots to consume characters)
+func TestPictureValidatorEmptyPatternNonEmptyInput(t *testing.T) {
+	v := NewPictureValidator("", false)
+	if v.IsValidInput("a", false) {
+		t.Error("IsValidInput(\"a\", false) should return false for empty picture — no slots available")
+	}
+}
