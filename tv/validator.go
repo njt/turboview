@@ -105,3 +105,36 @@ func (r *RangeValidator) Error() {
 	// In production: show message box "Value out of range"
 	// For unit testing: no-op to avoid panic when no Application is running
 }
+
+// StringLookupValidator validates input against a fixed list of allowed strings.
+type StringLookupValidator struct {
+	items map[string]bool
+}
+
+// NewStringLookupValidator creates a StringLookupValidator that accepts only
+// strings from the provided items list. Matching is case-sensitive.
+func NewStringLookupValidator(items []string) *StringLookupValidator {
+	m := make(map[string]bool, len(items))
+	for _, item := range items {
+		m[item] = true
+	}
+	return &StringLookupValidator{items: m}
+}
+
+// IsValidInput always returns true (any partial input is acceptable during typing).
+func (v *StringLookupValidator) IsValidInput(s string, noAutoFill bool) bool {
+	return true
+}
+
+// IsValid returns true if and only if the string is in the items list.
+// Matching is case-sensitive.
+func (v *StringLookupValidator) IsValid(s string) bool {
+	return v.items[s]
+}
+
+// Error is called when validation fails.
+// In production: show message box; for unit testing: no-op.
+func (v *StringLookupValidator) Error() {
+	// In production: show message box "Input not in valid list"
+	// For unit testing: no-op to avoid panic when no Application is running
+}
