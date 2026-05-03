@@ -51,6 +51,20 @@ go test ./e2e/ -timeout 180s
 
 When a bug is found and fixed in one widget, audit all similar widgets for the same class of bug before reporting done. The question is always: "which other components could have this same problem?"
 
+## Development skills
+
+This project uses a modified fork of [obra/superpowers](https://github.com/obra/superpowers) (v5.0.5 → v5.4.0), installed in `.claude/skills/`. The fork addresses failure modes discovered while building this project — specifically, multi-agent implementations that produce components passing all unit tests individually but failing when connected.
+
+### What changed from upstream superpowers
+
+**writing-plans:** Plans must sequence phases as capability slices (each phase produces a runnable app), not layer-by-layer (types first, wiring last). Every phase plan ends with an e2e test task that builds the binary and drives it through its real interface. Plans contain requirements and implementation code but NO test code — tests are written independently by a dedicated subagent to prevent confirmation bias.
+
+**subagent-driven-development:** Rewired to: Test Writer → Test Reviewer → Implementer (with locked tests) → Spec Reviewer → Code Quality Reviewer. Test writers receive only the spec, never implementation code. Test reviewers independently derive expected behavior before reading tests. Implementers can challenge tests via a formal protocol (evidence required). Added mandatory integration testing between task batches. Added e2e suite as a phase gate before auto-chaining. Added spec coverage auditor after all phases complete.
+
+**test-driven-development:** Added test quality gold standard (shared by test writers and reviewers). Three test levels: unit, integration, e2e. New anti-patterns: "all unit tests, no integration tests"; "tests that validate bugs as correct"; "e2e tests that route around broken behavior."
+
+**executing-plans, finishing-a-development-branch, brainstorming, using-git-worktrees, verification-before-completion, using-superpowers:** Unchanged from upstream — included for the complete workflow pipeline.
+
 ## Demo app
 
 `e2e/testapp/basic/main.go` — exercises all built widgets. Window names ("File Manager", "Editor", "Notes") are referenced by e2e tests; don't rename without updating tests. Any new widget should be added to this demo app.
