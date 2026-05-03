@@ -14,7 +14,7 @@
 | 5 | Multi-column clusters + list | CheckBoxes, RadioButtons, ListViewer (existing) |
 | 6 | TEditor + TEditWindow | Memo (existing + Batch 1-3 fixes) |
 | 7 | TFileDialog | ListBox, InputLine, Label, Dialog (existing) |
-| 8 | TColorDialog | ListViewer, multi-column clusters (Batch 5) |
+| 8 | TColorDialog | ListViewer (existing); TMonoSelector uses TCluster but only single-column (4 items, height 4) |
 | 9 | TOutline | ScrollBar (existing) |
 
 ---
@@ -151,7 +151,7 @@ Column count is determined dynamically from the widget's bounds height. Items fi
 
 - `row(item) = item % height` — which row an item occupies
 - `col(item) = item / height` — which column
-- Column width = widest label in that column + prefix (5 chars: 1 focus indicator + `[ ] ` or `( ) `)
+- Column width = widest label in that column + 6 chars prefix spacing (matching original `tcluster.cpp:column()` which uses `width + 6` — this covers the focus indicator, bracket pair, mark character, closing bracket, and inter-column space)
 - Column x-position = sum of widths of all columns to the left
 
 **Example:** 6 items, bounds height = 3:
@@ -234,7 +234,7 @@ All five themes updated.
 
 ## 6. TEditor + TEditWindow
 
-Reference: `editors.h`, `teditor1.cpp`, `teditor2.cpp`, `teditor3.cpp`
+Reference: `editors.h`, `teditor1.cpp`, `teditor2.cpp`
 
 ### 6.1 Architecture
 
@@ -815,16 +815,20 @@ The `+` on "docs" indicates it has children but is collapsed.
 |-----|--------|
 | Up | Move focus to previous visible row |
 | Down | Move focus to next visible row |
-| Right | If focused node has children and is collapsed: expand. If already expanded: move focus to first child |
-| Left | If focused node is expanded: collapse. If collapsed or leaf: move focus to parent |
-| Enter | Toggle expand/collapse |
-| `+` | Expand focused node |
-| `-` | Collapse focused node |
+| Right | Move focus to next visible row (alias for Down, matching original `toutline.cpp:487-495`) |
+| Left | Move focus to previous visible row (alias for Up, matching original) |
+| Enter | Toggle expand/collapse via `adjust()` |
+| `+` | Expand focused node via `adjust()` |
+| `-` | Collapse focused node via `adjust()` |
 | `*` | Expand all descendants of focused node recursively |
 | PgUp | Move focus up by `bounds.Height() - 1` rows |
 | PgDn | Move focus down by `bounds.Height() - 1` rows |
-| Home | Move focus to first visible node |
-| End | Move focus to last visible node |
+| Ctrl+PgUp | Move focus to first node in tree (absolute top) |
+| Ctrl+PgDn | Move focus to last visible node in tree (absolute bottom) |
+| Home | Move focus to first row of current viewport (`deltaY`) |
+| End | Move focus to last row of current viewport (`deltaY + height - 1`) |
+
+**Note on Left/Right:** The original TV uses Left/Right as simple Up/Down aliases in the outline, NOT as expand/collapse (that's the `+`/`-`/Enter keys). We match the original here.
 
 After expand/collapse, the focused node remains focused (its flattened index may change but the node identity is preserved). Scroll position adjusts to keep the focused node visible.
 
