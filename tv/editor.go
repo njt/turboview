@@ -178,8 +178,3 @@ func (e *Editor) broadcastIndicator() {
 		child.HandleEvent(ev)
 	}
 }
-
-// Stubs for find/replace - implemented in find_dialog.go (Task 3)
-func (e *Editor) openFindDialog()    {}
-func (e *Editor) openReplaceDialog() {}
-func (e *Editor) findNext() bool     { return false }
