@@ -210,7 +210,7 @@ func (lv *ListViewer) NumCols() int
 
 **Mouse:** Click x-position determines column (`col = x / colWidth`), y-position determines row. Item index = `topIndex + col*height + row`.
 
-**Scrollbar range:** Adjusted so each "page" scrolls by `numCols * height` items. `maxValue = ceil(itemCount / (numCols * height))`.
+**Scrollbar range:** Remains item-index based (matching existing `ListViewer.syncScrollBar()` pattern): `SetRange(0, itemCount)`, `SetValue(topIndex)`. Page step = `numCols * height`. Arrow step = `height`. This matches original `tlstview.cpp:48-58`.
 
 **Draw:** Iterate columns left-to-right. Each column draws its items as a vertical slice. Focused item highlight spans only its column width. Divider lines drawn in normal color.
 
