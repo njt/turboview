@@ -137,12 +137,20 @@ func NewCheckBoxes(bounds Rect, labels []string) *CheckBoxes {
 
 	for i, label := range labels {
 		cb := NewCheckBox(NewRect(0, i, bounds.Width(), 1), label)
+		cb.SetGrowMode(GfGrowHiX)
 		cbs.items = append(cbs.items, cb)
 		cbs.group.Insert(cb)
 	}
 
 	cbs.SetSelf(cbs)
 	return cbs
+}
+
+func (cbs *CheckBoxes) SetBounds(r Rect) {
+	cbs.BaseView.SetBounds(r)
+	if cbs.group != nil {
+		cbs.group.SetBounds(NewRect(0, 0, r.Width(), r.Height()))
+	}
 }
 
 func (cbs *CheckBoxes) Values() uint32 {

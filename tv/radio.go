@@ -147,6 +147,7 @@ func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 
 	for i, label := range labels {
 		rb := NewRadioButton(NewRect(0, i, bounds.Width(), 1), label)
+		rb.SetGrowMode(GfGrowHiX)
 		rbs.items = append(rbs.items, rb)
 		rbs.group.Insert(rb)
 	}
@@ -158,6 +159,13 @@ func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 
 	rbs.SetSelf(rbs)
 	return rbs
+}
+
+func (rbs *RadioButtons) SetBounds(r Rect) {
+	rbs.BaseView.SetBounds(r)
+	if rbs.group != nil {
+		rbs.group.SetBounds(NewRect(0, 0, r.Width(), r.Height()))
+	}
 }
 
 func (rbs *RadioButtons) Value() int {

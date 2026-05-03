@@ -37,6 +37,13 @@ func NewStringListBox(bounds Rect, items []string) *ListBox {
 	return NewListBox(bounds, NewStringList(items))
 }
 
+func (lb *ListBox) SetBounds(r Rect) {
+	lb.BaseView.SetBounds(r)
+	if lb.group != nil {
+		lb.group.SetBounds(NewRect(0, 0, r.Width(), r.Height()))
+	}
+}
+
 func (lb *ListBox) ListViewer() *ListViewer    { return lb.viewer }
 func (lb *ListBox) ScrollBar() *ScrollBar      { return lb.scrollbar }
 func (lb *ListBox) Selected() int              { return lb.viewer.Selected() }
