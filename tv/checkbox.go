@@ -25,7 +25,7 @@ func NewCheckBox(bounds Rect, label string) *CheckBox {
 	cb := &CheckBox{label: label}
 	cb.SetBounds(bounds)
 	cb.SetState(SfVisible, true)
-	cb.SetOptions(OfSelectable, true)
+	cb.SetOptions(OfSelectable|OfFirstClick, true)
 
 	// Extract shortcut from tilde notation
 	segments := ParseTildeLabel(label)
@@ -96,6 +96,10 @@ func (cb *CheckBox) Draw(buf *DrawBuffer) {
 
 func (cb *CheckBox) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
+		cb.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		if event.Mouse.Button == tcell.Button1 {
 			cb.checked = !cb.checked
 			event.Clear()
@@ -125,7 +129,7 @@ func NewCheckBoxes(bounds Rect, labels []string) *CheckBoxes {
 	cbs := &CheckBoxes{}
 	cbs.SetBounds(bounds)
 	cbs.SetState(SfVisible, true)
-	cbs.SetOptions(OfSelectable, true)
+	cbs.SetOptions(OfSelectable|OfFirstClick, true)
 	cbs.SetOptions(OfPreProcess, true)
 
 	cbs.group = NewGroup(bounds)
@@ -181,6 +185,10 @@ func (cbs *CheckBoxes) Draw(buf *DrawBuffer) {
 
 func (cbs *CheckBoxes) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
+		cbs.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		mx, my := event.Mouse.X, event.Mouse.Y
 		for _, item := range cbs.items {
 			if item.Bounds().Contains(NewPoint(mx, my)) {

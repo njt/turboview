@@ -25,7 +25,7 @@ func NewRadioButton(bounds Rect, label string) *RadioButton {
 	rb := &RadioButton{label: label}
 	rb.SetBounds(bounds)
 	rb.SetState(SfVisible, true)
-	rb.SetOptions(OfSelectable, true)
+	rb.SetOptions(OfSelectable|OfFirstClick, true)
 
 	segments := ParseTildeLabel(label)
 	for _, seg := range segments {
@@ -95,6 +95,10 @@ func (rb *RadioButton) Draw(buf *DrawBuffer) {
 
 func (rb *RadioButton) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
+		rb.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		if event.Mouse.Button == tcell.Button1 {
 			rb.selectInCluster()
 			event.Clear()
@@ -135,7 +139,7 @@ func NewRadioButtons(bounds Rect, labels []string) *RadioButtons {
 	rbs := &RadioButtons{}
 	rbs.SetBounds(bounds)
 	rbs.SetState(SfVisible, true)
-	rbs.SetOptions(OfSelectable, true)
+	rbs.SetOptions(OfSelectable|OfFirstClick, true)
 	rbs.SetOptions(OfPreProcess, true)
 
 	rbs.group = NewGroup(bounds)
@@ -196,6 +200,10 @@ func (rbs *RadioButtons) Draw(buf *DrawBuffer) {
 func (rbs *RadioButtons) HandleEvent(event *Event) {
 	// Route mouse events by position to the correct child.
 	if event.What == EvMouse && event.Mouse != nil {
+		rbs.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		mx, my := event.Mouse.X, event.Mouse.Y
 		for _, item := range rbs.items {
 			if item.Bounds().Contains(NewPoint(mx, my)) {

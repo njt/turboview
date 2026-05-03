@@ -34,7 +34,7 @@ func NewListViewer(bounds Rect, dataSource ListDataSource) *ListViewer {
 	lv := &ListViewer{dataSource: dataSource}
 	lv.SetBounds(bounds)
 	lv.SetState(SfVisible, true)
-	lv.SetOptions(OfSelectable, true)
+	lv.SetOptions(OfSelectable|OfFirstClick, true)
 	lv.SetSelf(lv)
 	return lv
 }
@@ -182,6 +182,10 @@ func (lv *ListViewer) Draw(buf *DrawBuffer) {
 
 func (lv *ListViewer) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
+		lv.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		if event.Mouse.Button&tcell.Button1 != 0 {
 			count := lv.dataSource.Count()
 			my := event.Mouse.Y

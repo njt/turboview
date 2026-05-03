@@ -13,7 +13,7 @@ func NewListBox(bounds Rect, ds ListDataSource) *ListBox {
 	lb := &ListBox{}
 	lb.SetBounds(bounds)
 	lb.SetState(SfVisible, true)
-	lb.SetOptions(OfSelectable, true)
+	lb.SetOptions(OfSelectable|OfFirstClick, true)
 
 	lb.group = NewGroup(bounds)
 	lb.group.SetFacade(lb)
@@ -65,6 +65,10 @@ func (lb *ListBox) Draw(buf *DrawBuffer) {
 
 func (lb *ListBox) HandleEvent(event *Event) {
 	if event.What == EvMouse && event.Mouse != nil {
+		lb.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		for _, child := range lb.group.Children() {
 			if child.Bounds().Contains(NewPoint(event.Mouse.X, event.Mouse.Y)) {
 				origX, origY := event.Mouse.X, event.Mouse.Y
