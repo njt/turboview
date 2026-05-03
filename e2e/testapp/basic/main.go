@@ -126,6 +126,8 @@ Line 16: Last line of demo content.`)
 	win3.Insert(memo)
 	win3.Insert(vScroll)
 	win3.Insert(hScroll)
+	vScroll.SetGrowMode(tv.GfGrowLoX | tv.GfGrowHiX | tv.GfGrowHiY)
+	hScroll.SetGrowMode(tv.GfGrowLoY | tv.GfGrowHiY | tv.GfGrowHiX)
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)
