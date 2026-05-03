@@ -285,4 +285,27 @@ func (d *Dialog) HandleEvent(event *Event) {
 			event.Command = CmCancel
 		}
 	}
+
+	// Validate before allowing CmOK to reach ExecView
+	if !event.IsCleared() && event.What == EvCommand && event.Command == CmOK {
+		if !d.Valid(CmOK) {
+			event.Clear()
+		}
+	}
+}
+
+func (d *Dialog) Valid(cmd CommandCode) bool {
+	if cmd == CmCancel {
+		return true
+	}
+	for _, child := range d.group.Children() {
+		if il, ok := child.(*InputLine); ok {
+			if il.Validator() != nil && !il.Validator().IsValid(il.Text()) {
+				d.group.SetFocusedChild(il)
+				il.Validator().Error()
+				return false
+			}
+		}
+	}
+	return true
 }
