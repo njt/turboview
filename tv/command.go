@@ -34,5 +34,11 @@ const (
 	CmSearchAgain
 	CmIndicatorUpdate
 
+	CmFileOpen
+	CmFileReplace
+	CmFileClear
+	CmFileFocused
+	CmFileFilter
+
 	CmUser CommandCode = 1000
 )
