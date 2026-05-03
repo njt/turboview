@@ -304,19 +304,20 @@ func (g *Group) selectChild(v View) {
 		return
 	}
 
+	// Set focused BEFORE deselecting old so that blur-validation callbacks
+	// (e.g., InputLine re-focusing itself on invalid input) can redirect focus.
+	g.focused = v
 	if old != nil {
 		old.SetState(SfSelected, false)
+		if g.focused != v {
+			// Blur validation stole focus (e.g., InputLine re-focused itself).
+			return
+		}
 	}
-	g.focused = v
 	if v != nil {
 		v.SetState(SfSelected, true)
 	}
 
-	// Broadcast focus changes — deliver to ALL non-disabled children unconditionally.
-	// CmReleasedFocus: sent whenever a prior focused child is being replaced.
-	// CmReceivedFocus: sent only when transitioning from one focused child to another
-	// (not on initial focus assignment from nil), so that construction via Insert
-	// does not emit spurious broadcasts before the group is fully populated.
 	if old != nil {
 		for _, child := range g.children {
 			if child.HasState(SfDisabled) {

@@ -17,6 +17,32 @@ type InputLine struct {
 	overwrite    bool
 	dragging     bool
 	dragAnchor   int
+	validator    Validator
+}
+
+type inputLineState struct {
+	text         []rune
+	cursorPos    int
+	scrollOffset int
+	selStart     int
+	selEnd       int
+}
+
+func (il *InputLine) saveState() inputLineState {
+	textCopy := make([]rune, len(il.text))
+	copy(textCopy, il.text)
+	return inputLineState{
+		text: textCopy, cursorPos: il.cursorPos,
+		scrollOffset: il.scrollOffset, selStart: il.selStart, selEnd: il.selEnd,
+	}
+}
+
+func (il *InputLine) restoreState(s inputLineState) {
+	il.text = s.text
+	il.cursorPos = s.cursorPos
+	il.scrollOffset = s.scrollOffset
+	il.selStart = s.selStart
+	il.selEnd = s.selEnd
 }
 
 type InputLineOption func(*InputLine)
@@ -34,10 +60,12 @@ func NewInputLine(bounds Rect, maxLen int, opts ...InputLineOption) *InputLine {
 	return il
 }
 
-func (il *InputLine) Text() string          { return string(il.text) }
-func (il *InputLine) CursorPos() int        { return il.cursorPos }
-func (il *InputLine) Selection() (int, int) { return il.selStart, il.selEnd }
-func (il *InputLine) Overwrite() bool       { return il.overwrite }
+func (il *InputLine) Text() string            { return string(il.text) }
+func (il *InputLine) CursorPos() int          { return il.cursorPos }
+func (il *InputLine) Selection() (int, int)   { return il.selStart, il.selEnd }
+func (il *InputLine) Overwrite() bool         { return il.overwrite }
+func (il *InputLine) Validator() Validator     { return il.validator }
+func (il *InputLine) SetValidator(v Validator) { il.validator = v }
 
 func (il *InputLine) SelectAll() {
 	il.selStart = 0
@@ -181,6 +209,35 @@ func (il *InputLine) Draw(buf *DrawBuffer) {
 	if il.scrollOffset+w < len(il.text) {
 		buf.WriteChar(w-1, 0, '►', selectionStyle)
 	}
+}
+
+func (il *InputLine) SetState(flag ViewState, on bool) {
+	wasSelected := il.HasState(SfSelected)
+	il.BaseView.SetState(flag, on)
+	if flag == SfSelected && wasSelected && !on {
+		if il.validator != nil && !il.validator.IsValid(string(il.text)) {
+			il.validator.Error()
+			if owner := il.Owner(); owner != nil {
+				owner.SetFocusedChild(il.self)
+			}
+		}
+	}
+}
+
+func (il *InputLine) validateMutation(saved inputLineState) {
+	if il.validator == nil {
+		return
+	}
+	newText := string(il.text)
+	if vaf, ok := il.validator.(ValidatorWithAutoFill); ok {
+		if vaf.IsValidInputAutoFill(&newText, false) {
+			il.text = []rune(newText)
+			return
+		}
+	} else if il.validator.IsValidInput(newText, false) {
+		return
+	}
+	il.restoreState(saved)
 }
 
 func (il *InputLine) HandleEvent(event *Event) {
@@ -355,11 +412,11 @@ func (il *InputLine) HandleEvent(event *Event) {
 			event.Clear()
 
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
+			saved := il.saveState()
 			ctrl := ke.Modifiers&(tcell.ModCtrl|tcell.ModAlt) != 0
 			if il.hasSelection() {
 				il.deleteSelection()
 			} else if ctrl {
-				// Ctrl+Backspace: delete from wordLeft(cursorPos) to cursorPos.
 				wl := il.wordLeft(il.cursorPos)
 				if wl < il.cursorPos {
 					il.text = append(il.text[:wl], il.text[il.cursorPos:]...)
@@ -369,15 +426,16 @@ func (il *InputLine) HandleEvent(event *Event) {
 				il.text = append(il.text[:il.cursorPos-1], il.text[il.cursorPos:]...)
 				il.cursorPos--
 			}
+			il.validateMutation(saved)
 			il.adjustScroll()
 			event.Clear()
 
 		case tcell.KeyDelete:
+			saved := il.saveState()
 			ctrl := ke.Modifiers&tcell.ModCtrl != 0
 			if il.hasSelection() {
 				il.deleteSelection()
 			} else if ctrl {
-				// Ctrl+Delete: delete from cursorPos to wordRight(cursorPos).
 				wr := il.wordRight(il.cursorPos)
 				if wr > il.cursorPos {
 					il.text = append(il.text[:il.cursorPos], il.text[wr:]...)
@@ -385,25 +443,22 @@ func (il *InputLine) HandleEvent(event *Event) {
 			} else if il.cursorPos < len(il.text) {
 				il.text = append(il.text[:il.cursorPos], il.text[il.cursorPos+1:]...)
 			}
+			il.validateMutation(saved)
 			il.adjustScroll()
 			event.Clear()
 
 		case tcell.KeyRune:
-			// Skip if Ctrl or Alt modifier is set.
 			if ke.Modifiers&(tcell.ModCtrl|tcell.ModAlt) != 0 {
 				return
 			}
-			// Replace selection if active.
+			saved := il.saveState()
 			if il.hasSelection() {
 				il.deleteSelection()
 			}
 			if il.overwrite && il.cursorPos < len(il.text) {
-				// Overwrite mode: replace char at cursorPos (no maxLen check needed — not changing length).
 				il.text[il.cursorPos] = ke.Rune
 				il.cursorPos++
 			} else {
-				// Insert mode (or at end in overwrite mode): insert rune at cursor.
-				// No-op if at maxLen.
 				if il.maxLen > 0 && len(il.text) >= il.maxLen {
 					event.Clear()
 					return
@@ -413,6 +468,7 @@ func (il *InputLine) HandleEvent(event *Event) {
 				il.text[il.cursorPos] = ke.Rune
 				il.cursorPos++
 			}
+			il.validateMutation(saved)
 			il.adjustScroll()
 			event.Clear()
 
@@ -438,19 +494,21 @@ func (il *InputLine) HandleEvent(event *Event) {
 
 			case tcell.KeyCtrlX:
 				if il.hasSelection() {
+					saved := il.saveState()
 					lo, hi := il.normalizedSel()
 					clipboard = string(il.text[lo:hi])
 					il.deleteSelection()
+					il.validateMutation(saved)
 					il.adjustScroll()
 				}
 				event.Clear()
 
 			case tcell.KeyCtrlV:
+				saved := il.saveState()
 				if il.hasSelection() {
 					il.deleteSelection()
 				}
 				paste := []rune(clipboard)
-				// Respect maxLen.
 				if il.maxLen > 0 {
 					remaining := il.maxLen - len(il.text)
 					if remaining <= 0 {
@@ -461,22 +519,24 @@ func (il *InputLine) HandleEvent(event *Event) {
 						paste = paste[:remaining]
 					}
 				}
-				// Insert paste at cursor.
 				newText := make([]rune, len(il.text)+len(paste))
 				copy(newText, il.text[:il.cursorPos])
 				copy(newText[il.cursorPos:], paste)
 				copy(newText[il.cursorPos+len(paste):], il.text[il.cursorPos:])
 				il.text = newText
 				il.cursorPos += len(paste)
+				il.validateMutation(saved)
 				il.adjustScroll()
 				event.Clear()
 
 			case tcell.KeyCtrlY:
+				saved := il.saveState()
 				il.text = il.text[:0]
 				il.cursorPos = 0
 				il.selStart = 0
 				il.selEnd = 0
 				il.scrollOffset = 0
+				il.validateMutation(saved)
 				event.Clear()
 
 			// Tab, Escape, Enter and other unhandled keys pass through.
