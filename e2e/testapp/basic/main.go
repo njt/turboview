@@ -63,27 +63,27 @@ func main() {
 	}
 
 	// Window 1 — buttons, checkboxes, radio buttons, input, history, label, validated port
-	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 16), "File Manager", tv.WithWindowNumber(1))
+	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 14), "File Manager", tv.WithWindowNumber(1))
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
 	win1.Insert(btnOK)
 	btnClose := tv.NewButton(tv.NewRect(15, 3, 12, 2), "Close", tv.CmClose)
 	win1.Insert(btnClose)
-	checkBoxes := tv.NewCheckBoxes(tv.NewRect(1, 5, 25, 3), []string{"~R~ead only", "~H~idden", "~S~ystem"})
+	checkBoxes := tv.NewCheckBoxes(tv.NewRect(1, 5, 30, 2), []string{"~R~ead only", "~H~idden", "~S~ystem"})
 	win1.Insert(checkBoxes)
-	radioButtons := tv.NewRadioButtons(tv.NewRect(1, 9, 25, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
+	radioButtons := tv.NewRadioButtons(tv.NewRect(1, 8, 30, 2), []string{"~T~ext", "~B~inary", "~H~ex"})
 	win1.Insert(radioButtons)
-	inputLine := tv.NewInputLine(tv.NewRect(11, 12, 20, 1), 40)
+	inputLine := tv.NewInputLine(tv.NewRect(11, 10, 20, 1), 40)
 	win1.Insert(inputLine)
-	history := tv.NewHistory(tv.NewRect(31, 12, 3, 1), inputLine, 1)
+	history := tv.NewHistory(tv.NewRect(31, 10, 3, 1), inputLine, 1)
 	win1.Insert(history)
-	nameLabel := tv.NewLabel(tv.NewRect(1, 12, 10, 1), "~N~ame:", inputLine)
+	nameLabel := tv.NewLabel(tv.NewRect(1, 10, 10, 1), "~N~ame:", inputLine)
 	win1.Insert(nameLabel)
-	portInput := tv.NewInputLine(tv.NewRect(11, 13, 10, 1), 5)
+	portInput := tv.NewInputLine(tv.NewRect(11, 11, 10, 1), 5)
 	portInput.SetValidator(tv.NewRangeValidator(1, 65535))
 	portInput.SetText("8080")
 	win1.Insert(portInput)
-	portLabel := tv.NewLabel(tv.NewRect(1, 13, 10, 1), "~P~ort:", portInput)
+	portLabel := tv.NewLabel(tv.NewRect(1, 11, 10, 1), "~P~ort:", portInput)
 	win1.Insert(portLabel)
 
 	// Window 2 — ListBox (ListViewer + ScrollBar)
@@ -106,6 +106,7 @@ func main() {
 	}
 
 	listBox := tv.NewStringListBox(tv.NewRect(0, 0, clientW, clientH), items)
+	listBox.ListViewer().SetNumCols(2)
 	win2.Insert(listBox)
 
 	// Window 3 — Memo (multi-line editor with scrollbars)

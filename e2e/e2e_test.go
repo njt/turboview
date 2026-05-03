@@ -1810,6 +1810,113 @@ func TestValidatorPortLabelVisible(t *testing.T) {
 	}
 }
 
+// TestMultiColumnCheckBoxesVisible verifies that with height=2 and 3 items,
+// CheckBoxes renders in 2 columns so labels from both columns are visible.
+func TestMultiColumnCheckBoxesVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-mc-cb"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to win1 and close overlapping windows so win1 is fully visible
+	tmuxSendKeys(t, session, "M-2")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-3")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// With 3 items at height 2, the layout wraps into 2 columns:
+	// col 0: Read only, Hidden   col 1: System
+	// Both "ead only" (R is shortcut) and "ystem" (S is shortcut) must appear.
+	if !containsAny(lines, "ead only") {
+		t.Error("checkbox label 'ead only' not visible — multi-column CheckBoxes may not be rendering column 0")
+	}
+	if !containsAny(lines, "ystem") {
+		t.Error("checkbox label 'ystem' not visible — multi-column CheckBoxes may not be rendering column 1")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestMultiColumnRadioButtonsVisible verifies that with height=2 and 3 items,
+// RadioButtons renders in 2 columns so labels from both columns are visible.
+func TestMultiColumnRadioButtonsVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-mc-rb"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to win1 and close overlapping windows so win1 is fully visible
+	tmuxSendKeys(t, session, "M-2")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-3")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// With 3 items at height 2, the layout wraps into 2 columns:
+	// col 0: Text, Binary   col 1: Hex
+	// Both "ext" (T is shortcut) and "ex" (H is shortcut) must appear.
+	if !containsAny(lines, "ext") {
+		t.Error("radio button label 'ext' not visible — multi-column RadioButtons may not be rendering column 0")
+	}
+	if !containsAny(lines, "inary") {
+		t.Error("radio button label 'inary' not visible — multi-column RadioButtons may not be rendering second item")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestMultiColumnListViewerDivider verifies that the ListViewer in win2 with
+// SetNumCols(2) renders a │ column-divider character between the two columns.
+func TestMultiColumnListViewerDivider(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-mc-lv"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// win2 (Editor) is focused on startup — it contains the 2-column ListViewer
+	lines := tmuxCapture(t, session)
+
+	// The │ divider should be visible between the two columns
+	if !containsAny(lines, "│") {
+		t.Error("column divider '│' not visible in win2 ListViewer — SetNumCols(2) may not be rendering divider")
+	}
+
+	// Items from both columns should be visible
+	if !containsAny(lines, "Item 1") {
+		t.Error("Item 1 not visible in multi-column ListViewer")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // TestListBoxNavigation verifies the ListBox widget in the Editor window:
 // initial items are visible, and arrow key navigation moves the selection.
 func TestListBoxNavigation(t *testing.T) {
