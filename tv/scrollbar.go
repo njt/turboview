@@ -219,12 +219,12 @@ func (sb *ScrollBar) handleVerticalClick(event *Event) {
 	}
 
 	if my == 0 {
-		sb.step(-1)
+		sb.step(-sb.arStep)
 		event.Clear()
 		return
 	}
 	if my == h-1 {
-		sb.step(1)
+		sb.step(sb.arStep)
 		event.Clear()
 		return
 	}
@@ -267,12 +267,12 @@ func (sb *ScrollBar) handleHorizontalClick(event *Event) {
 	}
 
 	if mx == 0 {
-		sb.step(-1)
+		sb.step(-sb.arStep)
 		event.Clear()
 		return
 	}
 	if mx == w-1 {
-		sb.step(1)
+		sb.step(sb.arStep)
 		event.Clear()
 		return
 	}
