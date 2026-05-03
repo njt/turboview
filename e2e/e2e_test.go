@@ -1723,6 +1723,93 @@ func TestHistoryDropdown(t *testing.T) {
 	}
 }
 
+// TestValidatorRejectsInvalidInput verifies that the Port InputLine with
+// RangeValidator(1, 65535) accepts digits and rejects letters at the keystroke level.
+// The Port InputLine starts pre-filled with "8080".
+func TestValidatorRejectsInvalidInput(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-validator"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Close win2 and win3 so win1 is fully visible and nothing overlaps the Port field
+	tmuxSendKeys(t, session, "M-2")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-3")
+	tmuxSendKeys(t, session, "M-F3")
+
+	// Focus win1
+	tmuxSendKeys(t, session, "M-1")
+
+	// Use Alt+P to focus the Port InputLine via label shortcut
+	tmuxSendKeys(t, session, "M-p")
+
+	// The field starts with "8080" — select all and type a new valid value
+	tmuxSendKeys(t, session, "C-a")
+	tmuxType(t, session, "443")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "443") {
+		t.Error("valid digits '443' not visible in Port InputLine — RangeValidator may be rejecting valid input")
+	}
+
+	// Now try typing a letter — it should be rejected by the RangeValidator
+	tmuxType(t, session, "a")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	// "443a" should NOT appear — the 'a' should have been rejected
+	if containsAny(lines, "443a") {
+		t.Error("letter 'a' was accepted in Port InputLine — RangeValidator should reject non-digit characters")
+	}
+	// "443" should still be there (unchanged)
+	if !containsAny(lines, "443") {
+		t.Error("Port InputLine content '443' disappeared after typing rejected character")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// TestValidatorPortLabelVisible verifies that the Port label and InputLine render in win1.
+func TestValidatorPortLabelVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-portlabel"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Close overlapping windows
+	tmuxSendKeys(t, session, "M-2")
+	tmuxSendKeys(t, session, "M-F3")
+	tmuxSendKeys(t, session, "M-3")
+	tmuxSendKeys(t, session, "M-F3")
+
+	tmuxSendKeys(t, session, "M-1")
+
+	lines := tmuxCapture(t, session)
+
+	// Port label text should be visible (the "P" is rendered as shortcut, "ort:" is normal)
+	if !containsAny(lines, "ort:") {
+		t.Error("Port label text 'ort:' not visible in win1")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // TestListBoxNavigation verifies the ListBox widget in the Editor window:
 // initial items are visible, and arrow key navigation moves the selection.
 func TestListBoxNavigation(t *testing.T) {

@@ -62,8 +62,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Window 1 — buttons, checkboxes, radio buttons, input, history, label
-	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 15), "File Manager", tv.WithWindowNumber(1))
+	// Window 1 — buttons, checkboxes, radio buttons, input, history, label, validated port
+	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 16), "File Manager", tv.WithWindowNumber(1))
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
 	win1.Insert(btnOK)
@@ -79,6 +79,12 @@ func main() {
 	win1.Insert(history)
 	nameLabel := tv.NewLabel(tv.NewRect(1, 12, 10, 1), "~N~ame:", inputLine)
 	win1.Insert(nameLabel)
+	portInput := tv.NewInputLine(tv.NewRect(11, 13, 10, 1), 5)
+	portInput.SetValidator(tv.NewRangeValidator(1, 65535))
+	portInput.SetText("8080")
+	win1.Insert(portInput)
+	portLabel := tv.NewLabel(tv.NewRect(1, 13, 10, 1), "~P~ort:", portInput)
+	win1.Insert(portLabel)
 
 	// Window 2 — ListBox (ListViewer + ScrollBar)
 	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
