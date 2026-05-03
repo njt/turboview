@@ -888,6 +888,7 @@ func TestRadioButtonsItemIndexCorrespondsToChild(t *testing.T) {
 // the cluster are deselected."
 func TestRadioButtonsExclusiveSelectionViaSpaceKey(t *testing.T) {
 	rbs := NewRadioButtons(NewRect(0, 0, 20, 3), []string{"A", "B", "C"})
+	rbs.SetState(SfSelected, true)
 	// Focus Item(1) and press Space.
 	rbs.SetFocusedChild(rbs.Item(1))
 

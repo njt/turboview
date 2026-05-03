@@ -167,7 +167,12 @@ func (w *Window) HandleEvent(event *Event) {
 	if event.What == EvBroadcast && event.Command == CmSelectWindowNum {
 		if n, ok := event.Info.(int); ok && n == w.number && w.HasOption(OfSelectable) {
 			if owner := w.Owner(); owner != nil {
-				owner.SetFocusedChild(w)
+				type fronter interface{ BringToFront(View) }
+				if f, ok := owner.(fronter); ok {
+					f.BringToFront(w)
+				} else {
+					owner.SetFocusedChild(w)
+				}
 			}
 			event.Clear()
 		}

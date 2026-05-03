@@ -228,8 +228,11 @@ func (cbs *CheckBoxes) HandleEvent(event *Event) {
 		}
 	}
 
-	// Delegate to group for Tab/Shift+Tab and other events
-	cbs.group.HandleEvent(event)
+	// Delegate to group only when focused — prevents PreProcess from
+	// forwarding Space/etc. to the internal CheckBox items.
+	if cbs.HasState(SfSelected) {
+		cbs.group.HandleEvent(event)
+	}
 }
 
 func (cbs *CheckBoxes) moveNavigation(delta int) {

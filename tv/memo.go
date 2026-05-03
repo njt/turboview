@@ -41,6 +41,7 @@ func NewMemo(bounds Rect, opts ...MemoOption) *Memo {
 	m.SetBounds(bounds)
 	m.SetState(SfVisible, true)
 	m.SetOptions(OfSelectable, true)
+	m.SetOptions(OfFirstClick, true)
 	m.SetGrowMode(GfGrowHiX | GfGrowHiY)
 
 	for _, opt := range opts {
@@ -489,7 +490,33 @@ func (m *Memo) selectLineAtCursor() {
 func (m *Memo) HandleEvent(event *Event) {
 	// Handle mouse events before keyboard events.
 	if event.What == EvMouse && event.Mouse != nil {
+		m.BaseView.HandleEvent(event)
+		if event.IsCleared() {
+			return
+		}
 		me := event.Mouse
+		if me.Button == tcell.WheelUp {
+			m.deltaY -= 3
+			if m.deltaY < 0 {
+				m.deltaY = 0
+			}
+			m.syncScrollBars()
+			event.Clear()
+			return
+		}
+		if me.Button == tcell.WheelDown {
+			maxDY := len(m.lines) - m.Bounds().Height()
+			if maxDY < 0 {
+				maxDY = 0
+			}
+			m.deltaY += 3
+			if m.deltaY > maxDY {
+				m.deltaY = maxDY
+			}
+			m.syncScrollBars()
+			event.Clear()
+			return
+		}
 		if me.Button&tcell.Button1 != 0 {
 			if m.dragging {
 				// Continued drag (motion with button held).

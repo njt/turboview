@@ -244,8 +244,11 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 		}
 	}
 
-	// Delegate to group for Tab/Shift+Tab and other events
-	rbs.group.HandleEvent(event)
+	// Delegate to group only when focused — prevents PreProcess from
+	// forwarding Space/etc. to the internal RadioButton items.
+	if rbs.HasState(SfSelected) {
+		rbs.group.HandleEvent(event)
+	}
 }
 
 func (rbs *RadioButtons) moveSelection(delta int) {

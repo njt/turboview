@@ -62,6 +62,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Window 1 — buttons, checkboxes, radio buttons, input, history, label
 	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 15), "File Manager", tv.WithWindowNumber(1))
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
@@ -79,9 +80,9 @@ func main() {
 	nameLabel := tv.NewLabel(tv.NewRect(1, 12, 10, 1), "~N~ame:", inputLine)
 	win1.Insert(nameLabel)
 
+	// Window 2 — ListBox (ListViewer + ScrollBar)
 	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
 
-	// Create a custom scheme for win2
 	editorScheme := &theme.ColorScheme{}
 	*editorScheme = *theme.BorlandBlue
 	editorScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
@@ -101,12 +102,30 @@ func main() {
 	listBox := tv.NewStringListBox(tv.NewRect(0, 0, clientW, clientH), items)
 	win2.Insert(listBox)
 
-	win3 := tv.NewWindow(tv.NewRect(45, 1, 30, 12), "Notes", tv.WithWindowNumber(3))
-	vScroll := tv.NewScrollBar(tv.NewRect(28, 0, 1, 10), tv.Vertical)
-	memo := tv.NewMemo(tv.NewRect(0, 0, 27, 10), tv.WithScrollBars(nil, vScroll))
-	memo.SetText("Hello, World!\nThis is a memo.\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\nLine 12\nLine 13\nLine 14\nLine 15")
+	// Window 3 — Memo (multi-line editor with scrollbars)
+	win3 := tv.NewWindow(tv.NewRect(45, 1, 35, 16), "Notes", tv.WithWindowNumber(3))
+	vScroll := tv.NewScrollBar(tv.NewRect(32, 0, 1, 13), tv.Vertical)
+	hScroll := tv.NewScrollBar(tv.NewRect(0, 13, 32, 1), tv.Horizontal)
+	memo := tv.NewMemo(tv.NewRect(0, 0, 32, 13), tv.WithScrollBars(hScroll, vScroll))
+	memo.SetText(`Hello, World!
+This is a memo.
+Type freely — Space, Enter, Backspace, Delete all work.
+Arrow keys navigate. Shift+arrow selects.
+Ctrl+A selects all. Ctrl+C/X/V for clipboard.
+Home/End for line start/end. Ctrl+Home/End for doc.
+PgUp/PgDn scroll. Mouse wheel scrolls too.
+Click positions cursor. Double-click selects word.
+Triple-click selects line. Ctrl+Y deletes line.
+
+Line 11: Tab between windows to test focus.
+Line 12: Try scrolling past this point.
+Line 13: More content below visible area.
+Line 14: Horizontal scrolling test — this line intentionally extends well past the visible width.
+Line 15: Almost at the bottom.
+Line 16: Last line of demo content.`)
 	win3.Insert(memo)
 	win3.Insert(vScroll)
+	win3.Insert(hScroll)
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)

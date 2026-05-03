@@ -1057,7 +1057,7 @@ func TestCheckboxIndicatorHidesOnFocusLoss(t *testing.T) {
 
 	// Indicator should be gone — original TV hides all indicators when cluster loses focus
 	for _, line := range lines {
-		if strings.Contains(line, "►") && strings.Contains(line, "[") {
+		if strings.Contains(line, "►[ ]") || strings.Contains(line, "►[X]") {
 			t.Errorf("► indicator still visible after Tab away from checkboxes: %q", line)
 			break
 		}
@@ -1519,6 +1519,7 @@ func TestMemoScrollbarVisible(t *testing.T) {
 
 	// Focus the Notes window (win3)
 	tmuxSendKeys(t, session, "M-3")
+	time.Sleep(300 * time.Millisecond)
 
 	lines := tmuxCapture(t, session)
 
@@ -1592,9 +1593,9 @@ func TestMemoScroll(t *testing.T) {
 
 	lines = tmuxCapture(t, session)
 
-	// Later lines should now be visible (PgDn scrolls by viewport height; Lines 6+ appear)
-	if !containsAny(lines, "Line 6", "Line 7", "Line 8", "Line 9", "Line 10") {
-		t.Error("later lines (Line 6+) not visible after PgDn — scroll may not have worked")
+	// Later lines should now be visible (PgDn scrolls by viewport height)
+	if !containsAny(lines, "Line 13", "Line 14", "Line 15", "Line 16") {
+		t.Error("later lines (Line 13+) not visible after PgDn — scroll may not have worked")
 	}
 
 	// Earlier content should have scrolled out of view

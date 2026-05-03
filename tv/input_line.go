@@ -26,6 +26,7 @@ func NewInputLine(bounds Rect, maxLen int, opts ...InputLineOption) *InputLine {
 	il.SetBounds(bounds)
 	il.SetState(SfVisible, true)
 	il.SetOptions(OfSelectable, true)
+	il.SetOptions(OfFirstClick, true)
 	for _, opt := range opts {
 		opt(il)
 	}
@@ -186,6 +187,10 @@ func (il *InputLine) HandleEvent(event *Event) {
 	switch event.What {
 	case EvMouse:
 		if event.Mouse == nil {
+			return
+		}
+		il.BaseView.HandleEvent(event)
+		if event.IsCleared() {
 			return
 		}
 		col := event.Mouse.X - il.Bounds().A.X + il.scrollOffset
