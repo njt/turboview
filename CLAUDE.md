@@ -9,7 +9,10 @@ Go TUI framework reimplementing Borland's Turbo Vision. Behavioral fidelity to t
 When behavior is ambiguous, the original library is the authority:
 
 - **Source code (primary):** [magiblot/tvision](https://github.com/magiblot/tvision) — modern C++ reimplementation. Clone to `/tmp/tvision` for research. This is where behavioral truth lives for most widgets.
-- **Borland docs (secondary):** Archive.org has the Programming Guide and User's Guide. These give API reference but rarely specify behavioral details (focus transitions, draw state changes, event consumption).
+- **Borland docs (secondary):** API reference, not behavioral specs.
+  - [TV 2.0 Programming Guide (Pascal, 1992)](https://archive.org/details/bitsavers_borlandTurrogrammingGuide1992_25707423)
+  - [TV for C++ User's Guide (1991/1993)](https://archive.org/details/kupdf.net_borland-turbo-vision-for-c-user39s-guide)
+  - [Direct PDF mirror](http://bitsavers.informatik.uni-stuttgart.de/pdf/borland/Turbo_Vision_Version_2.0_Programming_Guide_1992.pdf)
 - **Key finding:** For most widgets, source code is the ONLY reliable behavioral reference. The manuals describe what methods exist, not what they do in edge cases.
 
 When a bug report involves *behavior*, *consistency*, or *defaults* — check the original before deciding what correct behavior is.
