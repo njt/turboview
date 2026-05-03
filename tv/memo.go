@@ -230,9 +230,14 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 
 	sr, sc, er, ec := m.normalizedSelection()
 
+	cursorScreenX, cursorScreenY := -1, -1
+
 	for y := 0; y < h; y++ {
 		lineIdx := m.deltaY + y
 		if lineIdx >= len(m.lines) {
+			if lineIdx == m.cursorRow {
+				cursorScreenX, cursorScreenY = 0, y
+			}
 			buf.Fill(NewRect(0, y, w, 1), ' ', normalStyle)
 			continue
 		}
@@ -251,6 +256,10 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 		// Render visible runes starting from deltaX.
 		x := 0
 		for runeIdx := m.deltaX; runeIdx < len(line) && x < w; runeIdx++ {
+			if lineIdx == m.cursorRow && runeIdx == m.cursorCol {
+				cursorScreenX, cursorScreenY = x, y
+			}
+
 			ch := line[runeIdx]
 			inSel := m.posInSelection(lineIdx, runeIdx, sr, sc, er, ec)
 
@@ -273,6 +282,10 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 			}
 		}
 
+		if lineIdx == m.cursorRow && m.cursorCol >= len(line) && x < w {
+			cursorScreenX, cursorScreenY = x, y
+		}
+
 		// Trailing fill.
 		trailSelected := m.trailingSelected(lineIdx, len(line), sr, sc, er, ec)
 		trailStyle := normalStyle
@@ -282,6 +295,14 @@ func (m *Memo) Draw(buf *DrawBuffer) {
 		for ; x < w; x++ {
 			buf.WriteChar(x, y, ' ', trailStyle)
 		}
+	}
+
+	if m.HasState(SfSelected) && !m.HasSelection() && cursorScreenX >= 0 {
+		ch := rune(' ')
+		if m.cursorRow < len(m.lines) && m.cursorCol < len(m.lines[m.cursorRow]) {
+			ch = m.lines[m.cursorRow][m.cursorCol]
+		}
+		buf.WriteChar(cursorScreenX, cursorScreenY, ch, selectedStyle)
 	}
 }
 
