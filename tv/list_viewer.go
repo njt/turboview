@@ -140,6 +140,15 @@ func (lv *ListViewer) Draw(buf *DrawBuffer) {
 	buf.Fill(NewRect(0, 0, w, vh), ' ', normalStyle)
 
 	count := lv.dataSource.Count()
+	if count == 0 {
+		text := "<empty>"
+		for i, ch := range text {
+			if i < w {
+				buf.WriteChar(i, 0, ch, normalStyle)
+			}
+		}
+		return
+	}
 	hasFocus := lv.HasState(SfSelected)
 
 	for row := 0; row < vh; row++ {

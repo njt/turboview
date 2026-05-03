@@ -796,6 +796,30 @@ func TestDrawListNormalAndListSelectedAreDifferentStyles(t *testing.T) {
 	}
 }
 
+// Spec §2.10: "When the data source has 0 items, the ListViewer displays
+// <empty> in the first row using the normal color."
+func TestDrawEmptyDataSourceRendersEmptyText(t *testing.T) {
+	lv := newLV([]string{})
+	buf := NewDrawBuffer(20, 5)
+	lv.Draw(buf)
+
+	checkRowText(t, buf, 0, "<empty>")
+}
+
+func TestDrawEmptyDataSourceUsesNormalStyle(t *testing.T) {
+	lv := newLV([]string{})
+	buf := NewDrawBuffer(20, 5)
+	lv.Draw(buf)
+
+	normalStyle := theme.BorlandBlue.ListNormal
+	for i, ch := range []rune("<empty>") {
+		cell := buf.GetCell(i, 0)
+		if cell.Style != normalStyle {
+			t.Errorf("cell(%d,0) rune=%q style = %v, want ListNormal %v", i, ch, cell.Style, normalStyle)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Section 7 — Keyboard handling tests
 // ---------------------------------------------------------------------------
