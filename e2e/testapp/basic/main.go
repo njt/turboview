@@ -25,6 +25,11 @@ func main() {
 			tv.NewMenuSeparator(),
 			tv.NewMenuItem("E~x~it", tv.CmQuit, tv.KbAlt('X')),
 		),
+		tv.NewSubMenu("~E~dit",
+			tv.NewMenuItem("~F~ind...", tv.CmFind, tv.KbCtrl('F')),
+			tv.NewMenuItem("~R~eplace...", tv.CmReplace, tv.KbCtrl('H')),
+			tv.NewMenuItem("~S~earch Again", tv.CmSearchAgain, tv.KbFunc(3)),
+		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
 			tv.NewMenuItem("~C~ascade", tv.CmCascade, tv.KbNone()),
@@ -109,32 +114,25 @@ func main() {
 	listBox.ListViewer().SetNumCols(2)
 	win2.Insert(listBox)
 
-	// Window 3 — Memo (multi-line editor with scrollbars)
-	win3 := tv.NewWindow(tv.NewRect(45, 1, 35, 16), "Notes", tv.WithWindowNumber(3))
-	vScroll := tv.NewScrollBar(tv.NewRect(32, 0, 1, 13), tv.Vertical)
-	hScroll := tv.NewScrollBar(tv.NewRect(0, 13, 32, 1), tv.Horizontal)
-	memo := tv.NewMemo(tv.NewRect(0, 0, 32, 13), tv.WithScrollBars(hScroll, vScroll))
-	memo.SetText(`Hello, World!
-This is a memo.
-Type freely — Space, Enter, Backspace, Delete all work.
+	// Window 3 — EditWindow (full editor with undo, find/replace)
+	win3 := tv.NewEditWindow(tv.NewRect(45, 1, 35, 16), "", tv.WithWindowNumber(3))
+	win3.Editor().SetText(`Hello, Editor!
+This is the Editor widget.
+It supports undo (Ctrl+Z), find (Ctrl+F),
+replace (Ctrl+H), and search-again (F3).
 Arrow keys navigate. Shift+arrow selects.
 Ctrl+A selects all. Ctrl+C/X/V for clipboard.
 Home/End for line start/end. Ctrl+Home/End for doc.
 PgUp/PgDn scroll. Mouse wheel scrolls too.
 Click positions cursor. Double-click selects word.
-Triple-click selects line. Ctrl+Y deletes line.
 
 Line 11: Tab between windows to test focus.
 Line 12: Try scrolling past this point.
 Line 13: More content below visible area.
-Line 14: Horizontal scrolling test — this line intentionally extends well past the visible width.
+Line 14: Horizontal scrolling test — this line extends past the visible width.
 Line 15: Almost at the bottom.
 Line 16: Last line of demo content.`)
-	win3.Insert(memo)
-	win3.Insert(vScroll)
-	win3.Insert(hScroll)
-	vScroll.SetGrowMode(tv.GfGrowLoX | tv.GfGrowHiX | tv.GfGrowHiY)
-	hScroll.SetGrowMode(tv.GfGrowLoY | tv.GfGrowHiY | tv.GfGrowHiX)
+	win3.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 
 	win1.SetHelpCtx(1)
 	win2.SetHelpCtx(2)

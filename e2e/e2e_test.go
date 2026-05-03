@@ -1090,9 +1090,11 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 		t.Fatal("win2 'Editor' not visible before tile")
 	}
 
-	// Open Window menu: F10 → Right (to Window menu) → Enter (open popup) → Enter (select Tile)
+	// Open Window menu: F10 → Right → Right (skip Edit, land on Window) → Enter (open popup) → Enter (select Tile)
 	tmuxSendKeys(t, session, "F10")
 	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Right")
 	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Enter")
@@ -1325,8 +1327,18 @@ func TestAltF3CloseWindow(t *testing.T) {
 	if !containsAny(lines, "File Manager") {
 		t.Fatal("win1 not visible")
 	}
-	if !containsAny(lines, "Editor") {
-		t.Fatal("win2 not visible")
+	// win2 title "Editor" appears in the title bar with many ═ frame chars.
+	// A content line with "Hello, Editor!" has at most a few frame chars,
+	// whereas the title row has the full width filled with ═ chars.
+	editorTitleVisible := false
+	for _, line := range lines {
+		if strings.Contains(line, "Editor") && strings.Count(line, "═") > 5 {
+			editorTitleVisible = true
+			break
+		}
+	}
+	if !editorTitleVisible {
+		t.Fatal("win2 not visible (no 'Editor' window title found in frame)")
 	}
 
 	tmuxSendKeys(t, session, "M-2")
@@ -1334,8 +1346,12 @@ func TestAltF3CloseWindow(t *testing.T) {
 
 	lines = tmuxCapture(t, session)
 
-	if containsAny(lines, "Editor") {
-		t.Error("Alt+F3: Editor window still visible after close")
+	// After closing win2, no line should have "Editor" with many ═ frame chars
+	for _, line := range lines {
+		if strings.Contains(line, "Editor") && strings.Count(line, "═") > 5 {
+			t.Errorf("Alt+F3: Editor window title still visible in frame after close: %q", line)
+			break
+		}
 	}
 	if !containsAny(lines, "File Manager") {
 		t.Error("Alt+F3: File Manager window disappeared — wrong window closed")
@@ -1428,7 +1444,7 @@ func TestF6NextWindow(t *testing.T) {
 	// Verify some other window got the active frame
 	switchedToOther := false
 	for _, line := range lines {
-		otherActive := (strings.Contains(line, "Notes") || strings.Contains(line, "Editor")) && strings.Contains(line, "═")
+		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor")) && strings.Contains(line, "═")
 		if otherActive {
 			switchedToOther = true
 			break
@@ -1455,17 +1471,17 @@ func TestMemoVisible(t *testing.T) {
 
 	lines := tmuxCapture(t, session)
 
-	// Window title "Notes" should be visible
-	if !containsAny(lines, "Notes") {
-		t.Error("window title 'Notes' not visible")
+	// Window title "Untitled" should be visible (EditWindow with empty filename)
+	if !containsAny(lines, "Untitled") {
+		t.Error("window title 'Untitled' not visible")
 	}
 
 	// Pre-loaded text should be visible
-	if !containsAny(lines, "Hello, World!") {
-		t.Error("memo text 'Hello, World!' not visible")
+	if !containsAny(lines, "Hello, Editor!") {
+		t.Error("editor text 'Hello, Editor!' not visible")
 	}
-	if !containsAny(lines, "This is a memo.") {
-		t.Error("memo text 'This is a memo.' not visible")
+	if !containsAny(lines, "This is the Editor widget.") {
+		t.Error("editor text 'This is the Editor widget.' not visible")
 	}
 
 	// Clean exit
@@ -1494,9 +1510,9 @@ func TestMemoTyping(t *testing.T) {
 
 	lines := tmuxCapture(t, session)
 
-	// The typed text should appear: "Hello, World! TEST"
-	if !containsAny(lines, "Hello, World! TEST") {
-		t.Error("typed text 'Hello, World! TEST' not visible after typing in memo")
+	// The typed text should appear: "Hello, Editor! TEST"
+	if !containsAny(lines, "Hello, Editor! TEST") {
+		t.Error("typed text 'Hello, Editor! TEST' not visible after typing in memo")
 	}
 
 	// Clean exit
@@ -1555,9 +1571,9 @@ func TestMemoTypingAdvanced(t *testing.T) {
 
 	lines := tmuxCapture(t, session)
 
-	// The typed text should appear: "Hello, World! ADV"
-	if !containsAny(lines, "Hello, World! ADV") {
-		t.Error("typed text 'Hello, World! ADV' not visible after typing in scrollbar-enabled memo")
+	// The typed text should appear: "Hello, Editor! ADV"
+	if !containsAny(lines, "Hello, Editor! ADV") {
+		t.Error("typed text 'Hello, Editor! ADV' not visible after typing in scrollbar-enabled memo")
 	}
 
 	// Clean exit
@@ -1581,10 +1597,10 @@ func TestMemoScroll(t *testing.T) {
 	// Focus the Notes window (win3)
 	tmuxSendKeys(t, session, "M-3")
 
-	// Precondition: "Hello, World!" should be visible before scrolling
+	// Precondition: "Hello, Editor!" should be visible before scrolling
 	lines := tmuxCapture(t, session)
-	if !containsAny(lines, "Hello, World!") {
-		t.Fatal("precondition: 'Hello, World!' not visible before PgDn")
+	if !containsAny(lines, "Hello, Editor!") {
+		t.Fatal("precondition: 'Hello, Editor!' not visible before PgDn")
 	}
 
 	// Press PgDn to scroll down (NPage is tmux's key name for Page Down)
@@ -1599,8 +1615,8 @@ func TestMemoScroll(t *testing.T) {
 	}
 
 	// Earlier content should have scrolled out of view
-	if containsAny(lines, "Hello, World!") {
-		t.Error("'Hello, World!' still visible after PgDn — memo did not scroll")
+	if containsAny(lines, "Hello, Editor!") {
+		t.Error("'Hello, Editor!' still visible after PgDn — editor did not scroll")
 	}
 
 	// Clean exit
@@ -1971,5 +1987,80 @@ func TestListBoxNavigation(t *testing.T) {
 	}
 	if !exited {
 		t.Error("app did not exit after Alt+X")
+	}
+}
+
+func TestEditWindowVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-editwin"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Editor") {
+		t.Fatal("EditWindow content not visible")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestEditWindowUndoE2E(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-editundo"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	tmuxSendKeys(t, session, "M-3")
+	time.Sleep(200 * time.Millisecond)
+
+	tmuxSendKeys(t, session, "Z")
+	time.Sleep(100 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Z") {
+		t.Fatal("typed character not visible")
+	}
+
+	tmuxSendKeys(t, session, "C-z")
+	time.Sleep(100 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestEditWindowIndicatorVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-editind"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	tmuxSendKeys(t, session, "M-3")
+	time.Sleep(200 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "1:1") {
+		t.Fatal("indicator not showing initial position")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }

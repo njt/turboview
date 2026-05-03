@@ -118,10 +118,27 @@ func (d *Desktop) HandleEvent(event *Event) {
 	}
 }
 
+// windowFromView extracts the *Window from a View that is either a *Window
+// directly or a type that embeds *Window (e.g. *EditWindow).
+type windowEmbedder interface {
+	embeddedWindow() *Window
+}
+
+func windowFromView(v View) *Window {
+	if w, ok := v.(*Window); ok {
+		return w
+	}
+	if e, ok := v.(windowEmbedder); ok {
+		return e.embeddedWindow()
+	}
+	return nil
+}
+
 func (d *Desktop) selectWindowByNumber(n int) bool {
 	for _, child := range d.group.Children() {
-		if w, ok := child.(*Window); ok && w.Number() == n {
-			d.BringToFront(w)
+		w := windowFromView(child)
+		if w != nil && w.Number() == n {
+			d.BringToFront(child)
 			return true
 		}
 	}
@@ -169,7 +186,8 @@ func (d *Desktop) SelectPrevWindow() {
 func (d *Desktop) visibleWindows() []*Window {
 	var windows []*Window
 	for _, child := range d.group.Children() {
-		if w, ok := child.(*Window); ok && w.HasState(SfVisible) {
+		w := windowFromView(child)
+		if w != nil && w.HasState(SfVisible) {
 			windows = append(windows, w)
 		}
 	}

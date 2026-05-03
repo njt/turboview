@@ -76,12 +76,32 @@ func NewEditWindow(bounds Rect, filename string, opts ...WindowOption) *EditWind
 
 func (ew *EditWindow) Editor() *Editor { return ew.editor }
 
+// embeddedWindow satisfies the windowEmbedder interface used by Desktop
+// so that EditWindow is recognized as a window for selection and tiling.
+func (ew *EditWindow) embeddedWindow() *Window { return ew.Window }
+
 func (ew *EditWindow) HandleEvent(event *Event) {
 	if event.What == EvCommand && event.Command == CmClose {
 		if !ew.Valid(CmClose) {
 			event.Clear()
 			return
 		}
+	}
+	// CmSelectWindowNum: bring the EditWindow itself (not the embedded *Window)
+	// to the front so the desktop can locate it in its children list.
+	if event.What == EvBroadcast && event.Command == CmSelectWindowNum {
+		if n, ok := event.Info.(int); ok && n == ew.Window.Number() && ew.Window.HasOption(OfSelectable) {
+			if owner := ew.Window.Owner(); owner != nil {
+				type fronter interface{ BringToFront(View) }
+				if f, ok2 := owner.(fronter); ok2 {
+					f.BringToFront(ew)
+				} else {
+					owner.SetFocusedChild(ew)
+				}
+			}
+			event.Clear()
+		}
+		return
 	}
 	ew.Window.HandleEvent(event)
 }
