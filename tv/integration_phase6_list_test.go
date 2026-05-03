@@ -57,8 +57,11 @@ func makeListWindow(items []string) (*Window, *ListViewer, *ScrollBar) {
 
 // TestIntegrationPhase6ListScrollBarDownArrowUpdatesTopIndex verifies that a
 // mouse click on the ScrollBar's down arrow — routed through the Window's client
-// area dispatch chain — increments the ListViewer's topIndex via the OnChange
+// area dispatch chain — updates the ListViewer's topIndex via the OnChange
 // callback that SetScrollBar installs.
+//
+// syncScrollBar sets arStep = visibleHeight() = 8, so one down-arrow click
+// steps by 8.
 //
 // Layout (window-local coordinates):
 //   - Client area starts at (1,1) in window coords (1-cell frame).
@@ -84,33 +87,35 @@ func TestIntegrationPhase6ListScrollBarDownArrowUpdatesTopIndex(t *testing.T) {
 	win.HandleEvent(downArrowEv)
 
 	// SetScrollBar wires sb.OnChange to set lv.topIndex = val.
-	// After one step-down the ScrollBar value is 1; OnChange sets topIndex to 1.
-	if lv.TopIndex() != 1 {
-		t.Errorf("after ScrollBar down-arrow click, ListViewer.TopIndex() = %d, want 1", lv.TopIndex())
+	// syncScrollBar sets arStep = visibleHeight() = 8, so one step-down moves by 8.
+	if lv.TopIndex() != 8 {
+		t.Errorf("after ScrollBar down-arrow click, ListViewer.TopIndex() = %d, want 8 (arStep=visibleHeight=8)", lv.TopIndex())
 	}
 
-	// ScrollBar value should also be 1.
-	if sb.Value() != 1 {
-		t.Errorf("after ScrollBar down-arrow click, ScrollBar.Value() = %d, want 1", sb.Value())
+	// ScrollBar value should also be 8.
+	if sb.Value() != 8 {
+		t.Errorf("after ScrollBar down-arrow click, ScrollBar.Value() = %d, want 8", sb.Value())
 	}
 }
 
 // TestIntegrationPhase6ListScrollBarMultipleDownArrowsAccumulate verifies that
 // three down-arrow clicks accumulate correctly.
+// syncScrollBar sets arStep = visibleHeight() = 8, so each click steps by 8.
+// With range [0,20] and pageSize=8, max = 20-8 = 12; 3 clicks → min(3*8, 12) = 12.
 func TestIntegrationPhase6ListScrollBarMultipleDownArrowsAccumulate(t *testing.T) {
 	win, lv, sb := makeListWindow(makeItems(20))
 	win.SetFocusedChild(sb)
 
-	// Click down arrow 3 times.
+	// Click down arrow 3 times (each steps by arStep=8, clamped to max=12).
 	for i := 0; i < 3; i++ {
 		win.HandleEvent(clickEvent(28, 8, tcell.Button1))
 	}
 
-	if lv.TopIndex() != 3 {
-		t.Errorf("after 3 ScrollBar down-arrow clicks, TopIndex() = %d, want 3", lv.TopIndex())
+	if lv.TopIndex() != 12 {
+		t.Errorf("after 3 ScrollBar down-arrow clicks, TopIndex() = %d, want 12 (clamped to max=20-8)", lv.TopIndex())
 	}
-	if sb.Value() != 3 {
-		t.Errorf("after 3 ScrollBar down-arrow clicks, ScrollBar.Value() = %d, want 3", sb.Value())
+	if sb.Value() != 12 {
+		t.Errorf("after 3 ScrollBar down-arrow clicks, ScrollBar.Value() = %d, want 12", sb.Value())
 	}
 }
 

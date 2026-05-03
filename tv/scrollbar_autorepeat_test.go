@@ -163,41 +163,40 @@ func TestScrollBarAutoRepeatHorizontalLeftArrowTenClicks(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Section 3 — Custom arStep values: steps are multiplied correctly
+// Section 3 — Custom arStep values: arrow clicks use arStep
 // ---------------------------------------------------------------------------
 
 // TestScrollBarAutoRepeatVerticalUpArrowAlwaysStepByOne verifies that arrow clicks
-// always step by 1, regardless of arStep setting (arStep only affects wheel events).
-// This test verifies that 5 clicks always decrease by 5, not by 5*arStep.
-// Spec: "Each EvMouse with Button1 on the up arrow decrements by arStep (which for arrows is always 1)"
+// use arStep, so with arStep=3, each click decreases by 3.
+// Spec: "Each EvMouse with Button1 on the up arrow decrements by arStep"
 func TestScrollBarAutoRepeatVerticalUpArrowAlwaysStepByOne(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
 	sb.SetPageSize(10)
 	sb.SetValue(50)
-	sb.SetArStep(3) // arStep is 3, but arrow clicks ignore it
+	sb.SetArStep(3) // arStep=3; arrow clicks now use arStep
 
 	// Simulate 5 consecutive Button1 events on up arrow
-	// Arrow clicks step by 1, not by arStep
+	// Arrow clicks step by arStep=3
 	for i := 0; i < 5; i++ {
 		ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 0, Button: tcell.Button1}}
 		sb.HandleEvent(ev)
 	}
 
-	if sb.Value() != 45 {
-		t.Errorf("after 5 clicks on up arrow (arStep=3): Value() = %d, want 45 (50 - 5*1, arrows always step by 1)", sb.Value())
+	if sb.Value() != 35 {
+		t.Errorf("after 5 clicks on up arrow (arStep=3): Value() = %d, want 35 (50 - 5*3)", sb.Value())
 	}
 }
 
 // TestScrollBarAutoRepeatVerticalDownArrowAlwaysStepByOne verifies that down arrow
-// clicks always step by 1, regardless of arStep setting.
-// Spec: "Each EvMouse with Button1 on the down arrow increments by arStep (which for arrows is always 1)"
+// clicks use arStep, so with arStep=3, each click increases by 3.
+// Spec: "Each EvMouse with Button1 on the down arrow increments by arStep"
 func TestScrollBarAutoRepeatVerticalDownArrowAlwaysStepByOne(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
 	sb.SetPageSize(10)
 	sb.SetValue(50)
-	sb.SetArStep(3) // arStep is 3, but arrow clicks ignore it
+	sb.SetArStep(3) // arStep=3; arrow clicks now use arStep
 
 	// Simulate 5 consecutive Button1 events on down arrow
 	for i := 0; i < 5; i++ {
@@ -205,20 +204,20 @@ func TestScrollBarAutoRepeatVerticalDownArrowAlwaysStepByOne(t *testing.T) {
 		sb.HandleEvent(ev)
 	}
 
-	if sb.Value() != 55 {
-		t.Errorf("after 5 clicks on down arrow (arStep=3): Value() = %d, want 55 (50 + 5*1, arrows always step by 1)", sb.Value())
+	if sb.Value() != 65 {
+		t.Errorf("after 5 clicks on down arrow (arStep=3): Value() = %d, want 65 (50 + 5*3)", sb.Value())
 	}
 }
 
 // TestScrollBarAutoRepeatHorizontalLeftArrowAlwaysStepByOne verifies that left arrow
-// clicks always step by 1, regardless of arStep setting.
+// clicks use arStep, so with arStep=3, each click decreases by 3.
 // Spec: "Same for horizontal left/right arrows"
 func TestScrollBarAutoRepeatHorizontalLeftArrowAlwaysStepByOne(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 12, 1), Horizontal)
 	sb.SetRange(0, 100)
 	sb.SetPageSize(10)
 	sb.SetValue(50)
-	sb.SetArStep(3) // arStep is 3, but arrow clicks ignore it
+	sb.SetArStep(3) // arStep=3; arrow clicks now use arStep
 
 	// Simulate 5 consecutive Button1 events on left arrow
 	for i := 0; i < 5; i++ {
@@ -226,20 +225,20 @@ func TestScrollBarAutoRepeatHorizontalLeftArrowAlwaysStepByOne(t *testing.T) {
 		sb.HandleEvent(ev)
 	}
 
-	if sb.Value() != 45 {
-		t.Errorf("after 5 clicks on left arrow (arStep=3): Value() = %d, want 45 (50 - 5*1, arrows always step by 1)", sb.Value())
+	if sb.Value() != 35 {
+		t.Errorf("after 5 clicks on left arrow (arStep=3): Value() = %d, want 35 (50 - 5*3)", sb.Value())
 	}
 }
 
 // TestScrollBarAutoRepeatHorizontalRightArrowAlwaysStepByOne verifies that right arrow
-// clicks always step by 1, regardless of arStep setting.
+// clicks use arStep, so with arStep=3, each click increases by 3.
 // Spec: "Same for horizontal left/right arrows"
 func TestScrollBarAutoRepeatHorizontalRightArrowAlwaysStepByOne(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 12, 1), Horizontal)
 	sb.SetRange(0, 100)
 	sb.SetPageSize(10)
 	sb.SetValue(50)
-	sb.SetArStep(3) // arStep is 3, but arrow clicks ignore it
+	sb.SetArStep(3) // arStep=3; arrow clicks now use arStep
 
 	// Simulate 5 consecutive Button1 events on right arrow
 	for i := 0; i < 5; i++ {
@@ -247,8 +246,8 @@ func TestScrollBarAutoRepeatHorizontalRightArrowAlwaysStepByOne(t *testing.T) {
 		sb.HandleEvent(ev)
 	}
 
-	if sb.Value() != 55 {
-		t.Errorf("after 5 clicks on right arrow (arStep=3): Value() = %d, want 55 (50 + 5*1, arrows always step by 1)", sb.Value())
+	if sb.Value() != 65 {
+		t.Errorf("after 5 clicks on right arrow (arStep=3): Value() = %d, want 65 (50 + 5*3)", sb.Value())
 	}
 }
 
@@ -454,15 +453,15 @@ func TestScrollBarAutoRepeatValueChangesIncrementally(t *testing.T) {
 }
 
 // TestScrollBarAutoRepeatValueChangesIncrementallyArrowSteps verifies incremental
-// changes with multiple arrow clicks. Arrow clicks always step by 1 (not arStep).
-// Each click should change value by 1, and changes should be incremental.
+// changes with multiple arrow clicks. Arrow clicks use arStep, so with arStep=3,
+// each click decreases by 3 and changes are incremental.
 // Spec: "Falsifying: accumulation not all-at-once (value changes incrementally)"
 func TestScrollBarAutoRepeatValueChangesIncrementallyArrowSteps(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
 	sb.SetPageSize(10)
 	sb.SetValue(50)
-	sb.SetArStep(3) // arStep does not affect arrow clicks
+	sb.SetArStep(3) // arStep=3; arrow clicks now use arStep
 
 	var valueSequence []int
 	sb.OnChange = func(v int) {
@@ -470,14 +469,14 @@ func TestScrollBarAutoRepeatValueChangesIncrementallyArrowSteps(t *testing.T) {
 	}
 
 	// Simulate 5 consecutive Button1 events on up arrow
-	// Arrow clicks always step by 1, even with arStep=3
+	// Arrow clicks step by arStep=3
 	for i := 0; i < 5; i++ {
 		ev := &Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 0, Button: tcell.Button1}}
 		sb.HandleEvent(ev)
 	}
 
-	// Each click should decrease by 1: 49, 48, 47, 46, 45
-	expectedSequence := []int{49, 48, 47, 46, 45}
+	// Each click should decrease by 3: 47, 44, 41, 38, 35
+	expectedSequence := []int{47, 44, 41, 38, 35}
 
 	if len(valueSequence) != 5 {
 		t.Errorf("OnChange called %d times, want 5 (incremental)", len(valueSequence))
@@ -486,7 +485,7 @@ func TestScrollBarAutoRepeatValueChangesIncrementallyArrowSteps(t *testing.T) {
 
 	for i, expected := range expectedSequence {
 		if valueSequence[i] != expected {
-			t.Errorf("callback %d: value = %d, want %d (each arrow click should decrease by 1)",
+			t.Errorf("callback %d: value = %d, want %d (each arrow click should decrease by arStep=3)",
 				i+1, valueSequence[i], expected)
 		}
 	}

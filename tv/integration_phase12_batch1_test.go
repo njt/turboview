@@ -10,7 +10,7 @@ package tv
 // Features under test:
 //   Task 1: Keyboard handling (Up/Down/PgUp/PgDn/Ctrl+PgUp/Ctrl+PgDn/Left/Right/Home/End)
 //   Task 2: Mouse wheel speed (WheelUp/WheelDown scroll by 3 * arStep)
-//   Task 3: Arrow click auto-repeat (Button1 on arrow positions steps by 1 per click)
+//   Task 3: Arrow click auto-repeat (Button1 on arrow positions steps by arStep per click)
 //
 // Test naming: TestIntegrationPhase12Batch1<DescriptiveSuffix>
 
@@ -144,13 +144,13 @@ func TestIntegrationPhase12Batch1ArStepChangedMidSessionAffectsWheelOnly(t *test
 
 // ---------------------------------------------------------------------------
 // Scenario 3: Auto-repeat mouse clicks + keyboard navigation combined
-// Arrow clicks step by 1 (regardless of arStep); keyboard arrows step by arStep.
+// Arrow clicks use arStep (same as keyboard arrows).
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase12Batch1AutoRepeatThenKeyboard verifies that 5 mouse clicks
-// on the down arrow (each +1) followed by a keyboard Down arrow (+arStep) sum correctly.
+// on the down arrow (each +arStep=1) followed by a keyboard Down arrow (+arStep=1) sum correctly.
 //
-// Setup: range [0,100], pageSize=10, value=50, arStep=1
+// Setup: range [0,100], pageSize=10, value=50, arStep=1 (default)
 // 5×Button1 on Y=9 → 55; Down keyboard → 56.
 func TestIntegrationPhase12Batch1AutoRepeatThenKeyboard(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
@@ -175,11 +175,11 @@ func TestIntegrationPhase12Batch1AutoRepeatThenKeyboard(t *testing.T) {
 }
 
 // TestIntegrationPhase12Batch1AutoRepeatArStepDoesNotAffectMouseArrows verifies that
-// mouse clicks on arrows always step by 1, not by arStep, even when arStep is large.
-// Then keyboard Down should step by arStep.
+// mouse clicks on arrows use arStep (same as keyboard), so with arStep=5 each click
+// steps by 5. Keyboard Down also steps by arStep=5.
 //
 // Setup: range [0,100], pageSize=10, value=50, arStep=5
-// 5×Button1 on Y=9 → 55 (not 75); Down keyboard → 60.
+// 5×Button1 on Y=9 → 75 (5*5=25 increase); Down keyboard → 80.
 func TestIntegrationPhase12Batch1AutoRepeatArStepDoesNotAffectMouseArrows(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
@@ -188,18 +188,18 @@ func TestIntegrationPhase12Batch1AutoRepeatArStepDoesNotAffectMouseArrows(t *tes
 	sb.SetArStep(5)
 	sb.SetState(SfSelected, true)
 
-	// Task 3: 5 auto-repeat clicks — arrow clicks always step by 1, not arStep
+	// Task 3: 5 auto-repeat clicks — arrow clicks use arStep=5
 	for i := 0; i < 5; i++ {
 		sb.HandleEvent(&Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 9, Button: tcell.Button1}})
 	}
-	if sb.Value() != 55 {
-		t.Errorf("after 5 mouse clicks (arStep=5): Value() = %d, want 55 (mouse arrows always step by 1)", sb.Value())
+	if sb.Value() != 75 {
+		t.Errorf("after 5 mouse clicks (arStep=5): Value() = %d, want 75 (50 + 5*5)", sb.Value())
 	}
 
 	// Task 1: keyboard Down uses arStep=5
 	sb.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyDown}})
-	if sb.Value() != 60 {
-		t.Errorf("after 5 clicks + Down arrow (arStep=5): Value() = %d, want 60 (55+5)", sb.Value())
+	if sb.Value() != 80 {
+		t.Errorf("after 5 clicks + Down arrow (arStep=5): Value() = %d, want 80 (75+5)", sb.Value())
 	}
 }
 
@@ -422,10 +422,10 @@ func TestIntegrationPhase12Batch1OnChangeReceivesCorrectSequenceOfValues(t *test
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase12Batch1WheelSpeedAndKeyboardBothScaleWithArStep verifies that
-// when arStep=3, WheelDown=+9 and Down arrow=+3, and auto-repeat clicks remain +1.
+// when arStep=3, WheelDown=+9 and Down arrow=+3, and arrow clicks also use arStep=+3.
 //
 // Setup: range [0,100], pageSize=10, value=30, arStep=3
-// WheelDown → 39; Down → 42; Button1 on Y=9 → 43.
+// WheelDown → 39; Down → 42; Button1 on Y=9 → 45.
 func TestIntegrationPhase12Batch1WheelSpeedAndKeyboardBothScaleWithArStep(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 1, 10), Vertical)
 	sb.SetRange(0, 100)
@@ -446,10 +446,10 @@ func TestIntegrationPhase12Batch1WheelSpeedAndKeyboardBothScaleWithArStep(t *tes
 		t.Errorf("Down arrow (arStep=3): Value() = %d, want 42 (39+3)", sb.Value())
 	}
 
-	// Task 3: mouse click on down arrow (always +1, not +arStep)
+	// Task 3: mouse click on down arrow uses arStep=3
 	sb.HandleEvent(&Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 9, Button: tcell.Button1}})
-	if sb.Value() != 43 {
-		t.Errorf("down arrow click (arStep=3): Value() = %d, want 43 (42+1, mouse clicks always step by 1)", sb.Value())
+	if sb.Value() != 45 {
+		t.Errorf("down arrow click (arStep=3): Value() = %d, want 45 (42+3)", sb.Value())
 	}
 }
 
@@ -522,16 +522,16 @@ func TestIntegrationPhase12Batch1AllMethodsClampAtMin(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // Scenario 10: Keyboard navigation then auto-repeat on horizontal scrollbar
-// Combines Right-arrow keyboard (Task 1) with auto-repeat mouse right-arrow (Task 3)
-// and verifies that arStep affects keyboard but not mouse arrow clicks.
+// Combines Right-arrow keyboard (Task 1) with auto-repeat mouse right-arrow (Task 3).
+// Both keyboard and mouse arrow clicks use arStep.
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase12Batch1HorizontalKeyboardAutoRepeatWithCustomArStep verifies
-// that on a horizontal scrollbar with arStep=4, Right arrow uses arStep=4 but
-// mouse right-arrow clicks use 1.
+// that on a horizontal scrollbar with arStep=4, Right arrow uses arStep=4 and
+// mouse right-arrow clicks also use arStep=4.
 //
 // Setup: range [0,100], pageSize=10, value=30, arStep=4
-// Right arrow → 34; 3×Button1 at X=11 → 37.
+// Right arrow → 34; 3×Button1 at X=11 → 46 (34 + 3*4).
 func TestIntegrationPhase12Batch1HorizontalKeyboardAutoRepeatWithCustomArStep(t *testing.T) {
 	sb := NewScrollBar(NewRect(0, 0, 12, 1), Horizontal)
 	sb.SetRange(0, 100)
@@ -546,11 +546,11 @@ func TestIntegrationPhase12Batch1HorizontalKeyboardAutoRepeatWithCustomArStep(t 
 		t.Errorf("Right arrow (arStep=4): Value() = %d, want 34 (30+4)", sb.Value())
 	}
 
-	// Task 3: 3 mouse right-arrow clicks (each +1, not +arStep)
+	// Task 3: 3 mouse right-arrow clicks each use arStep=4
 	for i := 0; i < 3; i++ {
 		sb.HandleEvent(&Event{What: EvMouse, Mouse: &MouseEvent{X: 11, Y: 0, Button: tcell.Button1}})
 	}
-	if sb.Value() != 37 {
-		t.Errorf("Right arrow + 3 right clicks (arStep=4): Value() = %d, want 37 (34+3, clicks always +1)", sb.Value())
+	if sb.Value() != 46 {
+		t.Errorf("Right arrow + 3 right clicks (arStep=4): Value() = %d, want 46 (34 + 3*4)", sb.Value())
 	}
 }
