@@ -10,10 +10,13 @@ import (
 // tree of TNodes with expand/collapse, keyboard navigation, and mouse support.
 type OutlineViewer struct {
 	BaseView
-	root       *TNode
-	focusedIdx int
-	deltaY     int
-	vScrollBar *ScrollBar
+	root        *TNode
+	focusedIdx  int
+	deltaY      int
+	vScrollBar  *ScrollBar
+	selectedFn  func()
+	adjustFn    func()
+	adjustAllFn func()
 }
 
 // NewOutlineViewer creates a new OutlineViewer with the given bounds.
@@ -28,6 +31,9 @@ func NewOutlineViewer(bounds Rect) *OutlineViewer {
 	ov.SetOptions(OfSelectable, true)
 	ov.SetOptions(OfFirstClick, true)
 	ov.SetSelf(ov)
+	ov.selectedFn = ov.selected
+	ov.adjustFn = ov.adjust
+	ov.adjustAllFn = ov.adjustAll
 	return ov
 }
 
@@ -255,7 +261,7 @@ func (ov *OutlineViewer) handleKeyboard(event *Event) {
 		event.Clear()
 
 	case tcell.KeyEnter:
-		ov.selected()
+		ov.selectedFn()
 		event.Clear()
 
 	case tcell.KeyPgUp:
@@ -307,13 +313,13 @@ func (ov *OutlineViewer) handleKeyboard(event *Event) {
 	case tcell.KeyRune:
 		switch k.Rune {
 		case '+':
-			ov.adjust()
+			ov.adjustFn()
 			event.Clear()
 		case '-':
-			ov.adjust()
+			ov.adjustFn()
 			event.Clear()
 		case '*':
-			ov.adjustAll()
+			ov.adjustAllFn()
 			event.Clear()
 		}
 	}
@@ -336,7 +342,7 @@ func (ov *OutlineViewer) handleMouse(event *Event) {
 	// Move focus to the clicked row.
 	ov.focusedIdx = row
 
-	prefix, node, level := ov.graphPrefix(row)
+	_, node, level := ov.graphPrefix(row)
 	if node == nil {
 		return
 	}
@@ -346,9 +352,9 @@ func (ov *OutlineViewer) handleMouse(event *Event) {
 
 	if m.ClickCount >= 2 {
 		// Double-click: select, then toggle if has children.
-		ov.selected()
+		ov.selectedFn()
 		if node.Children != nil {
-			ov.adjust()
+			ov.adjustFn()
 		}
 		event.Clear()
 		return
@@ -356,10 +362,7 @@ func (ov *OutlineViewer) handleMouse(event *Event) {
 
 	if clickX < graphWidth {
 		// Click in graph area: toggle expand/collapse.
-		ov.adjust()
-	} else {
-		// Click in text area: just move focus.
-		_ = prefix
+		ov.adjustFn()
 	}
 	event.Clear()
 }
@@ -460,4 +463,119 @@ func expandAll(n *TNode) {
 	for child := n.Children; child != nil; child = child.Next {
 		expandAll(child)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Outline — concrete class that owns a node tree
+// ---------------------------------------------------------------------------
+
+// Outline is the concrete outline widget that owns a node tree and provides
+// visitor methods and an OnSelect callback. It embeds OutlineViewer by value.
+type Outline struct {
+	OutlineViewer
+	OnSelect func(node *TNode)
+}
+
+// NewOutline creates an Outline with the given bounds and root node.
+func NewOutline(bounds Rect, root *TNode) *Outline {
+	o := &Outline{}
+	o.SetBounds(bounds)
+	o.SetState(SfVisible, true)
+	o.SetOptions(OfSelectable, true)
+	o.SetOptions(OfFirstClick, true)
+	o.SetGrowMode(GfGrowHiX | GfGrowHiY)
+	o.SetSelf(o)
+	o.selectedFn = o.selected
+	o.adjustFn = o.adjust
+	o.adjustAllFn = o.adjustAll
+	o.root = root
+	o.Update()
+	return o
+}
+
+// Root returns the root node of the outline tree.
+func (o *Outline) Root() *TNode { return o.root }
+
+// SetRoot replaces the root node, resets focusedIdx and deltaY, and calls Update.
+func (o *Outline) SetRoot(root *TNode) {
+	o.root = root
+	o.focusedIdx = 0
+	o.deltaY = 0
+	o.Update()
+}
+
+// SetOnSelect sets the OnSelect callback.
+func (o *Outline) SetOnSelect(fn func(node *TNode)) {
+	o.OnSelect = fn
+}
+
+// Update recomputes the visible count and syncs the scrollbar.
+// If focusedIdx >= visibleCount(), it is clamped to visibleCount()-1.
+func (o *Outline) Update() {
+	total := o.visibleCount()
+	if total > 0 && o.focusedIdx >= total {
+		o.focusedIdx = total - 1
+	}
+	o.ensureVisible()
+	o.syncScrollBars()
+}
+
+// selected finds the focused node and calls OnSelect if set.
+func (o *Outline) selected() {
+	node, _ := o.nodeAt(o.focusedIdx)
+	if node != nil && o.OnSelect != nil {
+		o.OnSelect(node)
+	}
+}
+
+// adjust toggles the Expanded flag of the focused node and calls Update.
+func (o *Outline) adjust() {
+	node, _ := o.nodeAt(o.focusedIdx)
+	if node != nil {
+		node.Expanded = !node.Expanded
+	}
+	o.Update()
+}
+
+// adjustAll expands the focused node and all its descendants, then calls Update.
+func (o *Outline) adjustAll() {
+	node, _ := o.nodeAt(o.focusedIdx)
+	if node != nil {
+		expandAll(node)
+	}
+	o.Update()
+}
+
+// ForEach performs a depth-first traversal of ALL nodes (including collapsed).
+// Visits: node, then Children, then Next. Level starts at 0.
+func (o *Outline) ForEach(fn func(node *TNode, level int)) {
+	forEachNode(o.root, 0, fn)
+}
+
+func forEachNode(n *TNode, level int, fn func(*TNode, int)) {
+	if n == nil {
+		return
+	}
+	fn(n, level)
+	forEachNode(n.Children, level+1, fn)
+	forEachNode(n.Next, level, fn)
+}
+
+// FirstThat performs a depth-first traversal of ALL nodes (including collapsed)
+// and returns the first node where fn returns true, or nil.
+func (o *Outline) FirstThat(fn func(node *TNode, level int) bool) *TNode {
+	return firstThatNode(o.root, 0, fn)
+}
+
+func firstThatNode(n *TNode, level int, fn func(*TNode, int) bool) *TNode {
+	if n == nil {
+		return nil
+	}
+	if fn(n, level) {
+		return n
+	}
+	if result := firstThatNode(n.Children, level+1, fn); result != nil {
+		return result
+	}
+	return firstThatNode(n.Next, level, fn)
 }
