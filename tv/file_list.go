@@ -250,6 +250,7 @@ func (fl *FileList) HandleEvent(event *Event) {
 		}
 
 		if entry != nil && !entry.IsDir && entry.Name != ".." {
+			fl.broadcastFocused()
 			event.What = EvCommand
 			event.Command = CmOK
 			event.Mouse = nil
@@ -317,6 +318,7 @@ func (fl *FileList) HandleEvent(event *Event) {
 			}
 
 			if entry != nil && !entry.IsDir && entry.Name != ".." {
+				fl.broadcastFocused()
 				event.What = EvCommand
 				event.Command = CmOK
 				event.Key = nil
