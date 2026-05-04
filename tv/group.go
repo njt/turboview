@@ -85,6 +85,9 @@ func (g *Group) SetFacade(c Container) {
 }
 
 func (g *Group) Insert(v View) {
+	if v == nil {
+		return
+	}
 	owner := Container(g)
 	if g.facade != nil {
 		owner = g.facade

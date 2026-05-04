@@ -813,7 +813,7 @@ func TestFileListNavigationKeysClearSearchBuffer(t *testing.T) {
 		tcell.KeyUp, tcell.KeyDown, tcell.KeyPgUp, tcell.KeyPgDn,
 		tcell.KeyHome, tcell.KeyEnd, tcell.KeyLeft, tcell.KeyRight,
 	} {
-		t.Run(key.String(), func(t *testing.T) {
+		t.Run(tcell.KeyNames[key], func(t *testing.T) {
 			fl := newFileListWithTempDir(t, "*", nil,
 				[]string{"apple.txt", "bravo.txt", "charlie.txt"})
 
