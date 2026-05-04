@@ -249,7 +249,7 @@ func TestIntegrationPhase13Batch2CtrlPgDnThenHomeSelectsNewTopIndex(t *testing.T
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase13Batch2ScrollBarSyncAfterHome verifies scrollBar.Value()
-// equals topIndex after pressing Home on a scrolled list.
+// equals selected after pressing Home on a scrolled list.
 func TestIntegrationPhase13Batch2ScrollBarSyncAfterHome(t *testing.T) {
 	lv := scrolledLV()
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -257,13 +257,13 @@ func TestIntegrationPhase13Batch2ScrollBarSyncAfterHome(t *testing.T) {
 
 	lv.HandleEvent(listKeyEv(tcell.KeyHome))
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("Home: ScrollBar.Value()=%d, TopIndex()=%d; must be equal", sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("Home: ScrollBar.Value()=%d, Selected()=%d; must be equal", sb.Value(), lv.Selected())
 	}
 }
 
 // TestIntegrationPhase13Batch2ScrollBarSyncAfterEnd verifies scrollBar.Value()
-// equals topIndex after pressing End on a scrolled list.
+// equals selected after pressing End on a scrolled list.
 func TestIntegrationPhase13Batch2ScrollBarSyncAfterEnd(t *testing.T) {
 	lv := scrolledLV()
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -271,8 +271,9 @@ func TestIntegrationPhase13Batch2ScrollBarSyncAfterEnd(t *testing.T) {
 
 	lv.HandleEvent(listKeyEv(tcell.KeyEnd))
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("End: ScrollBar.Value()=%d, TopIndex()=%d; must be equal", sb.Value(), lv.TopIndex())
+	// After End: selected=14 (topIndex+height-1=10+5-1). Scrollbar tracks selected.
+	if sb.Value() != lv.Selected() {
+		t.Errorf("End: ScrollBar.Value()=%d, Selected()=%d; must be equal", sb.Value(), lv.Selected())
 	}
 }
 
@@ -292,12 +293,12 @@ func TestIntegrationPhase13Batch2ScrollBarZeroAfterCtrlPgUp(t *testing.T) {
 	if sb.Value() != 0 {
 		t.Errorf("Ctrl+PgUp: ScrollBar.Value()=%d, want 0", sb.Value())
 	}
-	if lv.TopIndex() != 0 {
-		t.Errorf("Ctrl+PgUp: TopIndex()=%d, want 0", lv.TopIndex())
+	if lv.Selected() != 0 {
+		t.Errorf("Ctrl+PgUp: Selected()=%d, want 0", lv.Selected())
 	}
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("Ctrl+PgUp: ScrollBar.Value()=%d != TopIndex()=%d; must be equal",
-			sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("Ctrl+PgUp: ScrollBar.Value()=%d != Selected()=%d; must be equal",
+			sb.Value(), lv.Selected())
 	}
 }
 
@@ -306,7 +307,9 @@ func TestIntegrationPhase13Batch2ScrollBarZeroAfterCtrlPgUp(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase13Batch2ScrollBarEqualsNewTopIndexAfterCtrlPgDn verifies
-// that after Ctrl+PgDn, scrollBar.Value() equals the new topIndex (15 for 20 items, height=5).
+// that after Ctrl+PgDn, the scrollbar tracks selected (clamped by scrollbar range).
+// With 20 items, height=5: selected=19, max=19, pageSize=5, effectiveMax=14.
+// The scrollbar value is clamped to 14.
 func TestIntegrationPhase13Batch2ScrollBarEqualsNewTopIndexAfterCtrlPgDn(t *testing.T) {
 	lv := newLVFocused(items20()) // 20 items, height=5, topIndex=0
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -314,16 +317,18 @@ func TestIntegrationPhase13Batch2ScrollBarEqualsNewTopIndexAfterCtrlPgDn(t *test
 
 	lv.HandleEvent(ctrlPgDnEv())
 
+	lastItem := lv.dataSource.Count() - 1 // 19
+	if lv.Selected() != lastItem {
+		t.Errorf("Ctrl+PgDn: Selected()=%d, want %d", lv.Selected(), lastItem)
+	}
 	wantTopIndex := lv.dataSource.Count() - lv.visibleHeight() // 20-5=15
 	if lv.TopIndex() != wantTopIndex {
 		t.Errorf("Ctrl+PgDn: TopIndex()=%d, want %d", lv.TopIndex(), wantTopIndex)
 	}
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("Ctrl+PgDn: ScrollBar.Value()=%d != TopIndex()=%d; must be equal",
-			sb.Value(), lv.TopIndex())
-	}
-	if sb.Value() != wantTopIndex {
-		t.Errorf("Ctrl+PgDn: ScrollBar.Value()=%d, want %d", sb.Value(), wantTopIndex)
+	// Scrollbar tracks selected but is clamped to max-pageSize = 19-5 = 14.
+	wantSBValue := sb.Max() - sb.PageSize() // effectiveMax
+	if sb.Value() != wantSBValue {
+		t.Errorf("Ctrl+PgDn: ScrollBar.Value()=%d, want %d (clamped selected)", sb.Value(), wantSBValue)
 	}
 }
 

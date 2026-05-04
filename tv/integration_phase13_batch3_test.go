@@ -197,7 +197,7 @@ func TestIntegrationPhase13Batch3SubsequentMoveAfterReleaseDoesNotDrag(t *testin
 // ---------------------------------------------------------------------------
 
 // TestIntegrationPhase13Batch3ScrollBarSyncDuringDrag verifies that the scrollbar
-// value equals topIndex after each event in a full drag sequence.
+// value equals selected after each event in a full drag sequence.
 func TestIntegrationPhase13Batch3ScrollBarSyncDuringDrag(t *testing.T) {
 	lv := newLVFocused(items20())
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -205,20 +205,20 @@ func TestIntegrationPhase13Batch3ScrollBarSyncDuringDrag(t *testing.T) {
 
 	// Press.
 	lv.HandleEvent(intDragPress(0, 0))
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after press: ScrollBar.Value()=%d, TopIndex()=%d; must match", sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after press: ScrollBar.Value()=%d, Selected()=%d; must match", sb.Value(), lv.Selected())
 	}
 
 	// Drag within bounds.
 	lv.HandleEvent(intDragMove(0, 3))
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after drag to row 3: ScrollBar.Value()=%d, TopIndex()=%d; must match", sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after drag to row 3: ScrollBar.Value()=%d, Selected()=%d; must match", sb.Value(), lv.Selected())
 	}
 
 	// Release.
 	lv.HandleEvent(intDragRelease(0, 3))
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after release: ScrollBar.Value()=%d, TopIndex()=%d; must match", sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after release: ScrollBar.Value()=%d, Selected()=%d; must match", sb.Value(), lv.Selected())
 	}
 }
 
@@ -233,9 +233,9 @@ func TestIntegrationPhase13Batch3ScrollBarSyncDuringAutoScrollUp(t *testing.T) {
 	lv.HandleEvent(intDragPress(0, 0))
 	lv.HandleEvent(intDragMove(0, -1)) // auto-scroll up
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after auto-scroll up: ScrollBar.Value()=%d, TopIndex()=%d; must match",
-			sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after auto-scroll up: ScrollBar.Value()=%d, Selected()=%d; must match",
+			sb.Value(), lv.Selected())
 	}
 }
 
@@ -249,9 +249,9 @@ func TestIntegrationPhase13Batch3ScrollBarSyncDuringAutoScrollDown(t *testing.T)
 	lv.HandleEvent(intDragPress(0, 0))
 	lv.HandleEvent(intDragMove(0, lv.visibleHeight())) // auto-scroll down
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after auto-scroll down: ScrollBar.Value()=%d, TopIndex()=%d; must match",
-			sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after auto-scroll down: ScrollBar.Value()=%d, Selected()=%d; must match",
+			sb.Value(), lv.Selected())
 	}
 }
 

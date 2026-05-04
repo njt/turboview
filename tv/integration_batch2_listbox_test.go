@@ -93,13 +93,14 @@ func TestIntegrationBatch2ListBoxScrollbarSyncsOnNavigationPastVisible(t *testin
 	}
 
 	// selected=5, visibleHeight=5 → selected >= topIndex+5 → topIndex = 5-5+1 = 1.
+	// Scrollbar tracks selected, so its value should equal Selected().
 	if lb.scrollbar.Value() <= 0 {
 		t.Errorf("after navigating past visible area, ScrollBar.Value() = %d, want > 0",
 			lb.scrollbar.Value())
 	}
-	if lb.viewer.TopIndex() != lb.scrollbar.Value() {
-		t.Errorf("ScrollBar.Value() = %d does not match ListViewer.TopIndex() = %d",
-			lb.scrollbar.Value(), lb.viewer.TopIndex())
+	if lb.viewer.Selected() != lb.scrollbar.Value() {
+		t.Errorf("ScrollBar.Value() = %d does not match ListViewer.Selected() = %d",
+			lb.scrollbar.Value(), lb.viewer.Selected())
 	}
 }
 

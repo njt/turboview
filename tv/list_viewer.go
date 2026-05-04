@@ -85,8 +85,7 @@ func (lv *ListViewer) SetScrollBar(sb *ScrollBar) {
 	lv.scrollBar = sb
 	if sb != nil {
 		sb.OnChange = func(val int) {
-			lv.topIndex = val
-			lv.clampTopIndex()
+			lv.SetSelected(val)
 		}
 		lv.syncScrollBar()
 	}
@@ -142,15 +141,20 @@ func (lv *ListViewer) syncScrollBar() {
 		return
 	}
 	count := lv.dataSource.Count()
-	lv.scrollBar.SetRange(0, count)
+	maxVal := count - 1
+	if maxVal < 0 {
+		maxVal = 0
+	}
+	lv.scrollBar.SetRange(0, maxVal)
 	lv.scrollBar.SetPageSize(lv.itemsPerPage())
-	lv.scrollBar.SetValue(lv.topIndex)
+	lv.scrollBar.SetValue(lv.selected)
 	vh := lv.visibleHeight()
 	if vh < 1 {
 		vh = 1
 	}
-	// Only set arStep if it hasn't been customised (i.e. still at the default of 1).
-	if lv.scrollBar.ArStep() == 1 {
+	if lv.numCols == 1 {
+		lv.scrollBar.SetArStep(1)
+	} else {
 		lv.scrollBar.SetArStep(vh)
 	}
 }

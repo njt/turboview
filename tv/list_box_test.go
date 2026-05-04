@@ -468,9 +468,9 @@ func TestScrollBarOnChangeUpdatesBehavior(t *testing.T) {
 	// Fire the OnChange callback as if the user scrolled to position 5
 	sb.OnChange(5)
 
-	// The ListViewer's topIndex must have been updated
-	if lb.ListViewer().TopIndex() != 5 {
-		t.Errorf("after OnChange(5), ListViewer.TopIndex() = %d, want 5 (wiring not working)",
-			lb.ListViewer().TopIndex())
+	// The ListViewer's selected must have been updated (scrollbar tracks selected)
+	if lb.ListViewer().Selected() != 5 {
+		t.Errorf("after OnChange(5), ListViewer.Selected() = %d, want 5 (wiring not working)",
+			lb.ListViewer().Selected())
 	}
 }

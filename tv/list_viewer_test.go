@@ -17,6 +17,7 @@ package tv
 //   Section 9  — Scroll adjustment tests (selected < topIndex, selected >= topIndex + visibleHeight)
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
@@ -512,7 +513,7 @@ func TestOnSelectMouseClickReceivesClickedIndex(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestSetScrollBarSyncsRange verifies SetScrollBar sets the scrollbar range.
-// Spec: "ScrollBar range: min=0, max=dataSource.Count(), pageSize=visible height"
+// Spec: "ScrollBar range: min=0, max=dataSource.Count()-1, pageSize=visible height"
 func TestSetScrollBarSyncsRange(t *testing.T) {
 	lv := newLV([]string{"a", "b", "c", "d", "e", "f", "g", "h"})
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -521,8 +522,8 @@ func TestSetScrollBarSyncsRange(t *testing.T) {
 	if sb.Min() != 0 {
 		t.Errorf("ScrollBar Min() = %d, want 0", sb.Min())
 	}
-	if sb.Max() != 8 {
-		t.Errorf("ScrollBar Max() = %d, want 8 (Count()=8)", sb.Max())
+	if sb.Max() != 7 {
+		t.Errorf("ScrollBar Max() = %d, want 7 (Count()-1=7)", sb.Max())
 	}
 }
 
@@ -539,21 +540,27 @@ func TestSetScrollBarSyncsPageSize(t *testing.T) {
 	}
 }
 
-// TestSetScrollBarSyncsValue verifies SetScrollBar sets the scrollbar value to topIndex.
-// Spec: "ScrollBar value: topIndex"
+// TestSetScrollBarSyncsValue verifies SetScrollBar sets the scrollbar value to selected.
+// Spec: "ScrollBar value: selected"
 func TestSetScrollBarSyncsValue(t *testing.T) {
-	lv := newLV([]string{"a", "b", "c", "d", "e", "f", "g", "h"})
-	lv.SetSelected(7) // force scroll so topIndex > 0
+	// Use 20 items so selected=7 is well within the scrollbar's effective range
+	// (max=19, pageSize=5, effectiveMax=14; 7 <= 14).
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("item%d", i)
+	}
+	lv := newLV(items)
+	lv.SetSelected(7) // force scroll so selected > 0
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
 	lv.SetScrollBar(sb)
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("ScrollBar Value() = %d, want %d (topIndex)", sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("ScrollBar Value() = %d, want %d (selected)", sb.Value(), lv.Selected())
 	}
 }
 
-// TestScrollBarOnChangeUpdatesTopIndex verifies ScrollBar's OnChange handler updates ListViewer topIndex.
-// Spec: "ScrollBar's OnChange is set to update ListViewer's topIndex when user interacts with the scrollbar"
+// TestScrollBarOnChangeUpdatesSelected verifies ScrollBar's OnChange handler updates ListViewer selected.
+// Spec: "ScrollBar's OnChange is set to update ListViewer's selected when user interacts with the scrollbar"
 func TestScrollBarOnChangeUpdatesTopIndex(t *testing.T) {
 	lv := newLV([]string{"a", "b", "c", "d", "e", "f", "g", "h"})
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
@@ -565,8 +572,8 @@ func TestScrollBarOnChangeUpdatesTopIndex(t *testing.T) {
 	}
 	sb.OnChange(3)
 
-	if lv.TopIndex() != 3 {
-		t.Errorf("after OnChange(3): TopIndex() = %d, want 3", lv.TopIndex())
+	if lv.Selected() != 3 {
+		t.Errorf("after OnChange(3): Selected() = %d, want 3", lv.Selected())
 	}
 }
 
@@ -606,7 +613,12 @@ func TestSetScrollBarNilUnbinds(t *testing.T) {
 // TestScrollBarUpdatedOnSelectionChange verifies bound scrollbar is updated when selection changes.
 // Spec: "After any state change that modifies topIndex or selected, update the bound ScrollBar (if any)"
 func TestScrollBarUpdatedOnSelectionChange(t *testing.T) {
-	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	// Use 20 items so selected=7 is within the scrollbar's effective range
+	// (max=19, pageSize=5, effectiveMax=14; 7 <= 14).
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("item%d", i)
+	}
 	lv := newLV(items)
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
 	lv.SetScrollBar(sb)
@@ -618,9 +630,9 @@ func TestScrollBarUpdatedOnSelectionChange(t *testing.T) {
 		lv.HandleEvent(ev)
 	}
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("after scrolling down, ScrollBar Value()=%d but TopIndex()=%d; scrollbar not updated",
-			sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("after scrolling down, ScrollBar Value()=%d but Selected()=%d; scrollbar not updated",
+			sb.Value(), lv.Selected())
 	}
 }
 
@@ -634,8 +646,8 @@ func TestScrollBarUpdatedOnSetDataSource(t *testing.T) {
 	newDS := NewStringList([]string{"x", "y", "z", "w", "v", "u", "t"})
 	lv.SetDataSource(newDS)
 
-	if sb.Max() != newDS.Count() {
-		t.Errorf("after SetDataSource, ScrollBar Max()=%d, want %d (new count)", sb.Max(), newDS.Count())
+	if sb.Max() != newDS.Count()-1 {
+		t.Errorf("after SetDataSource, ScrollBar Max()=%d, want %d (new count-1)", sb.Max(), newDS.Count()-1)
 	}
 }
 
@@ -1315,5 +1327,52 @@ func TestScrollAdjustTopBoundaryExact(t *testing.T) {
 
 	if lv.TopIndex() != 3 {
 		t.Errorf("SetSelected(3) == topIndex=3: TopIndex()=%d, want 3 (no change)", lv.TopIndex())
+	}
+}
+
+func TestScrollBarTracksSelectedNotTopIndex(t *testing.T) {
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i)
+	}
+	lv := newLV(items)
+	lv.SetNumCols(2)
+	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
+	lv.SetScrollBar(sb)
+
+	lv.SetSelected(5)
+
+	if sb.Value() != 5 {
+		t.Errorf("ScrollBar.Value() = %d, want 5 (should track selected, not topIndex)", sb.Value())
+	}
+}
+
+func TestScrollBarOnChangeSetsSelected(t *testing.T) {
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i)
+	}
+	lv := newLV(items)
+	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
+	lv.SetScrollBar(sb)
+
+	sb.OnChange(7)
+
+	if lv.Selected() != 7 {
+		t.Errorf("after OnChange(7): Selected() = %d, want 7", lv.Selected())
+	}
+}
+
+func TestScrollBarRangeIsCountMinusOne(t *testing.T) {
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i)
+	}
+	lv := newLV(items)
+	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
+	lv.SetScrollBar(sb)
+
+	if sb.Max() != 19 {
+		t.Errorf("ScrollBar.Max() = %d, want 19 (count-1)", sb.Max())
 	}
 }

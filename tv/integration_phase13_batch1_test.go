@@ -436,16 +436,18 @@ func TestIntegrationPhase13NavigationKeepsScrollBarInSync(t *testing.T) {
 		lv.HandleEvent(listKeyEv(tcell.KeyDown))
 	}
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("task 1+scrollbar: after navigation, ScrollBar.Value()=%d but TopIndex()=%d; must be equal",
-			sb.Value(), lv.TopIndex())
+	if sb.Value() != lv.Selected() {
+		t.Errorf("task 1+scrollbar: after navigation, ScrollBar.Value()=%d but Selected()=%d; must be equal",
+			sb.Value(), lv.Selected())
 	}
 }
 
 // TestIntegrationPhase13DoubleClickKeepsScrollBarInSync verifies that a double-click
 // on a scrolled list does not break ScrollBar synchronisation.
 func TestIntegrationPhase13DoubleClickKeepsScrollBarInSync(t *testing.T) {
-	items := make([]string, 15)
+	// Use 20 items so selected values stay within the scrollbar's effective range
+	// (max=19, pageSize=5, effectiveMax=14).
+	items := make([]string, 20)
 	for i := range items {
 		items[i] = "x"
 	}
@@ -453,20 +455,22 @@ func TestIntegrationPhase13DoubleClickKeepsScrollBarInSync(t *testing.T) {
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
 	lv.SetScrollBar(sb)
 
-	// Scroll to bottom using SetSelected to set a known topIndex.
-	lv.SetSelected(14) // topIndex = 14 - 5 + 1 = 10
+	// Scroll so topIndex=5 by selecting item 9.
+	lv.SetSelected(9) // topIndex = 9 - 5 + 1 = 5
 
 	topIdx := lv.TopIndex()
-	if topIdx != 10 {
-		t.Fatalf("prerequisite: TopIndex()=%d, want 10 after SetSelected(14)", topIdx)
+	if topIdx != 5 {
+		t.Fatalf("prerequisite: TopIndex()=%d, want 5 after SetSelected(9)", topIdx)
 	}
 
 	lv.OnSelect = func(index int) {}
+	// Double-click at y=2 → selected = topIndex + 2 = 5 + 2 = 7
 	doubleClickEv := &Event{What: EvMouse, Mouse: &MouseEvent{X: 0, Y: 2, Button: tcell.Button1, ClickCount: 2}}
 	lv.HandleEvent(doubleClickEv)
 
-	if sb.Value() != lv.TopIndex() {
-		t.Errorf("task 3+scrollbar: after double-click, ScrollBar.Value()=%d but TopIndex()=%d; must be equal",
-			sb.Value(), lv.TopIndex())
+	// selected=7, which is within effectiveMax=14, so scrollbar value = selected.
+	if sb.Value() != lv.Selected() {
+		t.Errorf("task 3+scrollbar: after double-click, ScrollBar.Value()=%d but Selected()=%d; must be equal",
+			sb.Value(), lv.Selected())
 	}
 }

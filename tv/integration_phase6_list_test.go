@@ -57,11 +57,11 @@ func makeListWindow(items []string) (*Window, *ListViewer, *ScrollBar) {
 
 // TestIntegrationPhase6ListScrollBarDownArrowUpdatesTopIndex verifies that a
 // mouse click on the ScrollBar's down arrow — routed through the Window's client
-// area dispatch chain — updates the ListViewer's topIndex via the OnChange
+// area dispatch chain — updates the ListViewer's selected via the OnChange
 // callback that SetScrollBar installs.
 //
-// syncScrollBar sets arStep = visibleHeight() = 8, so one down-arrow click
-// steps by 8.
+// syncScrollBar sets arStep = 1 for single-column, so one down-arrow click
+// steps selected by 1.
 //
 // Layout (window-local coordinates):
 //   - Client area starts at (1,1) in window coords (1-cell frame).
@@ -71,9 +71,9 @@ func TestIntegrationPhase6ListScrollBarDownArrowUpdatesTopIndex(t *testing.T) {
 	// Use 20 items so there is content to scroll.
 	win, lv, sb := makeListWindow(makeItems(20))
 
-	// Preconditions: topIndex must start at 0.
-	if lv.TopIndex() != 0 {
-		t.Fatalf("pre-condition: ListViewer.TopIndex() = %d, want 0", lv.TopIndex())
+	// Preconditions: selected must start at 0.
+	if lv.Selected() != 0 {
+		t.Fatalf("pre-condition: ListViewer.Selected() = %d, want 0", lv.Selected())
 	}
 
 	// To route the mouse click to the ScrollBar, the ScrollBar must be the focused
@@ -86,36 +86,36 @@ func TestIntegrationPhase6ListScrollBarDownArrowUpdatesTopIndex(t *testing.T) {
 	downArrowEv := clickEvent(28, 8, tcell.Button1)
 	win.HandleEvent(downArrowEv)
 
-	// SetScrollBar wires sb.OnChange to set lv.topIndex = val.
-	// syncScrollBar sets arStep = visibleHeight() = 8, so one step-down moves by 8.
-	if lv.TopIndex() != 8 {
-		t.Errorf("after ScrollBar down-arrow click, ListViewer.TopIndex() = %d, want 8 (arStep=visibleHeight=8)", lv.TopIndex())
+	// SetScrollBar wires sb.OnChange to call lv.SetSelected(val).
+	// syncScrollBar sets arStep = 1 for single-column, so one step-down moves by 1.
+	if lv.Selected() != 1 {
+		t.Errorf("after ScrollBar down-arrow click, ListViewer.Selected() = %d, want 1 (arStep=1)", lv.Selected())
 	}
 
-	// ScrollBar value should also be 8.
-	if sb.Value() != 8 {
-		t.Errorf("after ScrollBar down-arrow click, ScrollBar.Value() = %d, want 8", sb.Value())
+	// ScrollBar value should also be 1 (tracks selected).
+	if sb.Value() != 1 {
+		t.Errorf("after ScrollBar down-arrow click, ScrollBar.Value() = %d, want 1", sb.Value())
 	}
 }
 
 // TestIntegrationPhase6ListScrollBarMultipleDownArrowsAccumulate verifies that
 // three down-arrow clicks accumulate correctly.
-// syncScrollBar sets arStep = visibleHeight() = 8, so each click steps by 8.
-// With range [0,20] and pageSize=8, max = 20-8 = 12; 3 clicks → min(3*8, 12) = 12.
+// syncScrollBar sets arStep = 1 for single-column, so each click steps by 1.
+// Range is [0, 19] (count-1). 3 clicks from 0 → selected=3.
 func TestIntegrationPhase6ListScrollBarMultipleDownArrowsAccumulate(t *testing.T) {
 	win, lv, sb := makeListWindow(makeItems(20))
 	win.SetFocusedChild(sb)
 
-	// Click down arrow 3 times (each steps by arStep=8, clamped to max=12).
+	// Click down arrow 3 times (each steps by arStep=1).
 	for i := 0; i < 3; i++ {
 		win.HandleEvent(clickEvent(28, 8, tcell.Button1))
 	}
 
-	if lv.TopIndex() != 12 {
-		t.Errorf("after 3 ScrollBar down-arrow clicks, TopIndex() = %d, want 12 (clamped to max=20-8)", lv.TopIndex())
+	if lv.Selected() != 3 {
+		t.Errorf("after 3 ScrollBar down-arrow clicks, Selected() = %d, want 3", lv.Selected())
 	}
-	if sb.Value() != 12 {
-		t.Errorf("after 3 ScrollBar down-arrow clicks, ScrollBar.Value() = %d, want 12", sb.Value())
+	if sb.Value() != 3 {
+		t.Errorf("after 3 ScrollBar down-arrow clicks, ScrollBar.Value() = %d, want 3", sb.Value())
 	}
 }
 
@@ -125,7 +125,7 @@ func TestIntegrationPhase6ListScrollBarMultipleDownArrowsAccumulate(t *testing.T
 
 // TestIntegrationPhase6ListKeyboardDownUpdatesBoundScrollBar verifies that
 // pressing the Down arrow key while a ListViewer is focused inside a Window
-// advances the selection and syncs the ScrollBar.
+// advances the selection and syncs the ScrollBar (which tracks selected).
 func TestIntegrationPhase6ListKeyboardDownUpdatesBoundScrollBar(t *testing.T) {
 	win, lv, sb := makeListWindow(makeItems(20))
 	// ListViewer is already focused (makeListWindow sets it).
@@ -142,28 +142,26 @@ func TestIntegrationPhase6ListKeyboardDownUpdatesBoundScrollBar(t *testing.T) {
 		t.Errorf("after Down, Selected() = %d, want 1", lv.Selected())
 	}
 
-	// ScrollBar value: selected=1 is within topIndex+visibleHeight (0+8=8), so
-	// topIndex stays 0 and scrollBar value stays 0.
-	if sb.Value() != 0 {
-		t.Errorf("after Down (still visible), ScrollBar.Value() = %d, want 0", sb.Value())
+	// ScrollBar tracks selected, so value should be 1.
+	if sb.Value() != 1 {
+		t.Errorf("after Down, ScrollBar.Value() = %d, want 1 (tracks selected)", sb.Value())
 	}
 
 	// Press Down 7 more times to move selection to index 8 (beyond visible range).
 	for i := 0; i < 7; i++ {
 		win.HandleEvent(listKeyEv(tcell.KeyDown))
 	}
-	// selected=8, topIndex should shift to 1 (8 - 8 + 1 = 1).
-	wantTopIndex := 1
-	if lv.TopIndex() != wantTopIndex {
-		t.Errorf("after 8 Down presses, TopIndex() = %d, want %d", lv.TopIndex(), wantTopIndex)
+	// selected=8, scrollbar should track selected.
+	if lv.Selected() != 8 {
+		t.Errorf("after 8 Down presses, Selected() = %d, want 8", lv.Selected())
 	}
-	if sb.Value() != wantTopIndex {
-		t.Errorf("after 8 Down presses, ScrollBar.Value() = %d, want %d", sb.Value(), wantTopIndex)
+	if sb.Value() != 8 {
+		t.Errorf("after 8 Down presses, ScrollBar.Value() = %d, want 8 (tracks selected)", sb.Value())
 	}
 }
 
 // TestIntegrationPhase6ListKeyboardPgDnUpdatesBoundScrollBar verifies that
-// PgDn advances selection by visibleHeight and syncs the ScrollBar.
+// PgDn advances selection by visibleHeight and syncs the ScrollBar (which tracks selected).
 func TestIntegrationPhase6ListKeyboardPgDnUpdatesBoundScrollBar(t *testing.T) {
 	win, lv, sb := makeListWindow(makeItems(20))
 
@@ -178,8 +176,9 @@ func TestIntegrationPhase6ListKeyboardPgDnUpdatesBoundScrollBar(t *testing.T) {
 	if lv.TopIndex() != 1 {
 		t.Errorf("after PgDn, TopIndex() = %d, want 1", lv.TopIndex())
 	}
-	if sb.Value() != 1 {
-		t.Errorf("after PgDn, ScrollBar.Value() = %d, want 1", sb.Value())
+	// ScrollBar tracks selected, so value should be 8.
+	if sb.Value() != 8 {
+		t.Errorf("after PgDn, ScrollBar.Value() = %d, want 8 (tracks selected)", sb.Value())
 	}
 }
 
