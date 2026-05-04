@@ -10,7 +10,7 @@ type ColorItem struct {
 type ColorGroup struct {
 	Name        string
 	Items       []ColorItem
-	lastFocused int
+	LastFocused int
 }
 
 // ColorGroupDataSource implements ListDataSource for a []ColorGroup.

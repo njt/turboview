@@ -90,7 +90,7 @@ func TestNewColorItemDataSourceItemNeg1(t *testing.T) {
 }
 
 // TestColorGroupFields verifies ColorGroup has correct fields and
-// lastFocused starts at 0 (zero value of int).
+// LastFocused starts at 0 (zero value of int).
 func TestColorGroupFields(t *testing.T) {
 	cg := ColorGroup{Name: "Test", Items: []ColorItem{{"A", 1}}}
 	if cg.Name != "Test" {
@@ -99,8 +99,8 @@ func TestColorGroupFields(t *testing.T) {
 	if len(cg.Items) != 1 {
 		t.Errorf("Items len = %d, want 1", len(cg.Items))
 	}
-	if cg.lastFocused != 0 {
-		t.Errorf("lastFocused = %d, want 0", cg.lastFocused)
+	if cg.LastFocused != 0 {
+		t.Errorf("LastFocused = %d, want 0", cg.LastFocused)
 	}
 }
 
