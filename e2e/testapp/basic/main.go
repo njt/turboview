@@ -30,6 +30,9 @@ func main() {
 			tv.NewMenuItem("~R~eplace...", tv.CmReplace, tv.KbCtrl('H')),
 			tv.NewMenuItem("~S~earch Again", tv.CmSearchAgain, tv.KbFunc(3)),
 		),
+		tv.NewSubMenu("~O~ptions",
+			tv.NewMenuItem("~C~olors...", tv.CmUser+30, tv.KbNone()),
+		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
 			tv.NewMenuItem("~C~ascade", tv.CmCascade, tv.KbNone()),
@@ -69,6 +72,11 @@ func main() {
 						st.SetText("Opened: " + fn)
 					}
 				}
+				return true
+			}
+			if cmd == tv.CmUser+30 {
+				cd := tv.NewColorDialog(nil, nil)
+				app.Desktop().ExecView(cd)
 				return true
 			}
 			return false

@@ -2173,3 +2173,84 @@ func TestFileDialogSelectFile(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+func TestColorDialogRenderAndCancel(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-colordlg"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Right x2 reaches Options, Enter opens, C for Colors
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "C")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Colors") {
+		t.Fatal("ColorDialog title 'Colors' not visible")
+	}
+	if !containsAny(lines, "Group") {
+		t.Fatal("Group label not visible in ColorDialog")
+	}
+	if !containsAny(lines, "Foreground") {
+		t.Fatal("Foreground label not visible in ColorDialog")
+	}
+
+	// Cancel the dialog with Escape
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestColorDialogOK(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-colorok"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Open Options > Colors
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "C")
+	time.Sleep(500 * time.Millisecond)
+
+	// Press Enter to accept (OK is default button)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(300 * time.Millisecond)
+
+	// Dialog should be gone, desktop visible
+	lines := tmuxCapture(t, session)
+	if containsAny(lines, "Colors") {
+		t.Error("ColorDialog should be closed after Enter")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
