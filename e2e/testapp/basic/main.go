@@ -158,6 +158,31 @@ Line 16: Last line of demo content.`)
 	win2.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 	listBox.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 
+	// Window 4 — Outline (tree viewer with scrollbar)
+	goMod := tv.NewNode("go.mod", nil, nil)
+
+	e2eTest := tv.NewNode("e2e_test.go", nil, nil)
+	tests := tv.NewNode("tests", e2eTest, goMod) // tests.Next = goMod
+
+	design := tv.NewNode("DESIGN.md", nil, nil)
+	readme := tv.NewNode("README.md", nil, design) // README.Next = DESIGN
+	docs := tv.NewNode("docs", readme, tests)       // docs.Next = tests
+
+	utilGo := tv.NewNode("util.go", nil, nil)
+	mainGo := tv.NewNode("main.go", nil, utilGo) // main.Next = util
+	src := tv.NewNode("src", mainGo, docs)         // src.Next = docs
+
+	project := tv.NewNode("Project", src, nil)
+
+	outline := tv.NewOutline(tv.NewRect(1, 1, 28, 13), project)
+	vsb := tv.NewScrollBar(tv.NewRect(29, 1, 1, 13), tv.Vertical)
+	outline.SetVScrollBar(vsb)
+
+	win4 := tv.NewWindow(tv.NewRect(2, 4, 31, 15), "Outline", tv.WithWindowNumber(4))
+	win4.Insert(outline)
+	win4.Insert(vsb)
+
+	app.Desktop().Insert(win4)
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win3)
 	app.Desktop().Insert(win2)

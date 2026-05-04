@@ -1090,9 +1090,11 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 		t.Fatal("win2 'Editor' not visible before tile")
 	}
 
-	// Open Window menu: F10 → Right → Right (skip Edit, land on Window) → Enter (open popup) → Enter (select Tile)
+	// Open Window menu: F10 → Right x3 (skip Edit, Options, land on Window) → Enter (open popup) → Enter (select Tile)
 	tmuxSendKeys(t, session, "F10")
 	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Right")
 	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Right")
@@ -1444,7 +1446,7 @@ func TestF6NextWindow(t *testing.T) {
 	// Verify some other window got the active frame
 	switchedToOther := false
 	for _, line := range lines {
-		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor")) && strings.Contains(line, "═")
+		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor") || strings.Contains(line, "Outline")) && strings.Contains(line, "═")
 		if otherActive {
 			switchedToOther = true
 			break
@@ -2206,6 +2208,126 @@ func TestColorDialogRenderAndCancel(t *testing.T) {
 	// Cancel the dialog with Escape
 	tmuxSendKeys(t, session, "Escape")
 	time.Sleep(300 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineWindowShowsTree(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4 (Outline) with Alt+4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify "Outline" window title visible
+	if !containsAny(lines, "Outline") {
+		t.Error("Outline window title not visible")
+	}
+
+	// Verify tree content visible
+	if !containsAny(lines, "Project") {
+		t.Error("'Project' not visible in Outline window")
+	}
+	if !containsAny(lines, "src") {
+		t.Error("'src' not visible in Outline window")
+	}
+	if !containsAny(lines, "main.go") {
+		t.Error("'main.go' not visible in Outline window")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineCollapseExpand(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline-collapse"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	// Navigate to "src" (Down from Project)
+	tmuxSendKeys(t, session, "Down")
+
+	// Collapse src with '-'
+	tmuxSendKeys(t, session, "-")
+
+	lines := tmuxCapture(t, session)
+	// main.go and util.go should be hidden
+	if containsAny(lines, "main.go") {
+		t.Error("'main.go' should be hidden after collapsing src")
+	}
+	if containsAny(lines, "util.go") {
+		t.Error("'util.go' should be hidden after collapsing src")
+	}
+	// src should still be visible
+	if !containsAny(lines, "src") {
+		t.Error("'src' should still be visible after collapse")
+	}
+
+	// Expand src with '+'
+	tmuxSendKeys(t, session, "+")
+
+	lines = tmuxCapture(t, session)
+	// main.go should reappear
+	if !containsAny(lines, "main.go") {
+		t.Error("'main.go' should reappear after expanding src")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineKeyboardNavigation(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline-nav"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	// Navigate down several times, then back up
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+
+	lines := tmuxCapture(t, session)
+	// Tree should still be visible and navigable
+	if !containsAny(lines, "Project") {
+		t.Error("'Project' should be visible after navigation")
+	}
+	if !containsAny(lines, "docs") {
+		t.Error("'docs' should be visible after navigation")
+	}
 
 	// Clean exit
 	tmuxSendKeys(t, session, "M-x")
