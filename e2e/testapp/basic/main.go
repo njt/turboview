@@ -21,7 +21,7 @@ func main() {
 	menuBar := tv.NewMenuBar(
 		tv.NewSubMenu("~F~ile",
 			tv.NewMenuItem("~N~ew", tv.CmUser+1, tv.KbCtrl('N')),
-			tv.NewMenuItem("~O~pen...", tv.CmUser+2, tv.KbCtrl('O')),
+			tv.NewMenuItem("~O~pen...", tv.CmFileOpen, tv.KbFunc(3)),
 			tv.NewMenuSeparator(),
 			tv.NewMenuItem("E~x~it", tv.CmQuit, tv.KbAlt('X')),
 		),
@@ -57,6 +57,17 @@ func main() {
 				text, result := tv.InputBox(app.Desktop(), "Open File", "~N~ame:", "untitled.txt")
 				if result == tv.CmOK {
 					st.SetText("File: " + text)
+				}
+				return true
+			}
+			if cmd == tv.CmFileOpen {
+				fd := tv.NewFileDialogInDir(".", "*.go", "Open File", tv.FdOpenButton)
+				result := app.Desktop().ExecView(fd)
+				if result == tv.CmOK {
+					fn := fd.FileName()
+					if fn != "" {
+						st.SetText("Opened: " + fn)
+					}
 				}
 				return true
 			}

@@ -2064,3 +2064,112 @@ func TestEditWindowIndicatorVisible(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+func TestFileDialogOpenVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-fileopen"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Open...") {
+		t.Fatal("File > Open menu item not visible")
+	}
+
+	// Dismiss menu
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestFileDialogRenderAndClose(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-filedlg"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu, O selects Open...
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "O")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Open File") {
+		t.Fatal("FileDialog title 'Open File' not visible")
+	}
+	if !containsAny(lines, "Files") {
+		t.Fatal("Files label not visible in FileDialog")
+	}
+
+	// Cancel the dialog with Escape
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestFileDialogSelectFile(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-filesel"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu, O selects Open...
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "O")
+	time.Sleep(800 * time.Millisecond)
+
+	// Clear the wildcard and type a filename in the focused FileInputLine
+	for i := 0; i < 10; i++ {
+		tmuxSendKeys(t, session, "BSpace")
+	}
+	tmuxSendKeys(t, session, "testfile.txt")
+	time.Sleep(200 * time.Millisecond)
+
+	// Press Enter to accept
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify result appears in the static text area
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Opened:") {
+		t.Fatal("'Opened:' text not found after file selection")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}

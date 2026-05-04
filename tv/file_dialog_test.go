@@ -372,6 +372,9 @@ func TestFileDialog_HandleEvent_CmFileClearClearsInput(t *testing.T) {
 // Spec: "CmFileOpen: remaps to CmOK (process as OK)"
 func TestFileDialog_HandleEvent_CmFileOpenRemapsToCmOK(t *testing.T) {
 	fd := newFileDialogTest(t, FdOpenButton)
+	// Set a filename that passes Valid() — the test dir has no files,
+	// so any non-wildcard, non-directory name will be classified as a filename.
+	fd.fileInput.SetText("test.go")
 
 	ev := &Event{What: EvCommand, Command: CmFileOpen}
 	fd.HandleEvent(ev)
@@ -391,6 +394,7 @@ func TestFileDialog_HandleEvent_CmFileOpenRemapsToCmOK(t *testing.T) {
 // Spec: "CmFileReplace: remaps to CmOK"
 func TestFileDialog_HandleEvent_CmFileReplaceRemapsToCmOK(t *testing.T) {
 	fd := newFileDialogTest(t, FdReplaceButton)
+	fd.fileInput.SetText("test.go")
 
 	ev := &Event{What: EvCommand, Command: CmFileReplace}
 	fd.HandleEvent(ev)

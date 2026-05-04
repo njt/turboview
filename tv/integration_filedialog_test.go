@@ -254,13 +254,15 @@ func TestIntegrationFileDialog_CmFileClearResetsInputAndPath(t *testing.T) {
 // =============================================================================
 // 7. CmFileOpen remaps to CmOK through HandleEvent
 //
-// FileDialog.HandleEvent remaps CmFileOpen (and CmFileReplace) to CmOK before
-// delegating to Dialog.HandleEvent. Sends CmFileOpen through HandleEvent and
-// verifies the event command becomes CmOK. Also verifies CmFileReplace remap.
+// FileDialog.HandleEvent remaps CmFileOpen (and CmFileReplace) to CmOK after
+// delegating to Dialog.HandleEvent (so it catches the Enter→CmDefault→button
+// press flow). Valid() is called on the remapped CmOK — input must contain a
+// valid filename for the event to survive. Also verifies CmFileReplace remap.
 // =============================================================================
 
 func TestIntegrationFileDialog_CmFileOpenRemapsToCmOK(t *testing.T) {
-	fd, _ := setupFileDialogForIntegration(t, 0)
+	fd, dir := setupFileDialogForIntegration(t, 0)
+	fd.fileInput.SetText("alpha.txt") // valid filename so Valid() succeeds
 
 	ev := &Event{What: EvCommand, Command: CmFileOpen}
 	fd.HandleEvent(ev)
@@ -271,12 +273,16 @@ func TestIntegrationFileDialog_CmFileOpenRemapsToCmOK(t *testing.T) {
 	if ev.IsCleared() {
 		t.Error("event must NOT be cleared after CmFileOpen remap — it continues as CmOK")
 	}
+	if fd.FileName() != filepath.Join(dir, "alpha.txt") {
+		t.Errorf("FileName() = %q, want %q", fd.FileName(), filepath.Join(dir, "alpha.txt"))
+	}
 }
 
 // TestIntegrationFileDialog_CmFileReplaceRemapsToCmOK verifies that
 // CmFileReplace is also remapped to CmOK (same pattern as CmFileOpen).
 func TestIntegrationFileDialog_CmFileReplaceRemapsToCmOK(t *testing.T) {
-	fd, _ := setupFileDialogForIntegration(t, FdReplaceButton)
+	fd, dir := setupFileDialogForIntegration(t, FdReplaceButton)
+	fd.fileInput.SetText("alpha.txt") // valid filename so Valid() succeeds
 
 	ev := &Event{What: EvCommand, Command: CmFileReplace}
 	fd.HandleEvent(ev)
@@ -286,6 +292,9 @@ func TestIntegrationFileDialog_CmFileReplaceRemapsToCmOK(t *testing.T) {
 	}
 	if ev.IsCleared() {
 		t.Error("event must NOT be cleared after CmFileReplace remap — it continues as CmOK")
+	}
+	if fd.FileName() != filepath.Join(dir, "alpha.txt") {
+		t.Errorf("FileName() = %q, want %q", fd.FileName(), filepath.Join(dir, "alpha.txt"))
 	}
 
 	// Verify the Replace button exists.
@@ -303,7 +312,6 @@ func TestIntegrationFileDialog_CmFileReplaceRemapsToCmOK(t *testing.T) {
 	}
 }
 
-// =============================================================================
 // 8. Dialog stays open on wildcard (Valid returns false)
 //
 // When the FileInputLine contains wildcard text (* or ?), Valid(CmOK) returns

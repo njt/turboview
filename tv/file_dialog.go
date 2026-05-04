@@ -179,22 +179,19 @@ func buildFileDialogButtons(flags FileDialogFlag) []fileDialogButtonDef {
 
 // HandleEvent intercepts commands before delegating to Dialog.
 func (fd *FileDialog) HandleEvent(event *Event) {
-	if event.What == EvCommand {
-		switch event.Command {
-		case CmFileClear:
-			fd.fileInput.Clear()
-			fd.resultPath = ""
-			event.Clear()
-			return
-		case CmFileOpen:
-			event.Command = CmOK
-			// fall through to delegation
-		case CmFileReplace:
-			event.Command = CmOK
-			// fall through to delegation
-		}
+	if event.What == EvCommand && event.Command == CmFileClear {
+		fd.fileInput.Clear()
+		fd.resultPath = ""
+		event.Clear()
+		return
 	}
 	fd.Dialog.HandleEvent(event)
+	if event.What == EvCommand && (event.Command == CmFileOpen || event.Command == CmFileReplace) {
+		event.Command = CmOK
+		if !fd.Valid(CmOK) {
+			event.Clear()
+		}
+	}
 }
 
 // FileName returns the resolved file path.
