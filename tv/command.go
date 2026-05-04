@@ -40,5 +40,10 @@ const (
 	CmFileFocused
 	CmFileFilter
 
+	CmColorForegroundChanged
+	CmColorBackgroundChanged
+	CmNewColorGroup
+	CmNewColorIndex
+
 	CmUser CommandCode = 1000
 )
