@@ -51,6 +51,10 @@ func init() {
 		ColorSelectorNormal: s(tcell.ColorLightGray, tcell.ColorBlack),
 		ColorSelectorCursor: s(tcell.ColorWhite, tcell.ColorBlack),
 		ColorDisplayText:    s(tcell.ColorWhite, tcell.ColorBlack),
+		OutlineNormal:    s(tcell.ColorBlack, tcell.ColorTeal),
+		OutlineFocused:   s(tcell.ColorYellow, tcell.ColorBlue),
+		OutlineSelected:  s(tcell.ColorWhite, tcell.ColorBlack),
+		OutlineCollapsed: s(tcell.ColorGreen, tcell.ColorTeal),
 	}
 
 	Register("borland-blue", BorlandBlue)

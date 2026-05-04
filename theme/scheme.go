@@ -44,4 +44,8 @@ type ColorScheme struct {
 	ColorSelectorNormal tcell.Style
 	ColorSelectorCursor tcell.Style
 	ColorDisplayText    tcell.Style
+	OutlineNormal    tcell.Style
+	OutlineFocused   tcell.Style
+	OutlineSelected  tcell.Style
+	OutlineCollapsed tcell.Style
 }
