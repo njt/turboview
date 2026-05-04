@@ -251,6 +251,7 @@ func (e *Editor) openFindDialog() {
 	cancelBtn := NewButton(NewRect(15, 6, 12, 2), "Cancel", CmCancel)
 	dlg.Insert(okBtn)
 	dlg.Insert(cancelBtn)
+	dlg.SetFocusedChild(searchInput)
 
 	result := owner.ExecView(dlg)
 	if result == CmOK {
@@ -316,6 +317,7 @@ func (e *Editor) openReplaceDialog() {
 	dlg.Insert(okBtn)
 	dlg.Insert(replAllBtn)
 	dlg.Insert(cancelBtn)
+	dlg.SetFocusedChild(searchInput)
 
 	result := owner.ExecView(dlg)
 	if result == CmOK || result == CmYes {

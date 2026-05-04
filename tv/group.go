@@ -177,6 +177,11 @@ func (g *Group) ExecView(v View) CommandCode {
 		return CmCancel
 	}
 
+	// Compute the screen offset of this group's coordinate space so we can
+	// translate screen-absolute mouse coordinates from PollEvent into group-local
+	// coordinates before comparing against the dialog's bounds.
+	offX, offY := g.screenOffset()
+
 	// Draw immediately so the modal view is visible before the first event
 	app.drawAndFlush()
 
@@ -192,10 +197,11 @@ func (g *Group) ExecView(v View) CommandCode {
 		// Route event to modal view only
 		if event.What == EvMouse && event.Mouse != nil {
 			vb := v.Bounds()
-			mx, my := event.Mouse.X, event.Mouse.Y
-			if vb.Contains(NewPoint(mx, my)) {
-				event.Mouse.X -= vb.A.X
-				event.Mouse.Y -= vb.A.Y
+			localX := event.Mouse.X - offX
+			localY := event.Mouse.Y - offY
+			if vb.Contains(NewPoint(localX, localY)) {
+				event.Mouse.X = localX - vb.A.X
+				event.Mouse.Y = localY - vb.A.Y
 				v.HandleEvent(event)
 			}
 			// Outside clicks are discarded
@@ -221,6 +227,38 @@ func (g *Group) ExecView(v View) CommandCode {
 	g.Remove(v)
 	v.SetState(SfModal, false)
 	return result
+}
+
+// screenOffset computes the accumulated offset from screen-absolute coordinates
+// to this group's local coordinate space. This walks up the owner chain, adding
+// each ancestor's bounds origin and frame offset (for Window and Dialog frames).
+func (g *Group) screenOffset() (int, int) {
+	offX, offY := 0, 0
+	var cur Container = g.facade
+	if cur == nil {
+		return 0, 0
+	}
+	for cur != nil {
+		view, ok := cur.(View)
+		if !ok {
+			break
+		}
+		b := view.Bounds()
+		offX += b.A.X
+		offY += b.A.Y
+		// Framed containers (Window, Dialog) offset their client area by (1,1)
+		switch cur.(type) {
+		case *Window, *Dialog:
+			offX++
+			offY++
+		}
+		owner := view.Owner()
+		if owner == nil {
+			break
+		}
+		cur = owner
+	}
+	return offX, offY
 }
 
 func (g *Group) Draw(buf *DrawBuffer) {

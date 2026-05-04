@@ -1277,6 +1277,91 @@ func TestDialogOptionCanSetState(t *testing.T) {
 
 // TestDialogBringToFrontMovesChildToEnd verifies BringToFront re-orders children
 // so the specified view is last (and thus drawn on top).
+// TestExecViewMouseCoordinatesTranslatedFromScreenToLocal verifies that when
+// a dialog is opened via ExecView on a Window (not on Desktop), mouse events
+// in screen-absolute coordinates are correctly translated to the dialog's
+// local coordinate space. Bug: ExecView compared raw screen coords against
+// the dialog's owner-local bounds, so clicks never matched for non-zero-origin windows.
+func TestExecViewMouseCoordinatesTranslatedFromScreenToLocal(t *testing.T) {
+	app, win, screen := execViewStack(t)
+	defer screen.Fini()
+
+	// Window is at (5, 5, 40, 15) in the Desktop which is at (0, 0).
+	// Window client area starts at screen (6, 6) — frame offset (1, 1).
+	// Place dialog at (2, 1) within client area → screen (8, 7).
+	dialog := NewDialog(NewRect(2, 1, 20, 8), "Find")
+	child := newSelectableMockView(NewRect(0, 0, 18, 6))
+	dialog.Insert(child)
+
+	done := make(chan CommandCode, 1)
+	go func() {
+		done <- win.ExecView(dialog)
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+
+	// Click inside the dialog at screen (12, 10).
+	// Expected dialog-relative: (12-8, 10-7) = (4, 3)
+	// Dialog.HandleEvent subtracts frame (1,1) → client (3, 2)
+	// Child at (0,0) receives (3, 2).
+	app.screen.PostEvent(tcell.NewEventMouse(12, 10, tcell.Button1, tcell.ModNone))
+	time.Sleep(30 * time.Millisecond)
+
+	if child.eventHandled == nil {
+		t.Fatal("ExecView did not forward mouse event inside dialog — screen-to-local coordinate translation is broken")
+	}
+	if child.eventHandled.Mouse == nil {
+		t.Fatal("child received event but Mouse is nil")
+	}
+	gotX, gotY := child.eventHandled.Mouse.X, child.eventHandled.Mouse.Y
+	if gotX != 3 || gotY != 2 {
+		t.Errorf("child got mouse at (%d, %d), want (3, 2)", gotX, gotY)
+	}
+
+	app.PostCommand(CmCancel, nil)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecView did not return within 2 s")
+	}
+}
+
+// TestExecViewKeyboardEventsReachDialogChild verifies keyboard events in ExecView
+// are delivered to the dialog's focused child.
+func TestExecViewKeyboardEventsReachDialogChild(t *testing.T) {
+	app, win, screen := execViewStack(t)
+	defer screen.Fini()
+
+	dialog := NewDialog(NewRect(2, 1, 30, 10), "Find")
+	inputLine := NewInputLine(NewRect(1, 1, 20, 1), 100)
+	dialog.Insert(inputLine)
+	okBtn := NewButton(NewRect(1, 5, 10, 2), "OK", CmOK, WithDefault())
+	dialog.Insert(okBtn)
+	dialog.SetFocusedChild(inputLine)
+
+	done := make(chan CommandCode, 1)
+	go func() {
+		done <- win.ExecView(dialog)
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+
+	// Type 'a' — should reach the InputLine
+	app.screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'a', tcell.ModNone))
+	time.Sleep(30 * time.Millisecond)
+
+	if inputLine.Text() != "a" {
+		t.Errorf("InputLine text = %q, want %q — keyboard events not reaching focused child in ExecView", inputLine.Text(), "a")
+	}
+
+	app.PostCommand(CmCancel, nil)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ExecView did not return within 2 s")
+	}
+}
+
 func TestDialogBringToFrontMovesChildToEnd(t *testing.T) {
 	d := NewDialog(NewRect(0, 0, 40, 20), "Test")
 	first := newSelectableMockView(NewRect(0, 0, 10, 1))

@@ -2425,3 +2425,64 @@ func TestInputLineTypeTDoesNotActivateRadioButton(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+func TestFindDialogTypingAndEscape(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-find"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 3 (EditWindow)
+	tmuxSendKeys(t, session, "M-3")
+	time.Sleep(300 * time.Millisecond)
+
+	// Open Find dialog with Ctrl+F
+	tmuxSendKeys(t, session, "C-f")
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify dialog appeared
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Find") {
+		t.Fatal("Find dialog did not appear after Ctrl+F")
+	}
+	if !containsAny(lines, "Search for") {
+		t.Fatal("Find dialog missing 'Search for' label")
+	}
+
+	// Type directly — InputLine should have focus without Tab
+	tmuxType(t, session, "Editor")
+	time.Sleep(300 * time.Millisecond)
+
+	lines2 := tmuxCapture(t, session)
+	if !containsAny(lines2, "Editor") {
+		t.Error("typed text 'Editor' not visible in Find dialog — InputLine may not have initial focus")
+		for i, line := range lines2 {
+			t.Logf("line %02d: %q", i, line)
+		}
+	}
+
+	// Escape should close the dialog
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	lines3 := tmuxCapture(t, session)
+	hasFind := false
+	for _, line := range lines3 {
+		if strings.Contains(line, "Search for") {
+			hasFind = true
+			break
+		}
+	}
+	if hasFind {
+		t.Error("Find dialog still visible after Escape")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
