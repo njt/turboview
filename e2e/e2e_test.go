@@ -1090,9 +1090,11 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 		t.Fatal("win2 'Editor' not visible before tile")
 	}
 
-	// Open Window menu: F10 → Right → Right (skip Edit, land on Window) → Enter (open popup) → Enter (select Tile)
+	// Open Window menu: F10 → Right x3 (skip Edit, Options, land on Window) → Enter (open popup) → Enter (select Tile)
 	tmuxSendKeys(t, session, "F10")
 	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Right")
 	time.Sleep(300 * time.Millisecond)
 	tmuxSendKeys(t, session, "Right")
@@ -1444,7 +1446,7 @@ func TestF6NextWindow(t *testing.T) {
 	// Verify some other window got the active frame
 	switchedToOther := false
 	for _, line := range lines {
-		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor")) && strings.Contains(line, "═")
+		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor") || strings.Contains(line, "Outline")) && strings.Contains(line, "═")
 		if otherActive {
 			switchedToOther = true
 			break
@@ -2053,6 +2055,365 @@ func TestEditWindowIndicatorVisible(t *testing.T) {
 	lines := tmuxCapture(t, session)
 	if !containsAny(lines, "1:1") {
 		t.Fatal("indicator not showing initial position")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestFileDialogOpenVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-fileopen"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Open...") {
+		t.Fatal("File > Open menu item not visible")
+	}
+
+	// Dismiss menu
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestFileDialogRenderAndClose(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-filedlg"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu, O selects Open...
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "O")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Open File") {
+		t.Fatal("FileDialog title 'Open File' not visible")
+	}
+	if !containsAny(lines, "Files") {
+		t.Fatal("Files label not visible in FileDialog")
+	}
+
+	// Cancel the dialog with Escape
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestFileDialogSelectFile(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-filesel"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Enter opens File menu, O selects Open...
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "O")
+	time.Sleep(800 * time.Millisecond)
+
+	// Clear the wildcard and type a filename in the focused FileInputLine
+	for i := 0; i < 10; i++ {
+		tmuxSendKeys(t, session, "BSpace")
+	}
+	tmuxSendKeys(t, session, "testfile.txt")
+	time.Sleep(200 * time.Millisecond)
+
+	// Press Enter to accept
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify result appears in the static text area
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Opened:") {
+		t.Fatal("'Opened:' text not found after file selection")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestColorDialogRenderAndCancel(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-colordlg"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// F10 activates menu bar, Right x2 reaches Options, Enter opens, C for Colors
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "C")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Colors") {
+		t.Fatal("ColorDialog title 'Colors' not visible")
+	}
+	if !containsAny(lines, "Group") {
+		t.Fatal("Group label not visible in ColorDialog")
+	}
+	if !containsAny(lines, "Foreground") {
+		t.Fatal("Foreground label not visible in ColorDialog")
+	}
+
+	// Cancel the dialog with Escape
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(300 * time.Millisecond)
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineWindowShowsTree(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4 (Outline) with Alt+4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify "Outline" window title visible
+	if !containsAny(lines, "Outline") {
+		t.Error("Outline window title not visible")
+	}
+
+	// Verify tree content visible
+	if !containsAny(lines, "Project") {
+		t.Error("'Project' not visible in Outline window")
+	}
+	if !containsAny(lines, "src") {
+		t.Error("'src' not visible in Outline window")
+	}
+	if !containsAny(lines, "main.go") {
+		t.Error("'main.go' not visible in Outline window")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineCollapseExpand(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline-collapse"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	// Navigate to "src" (Down from Project)
+	tmuxSendKeys(t, session, "Down")
+
+	// Collapse src with '-'
+	tmuxSendKeys(t, session, "-")
+
+	lines := tmuxCapture(t, session)
+	// main.go and util.go should be hidden
+	if containsAny(lines, "main.go") {
+		t.Error("'main.go' should be hidden after collapsing src")
+	}
+	if containsAny(lines, "util.go") {
+		t.Error("'util.go' should be hidden after collapsing src")
+	}
+	// src should still be visible
+	if !containsAny(lines, "src") {
+		t.Error("'src' should still be visible after collapse")
+	}
+
+	// Expand src with '+'
+	tmuxSendKeys(t, session, "+")
+
+	lines = tmuxCapture(t, session)
+	// main.go should reappear
+	if !containsAny(lines, "main.go") {
+		t.Error("'main.go' should reappear after expanding src")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestOutlineKeyboardNavigation(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-outline-nav"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Switch to Window 4
+	tmuxSendKeys(t, session, "M-4")
+	time.Sleep(300 * time.Millisecond)
+
+	// Navigate down several times, then back up
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+
+	lines := tmuxCapture(t, session)
+	// Tree should still be visible and navigable
+	if !containsAny(lines, "Project") {
+		t.Error("'Project' should be visible after navigation")
+	}
+	if !containsAny(lines, "docs") {
+		t.Error("'docs' should be visible after navigation")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestColorDialogOK(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-colorok"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Open Options > Colors
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "C")
+	time.Sleep(500 * time.Millisecond)
+
+	// Press Enter to accept (OK is default button)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(300 * time.Millisecond)
+
+	// Dialog should be gone, desktop visible
+	lines := tmuxCapture(t, session)
+	if containsAny(lines, "Colors") {
+		t.Error("ColorDialog should be closed after Enter")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestInputLineTypeTDoesNotActivateRadioButton(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-inputt"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Focus Window 1 (File Manager)
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	// Alt+N focuses the InputLine via its Label shortcut
+	tmuxSendKeys(t, session, "M-n")
+	time.Sleep(300 * time.Millisecond)
+
+	// Type 'T' — should go into InputLine, not activate RadioButtons ~T~ext
+	tmuxType(t, session, "T")
+	time.Sleep(300 * time.Millisecond)
+
+	lines2 := tmuxCapture(t, session)
+
+	found := false
+	for _, line := range lines2 {
+		if strings.Contains(line, "Name:") && strings.Contains(line, "T") {
+			idx := strings.Index(line, "Name:")
+			if idx >= 0 && strings.Contains(line[idx+5:], "T") {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Error("expected 'T' in InputLine after Name: label — RadioButtons may have stolen the keystroke")
+		for i, line := range lines2 {
+			t.Logf("line %02d: %q", i, line)
+		}
 	}
 
 	// Clean exit

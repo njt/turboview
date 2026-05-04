@@ -48,6 +48,13 @@ func init() {
 		MemoSelected:        s(tcell.ColorWhite, tcell.ColorBlue),
 		HistoryArrow:        s(tcell.ColorDarkCyan, tcell.ColorWhite),
 		HistorySides:        s(tcell.ColorWhite, tcell.ColorTeal),
+		ColorSelectorNormal: s(tcell.ColorLightGray, tcell.ColorBlack),
+		ColorSelectorCursor: s(tcell.ColorYellow, tcell.ColorBlack),
+		ColorDisplayText:    s(tcell.ColorWhite, tcell.ColorBlack),
+		OutlineNormal:    s(tcell.ColorBlack, tcell.ColorTeal),
+		OutlineFocused:   s(tcell.ColorYellow, tcell.ColorBlue),
+		OutlineSelected:  s(tcell.ColorWhite, tcell.ColorBlack),
+		OutlineCollapsed: s(tcell.ColorGreen, tcell.ColorTeal),
 	}
 
 	Register("borland-cyan", BorlandCyan)

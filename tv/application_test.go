@@ -462,3 +462,48 @@ func TestEventConversionResizeEventBecomesEvCommandCmResize(t *testing.T) {
 		t.Error("Run() did not exit within 2 s after resize + quit")
 	}
 }
+
+func TestConvertEventSetsClickCount(t *testing.T) {
+	screen := newTestScreen(t)
+	defer screen.Fini()
+
+	app, err := NewApplication(WithScreen(screen), WithTheme(theme.BorlandBlue))
+	if err != nil {
+		t.Fatalf("NewApplication: %v", err)
+	}
+
+	makeMouseEvent := func(x, y int, btn tcell.ButtonMask) tcell.Event {
+		return tcell.NewEventMouse(x, y, btn, tcell.ModNone)
+	}
+
+	// First click: ClickCount should be 1
+	ev1 := app.convertEvent(makeMouseEvent(10, 5, tcell.Button1))
+	if ev1.Mouse.ClickCount != 1 {
+		t.Errorf("first click: ClickCount = %d, want 1", ev1.Mouse.ClickCount)
+	}
+
+	// Release
+	app.convertEvent(makeMouseEvent(10, 5, tcell.ButtonNone))
+
+	// Second click at same position within double-click delay: ClickCount should be 2
+	ev2 := app.convertEvent(makeMouseEvent(10, 5, tcell.Button1))
+	if ev2.Mouse.ClickCount != 2 {
+		t.Errorf("second click same position: ClickCount = %d, want 2", ev2.Mouse.ClickCount)
+	}
+
+	// Release
+	app.convertEvent(makeMouseEvent(10, 5, tcell.ButtonNone))
+
+	// Third click at same position: ClickCount should be 3
+	ev3 := app.convertEvent(makeMouseEvent(10, 5, tcell.Button1))
+	if ev3.Mouse.ClickCount != 3 {
+		t.Errorf("third click same position: ClickCount = %d, want 3", ev3.Mouse.ClickCount)
+	}
+
+	// Release and click at different position: ClickCount should reset to 1
+	app.convertEvent(makeMouseEvent(10, 5, tcell.ButtonNone))
+	ev4 := app.convertEvent(makeMouseEvent(20, 5, tcell.Button1))
+	if ev4.Mouse.ClickCount != 1 {
+		t.Errorf("click at new position: ClickCount = %d, want 1", ev4.Mouse.ClickCount)
+	}
+}

@@ -398,8 +398,8 @@ func TestClusterDisabled_FieldCountIncludesClusterDisabled(t *testing.T) {
 			}
 		}
 
-		if nonZeroCount != 38 {
-			t.Errorf("%s: expected 38 non-zero fields (including ClusterDisabled), got %d", themeName, nonZeroCount)
+		if nonZeroCount != 45 {
+			t.Errorf("%s: expected 45 non-zero fields (including ClusterDisabled), got %d", themeName, nonZeroCount)
 		}
 	}
 }

@@ -1356,3 +1356,25 @@ func TestCheckBoxDrawTildeTextLenMatchesRenderedLabelWidth(t *testing.T) {
 			rendered, label, expected)
 	}
 }
+
+func TestCheckBoxesPlainLetterDoesNotStealFromFocusedSibling(t *testing.T) {
+	grp := NewGroup(NewRect(0, 0, 50, 20))
+	grp.SetState(SfVisible|SfSelected|SfFocused, true)
+
+	input := NewInputLine(NewRect(0, 0, 20, 1), 40)
+	cbs := NewCheckBoxes(NewRect(0, 5, 30, 3), []string{"~R~ead only", "~H~idden", "~S~ystem"})
+
+	grp.Insert(input)
+	grp.Insert(cbs)
+	grp.SetFocusedChild(input)
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'r', Modifiers: 0}}
+	grp.HandleEvent(ev)
+
+	if input.Text() != "r" {
+		t.Errorf("InputLine.Text() = %q, want %q — CheckBoxes stole plain 'r' via PostProcess", input.Text(), "r")
+	}
+	if cbs.Values()&1 != 0 {
+		t.Error("CheckBoxes toggled 'Read only' — should not match plain 'r' when InputLine is focused")
+	}
+}

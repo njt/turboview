@@ -34,5 +34,16 @@ const (
 	CmSearchAgain
 	CmIndicatorUpdate
 
+	CmFileOpen
+	CmFileReplace
+	CmFileClear
+	CmFileFocused
+	CmFileFilter
+
+	CmColorForegroundChanged
+	CmColorBackgroundChanged
+	CmNewColorGroup
+	CmNewColorIndex
+
 	CmUser CommandCode = 1000
 )

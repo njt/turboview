@@ -48,6 +48,13 @@ func init() {
 		MemoSelected:        s(tcell.ColorBlack, tcell.ColorGreen),
 		HistoryArrow:        s(tcell.ColorWhite, tcell.ColorDarkGreen),
 		HistorySides:        s(tcell.ColorGreen, tcell.ColorBlack),
+		ColorSelectorNormal: s(tcell.ColorGreen, tcell.ColorBlack),
+		ColorSelectorCursor: s(tcell.ColorLightGreen, tcell.ColorBlack),
+		ColorDisplayText:    s(tcell.ColorGreen, tcell.ColorBlack),
+		OutlineNormal:    s(tcell.ColorGreen, tcell.ColorBlack),
+		OutlineFocused:   s(tcell.ColorYellow, tcell.ColorBlack),
+		OutlineSelected:  s(tcell.ColorWhite, tcell.ColorGreen),
+		OutlineCollapsed: s(tcell.ColorDarkGreen, tcell.ColorBlack),
 	}
 
 	Register("matrix", Matrix)

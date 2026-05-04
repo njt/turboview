@@ -77,6 +77,12 @@ type Application struct {
 	mouseAutoX    int
 	mouseAutoY    int
 	mouseAutoChan chan struct{}
+
+	lastClickX    int
+	lastClickY    int
+	lastClickBtn  tcell.ButtonMask
+	lastClickTime time.Time
+	clickCount    int
 }
 
 func NewApplication(opts ...AppOption) (*Application, error) {
@@ -535,13 +541,31 @@ func (app *Application) convertEvent(tcellEv tcell.Event) *Event {
 		} else if realButtons == 0 && app.mouseAutoBtn != 0 {
 			app.stopMouseAuto()
 		}
+		clickCount := 0
+		if realButtons != 0 {
+			now := time.Now()
+			const doubleClickDelay = 500 * time.Millisecond
+			if realButtons == app.lastClickBtn &&
+				x == app.lastClickX && y == app.lastClickY &&
+				now.Sub(app.lastClickTime) < doubleClickDelay {
+				app.clickCount++
+			} else {
+				app.clickCount = 1
+			}
+			app.lastClickX = x
+			app.lastClickY = y
+			app.lastClickBtn = realButtons
+			app.lastClickTime = now
+			clickCount = app.clickCount
+		}
 		return &Event{
 			What: EvMouse,
 			Mouse: &MouseEvent{
-				X:         x,
-				Y:         y,
-				Button:    buttons,
-				Modifiers: ev.Modifiers(),
+				X:          x,
+				Y:          y,
+				Button:     buttons,
+				Modifiers:  ev.Modifiers(),
+				ClickCount: clickCount,
 			},
 		}
 	case *mouseAutoEvent:

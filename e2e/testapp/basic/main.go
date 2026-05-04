@@ -21,7 +21,7 @@ func main() {
 	menuBar := tv.NewMenuBar(
 		tv.NewSubMenu("~F~ile",
 			tv.NewMenuItem("~N~ew", tv.CmUser+1, tv.KbCtrl('N')),
-			tv.NewMenuItem("~O~pen...", tv.CmUser+2, tv.KbCtrl('O')),
+			tv.NewMenuItem("~O~pen...", tv.CmFileOpen, tv.KbFunc(3)),
 			tv.NewMenuSeparator(),
 			tv.NewMenuItem("E~x~it", tv.CmQuit, tv.KbAlt('X')),
 		),
@@ -29,6 +29,9 @@ func main() {
 			tv.NewMenuItem("~F~ind...", tv.CmFind, tv.KbCtrl('F')),
 			tv.NewMenuItem("~R~eplace...", tv.CmReplace, tv.KbCtrl('H')),
 			tv.NewMenuItem("~S~earch Again", tv.CmSearchAgain, tv.KbFunc(3)),
+		),
+		tv.NewSubMenu("~O~ptions",
+			tv.NewMenuItem("~C~olors...", tv.CmUser+30, tv.KbNone()),
 		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
@@ -58,6 +61,22 @@ func main() {
 				if result == tv.CmOK {
 					st.SetText("File: " + text)
 				}
+				return true
+			}
+			if cmd == tv.CmFileOpen {
+				fd := tv.NewFileDialogInDir(".", "*.go", "Open File", tv.FdOpenButton)
+				result := app.Desktop().ExecView(fd)
+				if result == tv.CmOK {
+					fn := fd.FileName()
+					if fn != "" {
+						st.SetText("Opened: " + fn)
+					}
+				}
+				return true
+			}
+			if cmd == tv.CmUser+30 {
+				cd := tv.NewColorDialog(nil, nil)
+				app.Desktop().ExecView(cd)
 				return true
 			}
 			return false
@@ -139,6 +158,31 @@ Line 16: Last line of demo content.`)
 	win2.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 	listBox.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
 
+	// Window 4 — Outline (tree viewer with scrollbar)
+	goMod := tv.NewNode("go.mod", nil, nil)
+
+	e2eTest := tv.NewNode("e2e_test.go", nil, nil)
+	tests := tv.NewNode("tests", e2eTest, goMod) // tests.Next = goMod
+
+	design := tv.NewNode("DESIGN.md", nil, nil)
+	readme := tv.NewNode("README.md", nil, design) // README.Next = DESIGN
+	docs := tv.NewNode("docs", readme, tests)       // docs.Next = tests
+
+	utilGo := tv.NewNode("util.go", nil, nil)
+	mainGo := tv.NewNode("main.go", nil, utilGo) // main.Next = util
+	src := tv.NewNode("src", mainGo, docs)         // src.Next = docs
+
+	project := tv.NewNode("Project", src, nil)
+
+	outline := tv.NewOutline(tv.NewRect(1, 1, 28, 13), project)
+	vsb := tv.NewScrollBar(tv.NewRect(29, 1, 1, 13), tv.Vertical)
+	outline.SetVScrollBar(vsb)
+
+	win4 := tv.NewWindow(tv.NewRect(2, 4, 31, 15), "Outline", tv.WithWindowNumber(4))
+	win4.Insert(outline)
+	win4.Insert(vsb)
+
+	app.Desktop().Insert(win4)
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win3)
 	app.Desktop().Insert(win2)

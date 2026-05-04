@@ -41,4 +41,11 @@ type ColorScheme struct {
 	MemoSelected        tcell.Style
 	HistoryArrow        tcell.Style
 	HistorySides        tcell.Style
+	ColorSelectorNormal tcell.Style
+	ColorSelectorCursor tcell.Style
+	ColorDisplayText    tcell.Style
+	OutlineNormal    tcell.Style
+	OutlineFocused   tcell.Style
+	OutlineSelected  tcell.Style
+	OutlineCollapsed tcell.Style
 }
