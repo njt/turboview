@@ -16,6 +16,8 @@ package tv
 
 import (
 	"testing"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 // ---------------------------------------------------------------------------
@@ -432,6 +434,46 @@ func TestNewMemoWithDifferentBoundsDoesNotShareState(t *testing.T) {
 	}
 	if m2.Text() != "memo two content" {
 		t.Errorf("m2.Text() = %q, want %q", m2.Text(), "memo two content")
+	}
+}
+
+func TestMemoClickPositionsCursor(t *testing.T) {
+	m := NewMemo(NewRect(0, 0, 40, 10))
+	m.SetState(SfVisible|SfSelected|SfFocused, true)
+	m.SetText("Hello, World!\nSecond line here\nThird line")
+
+	ev := &Event{
+		What: EvMouse,
+		Mouse: &MouseEvent{
+			X: 5, Y: 1,
+			Button:     tcell.Button1,
+			ClickCount: 1,
+		},
+	}
+	m.HandleEvent(ev)
+
+	if m.cursorRow != 1 || m.cursorCol != 5 {
+		t.Errorf("after click at (5,1): cursor at (%d,%d), want (1,5)", m.cursorRow, m.cursorCol)
+	}
+}
+
+func TestMemoDoubleClickSelectsWord(t *testing.T) {
+	m := NewMemo(NewRect(0, 0, 40, 10))
+	m.SetState(SfVisible|SfSelected|SfFocused, true)
+	m.SetText("Hello World")
+
+	ev := &Event{
+		What: EvMouse,
+		Mouse: &MouseEvent{
+			X: 2, Y: 0,
+			Button:     tcell.Button1,
+			ClickCount: 2,
+		},
+	}
+	m.HandleEvent(ev)
+
+	if m.selectedText() != "Hello" {
+		t.Errorf("double-click at col 2: selectedText() = %q, want %q", m.selectedText(), "Hello")
 	}
 }
 
