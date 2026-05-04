@@ -277,7 +277,8 @@ func (d *Desktop) routeMouseEvent(event *Event) {
 			child.HandleEvent(event)
 			return
 		}
-		if w, ok := child.(*Window); ok && w.resizing {
+		w := windowFromView(child)
+		if w != nil && w.resizing {
 			child.HandleEvent(event)
 			return
 		}

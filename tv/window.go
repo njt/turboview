@@ -252,7 +252,7 @@ func (w *Window) handleMouseEvent(event *Event) {
 		return
 	}
 
-	// During resize: coordinates are in Desktop-local space
+	// During resize: Desktop captures mouse for us, so mx/my are Desktop-local
 	if w.resizing {
 		if event.Mouse.Button&tcell.Button1 != 0 {
 			bounds := w.Bounds()

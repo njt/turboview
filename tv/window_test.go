@@ -1116,3 +1116,78 @@ func TestHandleEventNoChildDoesNotPanic(t *testing.T) {
 	// Must not panic.
 	w.HandleEvent(event)
 }
+
+func TestResizeBottomRightDoesNotShrinkOnInitialClick(t *testing.T) {
+	d := NewDesktop(NewRect(0, 0, 80, 24))
+	w := NewWindow(NewRect(10, 5, 35, 16), "Resize Test")
+	d.Insert(w)
+	origBounds := w.Bounds()
+
+	// Click the bottom-right corner in Desktop-local space: (10+34, 5+15) = (44, 20)
+	d.HandleEvent(mouseEvent(44, 20, tcell.Button1))
+	if !w.resizing {
+		t.Fatal("resize should have started")
+	}
+
+	// Mouse stays at the same Desktop-local position (stationary click)
+	d.HandleEvent(mouseEvent(44, 20, tcell.Button1))
+
+	newBounds := w.Bounds()
+	if newBounds.Width() != origBounds.Width() || newBounds.Height() != origBounds.Height() {
+		t.Errorf("window resized on stationary click: %dx%d → %dx%d",
+			origBounds.Width(), origBounds.Height(),
+			newBounds.Width(), newBounds.Height())
+	}
+}
+
+func TestResizeEditWindowDoesNotShrinkOnStationary(t *testing.T) {
+	d := NewDesktop(NewRect(0, 0, 80, 24))
+	ew := NewEditWindow(NewRect(45, 1, 35, 16), "")
+	d.Insert(ew)
+	origBounds := ew.Bounds()
+
+	// Bottom-right corner at Desktop-local (45+34, 1+15) = (79, 16)
+	brx := origBounds.B.X - 1
+	bry := origBounds.B.Y - 1
+	d.HandleEvent(mouseEvent(brx, bry, tcell.Button1))
+
+	w := ew.Window
+	if !w.resizing {
+		t.Fatal("resize should have started on EditWindow's embedded Window")
+	}
+
+	// Mouse stays at same position
+	d.HandleEvent(mouseEvent(brx, bry, tcell.Button1))
+
+	newBounds := ew.Bounds()
+	if newBounds.Width() != origBounds.Width() || newBounds.Height() != origBounds.Height() {
+		t.Errorf("EditWindow resized on stationary click: %dx%d → %dx%d",
+			origBounds.Width(), origBounds.Height(),
+			newBounds.Width(), newBounds.Height())
+	}
+}
+
+func TestResizeBottomRightGrowsByDelta(t *testing.T) {
+	d := NewDesktop(NewRect(0, 0, 80, 24))
+	w := NewWindow(NewRect(10, 5, 35, 16), "Resize Test")
+	d.Insert(w)
+
+	// Bottom-right corner at Desktop-local (10+34, 5+15) = (44, 20)
+	d.HandleEvent(mouseEvent(44, 20, tcell.Button1))
+	if !w.resizing {
+		t.Fatal("resize should have started")
+	}
+
+	// Drag 5 right and 3 down: to (49, 23)
+	d.HandleEvent(mouseEvent(49, 23, tcell.Button1))
+
+	newBounds := w.Bounds()
+	wantW := 49 - 10 + 1 // mx - bounds.A.X + 1 = 40
+	wantH := 23 - 5 + 1  // my - bounds.A.Y + 1 = 19
+	if newBounds.Width() != wantW {
+		t.Errorf("width after drag: got %d, want %d", newBounds.Width(), wantW)
+	}
+	if newBounds.Height() != wantH {
+		t.Errorf("height after drag: got %d, want %d", newBounds.Height(), wantH)
+	}
+}
