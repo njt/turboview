@@ -66,7 +66,14 @@ func (sb *ScrollBar) SetPageSize(n int) {
 func (sb *ScrollBar) clampValue() {
 	maxVal := sb.max - sb.pageSize
 	if maxVal < sb.min {
-		maxVal = sb.min
+		// When pageSize covers the full range (all items fit on one page),
+		// allow the value to range up to max-1. Each view widget (e.g.
+		// OutlineViewer, ListViewer) independently clamps its scroll
+		// position to its own valid range.
+		maxVal = sb.max - 1
+		if maxVal < sb.min {
+			maxVal = sb.min
+		}
 	}
 	if sb.value < sb.min {
 		sb.value = sb.min
