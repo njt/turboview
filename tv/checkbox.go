@@ -315,23 +315,35 @@ func (cbs *CheckBoxes) HandleEvent(event *Event) {
 		return
 	}
 
-	// Plain-letter shortcut matching (before SfSelected guard).
+	// Plain-letter shortcut matching — per original TV: match only when
+	// focused (SfSelected) or in PostProcess phase (owner.Phase() == PhPostProcess).
 	if event.What == EvKeyboard && event.Key != nil &&
 		event.Key.Key == tcell.KeyRune &&
 		event.Key.Modifiers == 0 {
-		r := unicode.ToLower(event.Key.Rune)
-		for i, item := range cbs.items {
-			if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
-				if !cbs.IsEnabled(i) {
-					continue
+		canMatch := cbs.HasState(SfSelected)
+		if !canMatch {
+			type phaser interface{ Phase() int }
+			if p, ok := cbs.Owner().(phaser); ok {
+				canMatch = p.Phase() == PhPostProcess
+			} else {
+				canMatch = true
+			}
+		}
+		if canMatch {
+			r := unicode.ToLower(event.Key.Rune)
+			for i, item := range cbs.items {
+				if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
+					if !cbs.IsEnabled(i) {
+						continue
+					}
+					if owner, ok := cbs.Owner().(Container); ok && !cbs.HasState(SfSelected) {
+						owner.SetFocusedChild(cbs)
+					}
+					cbs.group.SetFocusedChild(item)
+					item.SetChecked(!item.Checked())
+					event.Clear()
+					return
 				}
-				if owner, ok := cbs.Owner().(Container); ok && !cbs.HasState(SfSelected) {
-					owner.SetFocusedChild(cbs)
-				}
-				cbs.group.SetFocusedChild(item)
-				item.SetChecked(!item.Checked())
-				event.Clear()
-				return
 			}
 		}
 	}

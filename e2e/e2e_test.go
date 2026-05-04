@@ -2376,3 +2376,52 @@ func TestColorDialogOK(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+func TestInputLineTypeTDoesNotActivateRadioButton(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-inputt"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Focus Window 1 (File Manager)
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	// Alt+N focuses the InputLine via its Label shortcut
+	tmuxSendKeys(t, session, "M-n")
+	time.Sleep(300 * time.Millisecond)
+
+	// Type 'T' — should go into InputLine, not activate RadioButtons ~T~ext
+	tmuxType(t, session, "T")
+	time.Sleep(300 * time.Millisecond)
+
+	lines2 := tmuxCapture(t, session)
+
+	found := false
+	for _, line := range lines2 {
+		if strings.Contains(line, "Name:") && strings.Contains(line, "T") {
+			idx := strings.Index(line, "Name:")
+			if idx >= 0 && strings.Contains(line[idx+5:], "T") {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Error("expected 'T' in InputLine after Name: label — RadioButtons may have stolen the keystroke")
+		for i, line := range lines2 {
+			t.Logf("line %02d: %q", i, line)
+		}
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}

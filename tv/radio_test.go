@@ -1430,3 +1430,56 @@ func TestRadioButtonsTabDoesNotChangeSelection(t *testing.T) {
 		t.Errorf("Tab changed selection: Value() = %d, want 0 (Tab must not change selection)", rbs.Value())
 	}
 }
+
+func TestRadioButtonsPlainLetterDoesNotStealFromFocusedSibling(t *testing.T) {
+	grp := NewGroup(NewRect(0, 0, 50, 20))
+	grp.SetState(SfVisible|SfSelected|SfFocused, true)
+
+	input := NewInputLine(NewRect(0, 0, 20, 1), 40)
+	rbs := NewRadioButtons(NewRect(0, 5, 30, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
+
+	grp.Insert(input)
+	grp.Insert(rbs)
+	grp.SetFocusedChild(input)
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 't', Modifiers: 0}}
+	grp.HandleEvent(ev)
+
+	if input.Text() != "t" {
+		t.Errorf("InputLine.Text() = %q, want %q — RadioButtons stole plain 't' via PreProcess", input.Text(), "t")
+	}
+	if rbs.Value() != 0 {
+		t.Errorf("RadioButtons.Value() = %d, want 0 — should not have switched to Text", rbs.Value())
+	}
+}
+
+func TestRadioButtonsPlainLetterMatchesInPostProcess(t *testing.T) {
+	grp := NewGroup(NewRect(0, 0, 50, 20))
+	grp.SetState(SfVisible|SfSelected|SfFocused, true)
+
+	btn := NewButton(NewRect(0, 0, 10, 2), "OK", CmOK)
+	rbs := NewRadioButtons(NewRect(0, 5, 30, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
+
+	grp.Insert(btn)
+	grp.Insert(rbs)
+	grp.SetFocusedChild(btn)
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 't', Modifiers: 0}}
+	grp.HandleEvent(ev)
+
+	if rbs.Value() != 0 {
+		t.Errorf("Value() = %d, want 0 — plain 't' should match ~T~ext in PostProcess when focused sibling doesn't consume it", rbs.Value())
+	}
+}
+
+func TestRadioButtonsPlainLetterMatchesWhenFocused(t *testing.T) {
+	rbs := NewRadioButtons(NewRect(0, 0, 30, 3), []string{"~T~ext", "~B~inary", "~H~ex"})
+	rbs.SetState(SfVisible|SfSelected|SfFocused, true)
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'b', Modifiers: 0}}
+	rbs.HandleEvent(ev)
+
+	if rbs.Value() != 1 {
+		t.Errorf("Value() = %d, want 1 — plain 'b' should match ~B~inary when focused", rbs.Value())
+	}
+}

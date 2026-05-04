@@ -51,6 +51,7 @@ func (w *Window) SetColorScheme(cs *theme.ColorScheme) {
 	w.scheme = cs
 }
 
+func (w *Window) Phase() int                   { return w.group.Phase() }
 func (w *Window) Insert(v View)               { w.group.Insert(v) }
 func (w *Window) Remove(v View)               { w.group.Remove(v) }
 func (w *Window) Children() []View            { return w.group.Children() }

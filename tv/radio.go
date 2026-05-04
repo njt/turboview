@@ -321,22 +321,34 @@ func (rbs *RadioButtons) HandleEvent(event *Event) {
 		return
 	}
 
-	// Plain-letter shortcut matching (before SfSelected guard).
+	// Plain-letter shortcut matching — per original TV: match only when
+	// focused (SfSelected) or in PostProcess phase (owner.Phase() == PhPostProcess).
 	if event.What == EvKeyboard && event.Key != nil &&
 		event.Key.Key == tcell.KeyRune && event.Key.Modifiers == 0 {
-		r := unicode.ToLower(event.Key.Rune)
-		for i, item := range rbs.items {
-			if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
-				if !rbs.IsEnabled(i) {
-					continue
+		canMatch := rbs.HasState(SfSelected)
+		if !canMatch {
+			type phaser interface{ Phase() int }
+			if p, ok := rbs.Owner().(phaser); ok {
+				canMatch = p.Phase() == PhPostProcess
+			} else {
+				canMatch = true
+			}
+		}
+		if canMatch {
+			r := unicode.ToLower(event.Key.Rune)
+			for i, item := range rbs.items {
+				if item.Shortcut() != 0 && unicode.ToLower(item.Shortcut()) == r {
+					if !rbs.IsEnabled(i) {
+						continue
+					}
+					if owner, ok := rbs.Owner().(Container); ok && !rbs.HasState(SfSelected) {
+						owner.SetFocusedChild(rbs)
+					}
+					rbs.group.SetFocusedChild(item)
+					rbs.SetValue(i)
+					event.Clear()
+					return
 				}
-				if owner, ok := rbs.Owner().(Container); ok && !rbs.HasState(SfSelected) {
-					owner.SetFocusedChild(rbs)
-				}
-				rbs.group.SetFocusedChild(item)
-				rbs.SetValue(i)
-				event.Clear()
-				return
 			}
 		}
 	}

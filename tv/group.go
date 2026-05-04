@@ -1,12 +1,21 @@
 package tv
 
 
+const (
+	PhPreProcess  = 0
+	PhFocused     = 1
+	PhPostProcess = 2
+)
+
 type Group struct {
 	BaseView
 	children []View
 	focused  View
 	facade   Container
+	phase    int
 }
+
+func (g *Group) Phase() int { return g.phase }
 
 func NewGroup(bounds Rect) *Group {
 	g := &Group{}
@@ -276,6 +285,7 @@ func (g *Group) HandleEvent(event *Event) {
 	// Three-phase dispatch for keyboard and command events
 
 	// Phase 1: Preprocess
+	g.phase = PhPreProcess
 	for _, child := range g.children {
 		if event.IsCleared() {
 			return
@@ -286,11 +296,13 @@ func (g *Group) HandleEvent(event *Event) {
 	}
 
 	// Phase 2: Focused
+	g.phase = PhFocused
 	if !event.IsCleared() && g.focused != nil && g.canReceiveEvent(g.focused, event.What) {
 		g.focused.HandleEvent(event)
 	}
 
 	// Phase 3: Postprocess
+	g.phase = PhPostProcess
 	for _, child := range g.children {
 		if event.IsCleared() {
 			return
