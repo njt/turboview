@@ -1,6 +1,7 @@
 package tv
 
 import (
+	"fmt"
 	"unicode"
 
 	"github.com/gdamore/tcell/v2"
@@ -303,37 +304,7 @@ func (r *mdRenderer) tableHeight(b mdBlock, availWidth int) int {
 	if colWidths == nil {
 		return 0
 	}
-
-	// Determine effective column widths for wrapping.  When the total
-	// table width exceeds the available width and wrapping is enabled,
-	// scale column widths down proportionally so that cells wrap to fit
-	// within the viewport instead of at their ideal (overflow) widths.
-	effectiveWidths := make([]int, len(colWidths))
-	copy(effectiveWidths, colWidths)
-
-	totalTableWidth := len(colWidths) + 1 // border overhead
-	for _, w := range colWidths {
-		totalTableWidth += w
-	}
-	if r.wrapText && totalTableWidth > availWidth && availWidth > len(colWidths)+1 {
-		contentAvail := availWidth - (len(colWidths) + 1)
-		totalCol := 0
-		for _, w := range colWidths {
-			totalCol += w
-		}
-		allocated := 0
-		for i := range effectiveWidths {
-			effectiveWidths[i] = colWidths[i] * contentAvail / totalCol
-			if effectiveWidths[i] < 1 {
-				effectiveWidths[i] = 1
-			}
-			allocated += effectiveWidths[i]
-		}
-		for i := 0; allocated < contentAvail && i < len(effectiveWidths); i++ {
-			effectiveWidths[i]++
-			allocated++
-		}
-	}
+	effectiveWidths := computeEffectiveWidths(colWidths, availWidth, r.wrapText)
 
 	h := 2 // top + bottom borders
 
@@ -504,4 +475,782 @@ func allRunText(runs []mdRun) string {
 		s += r.text
 	}
 	return s
+}
+
+// runLen returns the total rune count of all runs combined.
+func runLen(runs []mdRun) int {
+	n := 0
+	for _, r := range runs {
+		n += len([]rune(r.text))
+	}
+	return n
+}
+
+// =============================================================================
+// maxContentWidth — maximum rendered line width for horizontal scroll
+// =============================================================================
+
+// maxContentWidth returns the maximum rendered content width in characters,
+// used to determine horizontal scroll range.
+func (r *mdRenderer) maxContentWidth() int {
+	return r.blocksMaxWidth(r.blocks, 0)
+}
+
+// blocksMaxWidth computes max width across a slice of blocks.
+func (r *mdRenderer) blocksMaxWidth(blocks []mdBlock, depth int) int {
+	maxW := 0
+	for _, b := range blocks {
+		w := r.blockMaxWidth(b, depth)
+		if w > maxW {
+			maxW = w
+		}
+	}
+	return maxW
+}
+
+// blockMaxWidth computes the maximum rendered width for a single block.
+func (r *mdRenderer) blockMaxWidth(b mdBlock, depth int) int {
+	indent := depth * 2
+	avail := r.width - indent
+	if avail < 1 {
+		avail = 1
+	}
+
+	switch b.kind {
+	case blockParagraph:
+		if r.wrapText {
+			maxW := indent
+			for _, line := range wrapRuns(b.runs, avail) {
+				w := indent + runLen(line)
+				if w > maxW {
+					maxW = w
+				}
+			}
+			return maxW
+		}
+		if len(b.runs) == 0 {
+			return indent
+		}
+		return indent + runLen(b.runs)
+
+	case blockHeader:
+		if r.wrapText {
+			maxW := indent
+			for _, line := range wrapRuns(b.runs, avail) {
+				w := indent + runLen(line)
+				if w > maxW {
+					maxW = w
+				}
+			}
+			return maxW
+		}
+		return indent + runLen(b.runs)
+
+	case blockCodeBlock:
+		maxW := indent
+		for _, line := range b.code {
+			w := indent + len([]rune(line))
+			if w > maxW {
+				maxW = w
+			}
+		}
+		return maxW
+
+	case blockBulletList, blockNumberList, blockCheckList:
+		markerWidth := 4
+		itemIndent := depth*2 + markerWidth
+		itemAvail := r.width - itemIndent
+		if itemAvail < 1 {
+			itemAvail = 1
+		}
+		maxW := 0
+		for _, item := range b.items {
+			if len(item.runs) > 0 {
+				if r.wrapText {
+					for _, line := range wrapRuns(item.runs, itemAvail) {
+						w := itemIndent + runLen(line)
+						if w > maxW {
+							maxW = w
+						}
+					}
+				} else {
+					w := itemIndent + runLen(item.runs)
+					if w > maxW {
+						maxW = w
+					}
+				}
+			}
+			cw := r.blocksMaxWidth(item.children, depth+1)
+			if cw > maxW {
+				maxW = cw
+			}
+		}
+		return maxW
+
+	case blockBlockquote:
+		return r.blocksMaxWidth(b.children, depth+1)
+
+	case blockTable:
+		colWidths := layoutTable(b, avail)
+		if colWidths == nil {
+			return indent
+		}
+		eff := computeEffectiveWidths(colWidths, avail, r.wrapText)
+		totalW := len(colWidths) + 1 // borders
+		for _, cw := range eff {
+			totalW += cw
+		}
+		return indent + totalW
+
+	case blockHRule:
+		return indent + 1
+
+	case blockDefList:
+		defIndent := 4
+		defAvail := r.width - depth*2 - defIndent
+		if defAvail < 1 {
+			defAvail = 1
+		}
+		maxW := 0
+		for _, item := range b.items {
+			w := depth*2 + runLen(item.term)
+			if w > maxW {
+				maxW = w
+			}
+			if len(item.runs) > 0 {
+				if r.wrapText {
+					for _, line := range wrapRuns(item.runs, defAvail) {
+						w := depth*2 + defIndent + runLen(line)
+						if w > maxW {
+							maxW = w
+						}
+					}
+				} else {
+					w := depth*2 + defIndent + runLen(item.runs)
+					if w > maxW {
+						maxW = w
+					}
+				}
+			}
+			cw := r.blocksMaxWidth(item.children, depth+1)
+			if cw > maxW {
+				maxW = cw
+			}
+		}
+		return maxW
+	}
+	return 0
+}
+
+// =============================================================================
+// renderLineInto — renders a single visual line into a DrawBuffer
+// =============================================================================
+
+// renderLineInto renders a single visual line (document line index lineY) into
+// the DrawBuffer at the given screen row, applying horizontal scroll offset dx.
+func (r *mdRenderer) renderLineInto(buf *DrawBuffer, lineY, screenY, dx, w int) {
+	if r.cs == nil {
+		return
+	}
+	cur := 0
+	for i, b := range r.blocks {
+		if i > 0 {
+			if cur == lineY {
+				return // blank separator line; already background-filled
+			}
+			cur++
+		}
+		if r.renderBlockLine(buf, b, lineY, screenY, dx, w, 0, &cur) {
+			return
+		}
+	}
+}
+
+// renderBlockLine dispatches to the appropriate block-type renderer.
+func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	switch b.kind {
+	case blockParagraph:
+		return r.renderParagraphLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockHeader:
+		return r.renderHeaderLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockCodeBlock:
+		return r.renderCodeBlockLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockBulletList, blockNumberList, blockCheckList:
+		return r.renderListLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockBlockquote:
+		return r.renderBlockquoteLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockTable:
+		return r.renderTableLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockHRule:
+		return r.renderHRuleLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	case blockDefList:
+		return r.renderDefListLine(buf, b, lineY, screenY, dx, w, depth, cur)
+	}
+	return false
+}
+
+// =============================================================================
+// Paragraph rendering
+// =============================================================================
+
+func (r *mdRenderer) renderParagraphLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	indent := depth * 2
+	avail := w - indent
+	if avail < 1 {
+		avail = 1
+	}
+
+	var lines [][]mdRun
+	if r.wrapText && len(b.runs) > 0 {
+		lines = wrapRuns(b.runs, avail)
+	} else {
+		lines = [][]mdRun{b.runs}
+	}
+
+	normalStyle := r.cs.MarkdownNormal
+
+	for _, line := range lines {
+		if *cur == lineY {
+			x := indent - dx
+			for _, run := range line {
+				s := composeStyle(normalStyle, run.style, r.cs)
+				for _, ch := range run.text {
+					if x >= 0 && x < w {
+						buf.WriteChar(x, screenY, ch, s)
+					}
+					x++
+				}
+			}
+			return true
+		}
+		*cur++
+	}
+	return false
+}
+
+// =============================================================================
+// Header rendering
+// =============================================================================
+
+func (r *mdRenderer) renderHeaderLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	indent := depth * 2
+	avail := w - indent
+	if avail < 1 {
+		avail = 1
+	}
+
+	var lines [][]mdRun
+	if r.wrapText && len(b.runs) > 0 {
+		lines = wrapRuns(b.runs, avail)
+	} else {
+		lines = [][]mdRun{b.runs}
+	}
+
+	headerStyle := r.cs.MarkdownNormal
+	switch b.level {
+	case 1:
+		headerStyle = r.cs.MarkdownH1
+	case 2:
+		headerStyle = r.cs.MarkdownH2
+	case 3:
+		headerStyle = r.cs.MarkdownH3
+	case 4:
+		headerStyle = r.cs.MarkdownH4
+	case 5:
+		headerStyle = r.cs.MarkdownH5
+	case 6:
+		headerStyle = r.cs.MarkdownH6
+	}
+
+	for _, line := range lines {
+		if *cur == lineY {
+			x := indent - dx
+			for _, run := range line {
+				s := composeStyle(headerStyle, run.style, r.cs)
+				for _, ch := range run.text {
+					if x >= 0 && x < w {
+						buf.WriteChar(x, screenY, ch, s)
+					}
+					x++
+				}
+			}
+			return true
+		}
+		*cur++
+	}
+	return false
+}
+
+// =============================================================================
+// Code block rendering
+// =============================================================================
+
+func (r *mdRenderer) renderCodeBlockLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	indent := depth * 2
+	codeStyle := r.cs.MarkdownCodeBlock
+
+	// Fill row with code block background, starting at indent offset
+	startX := indent - dx
+	if startX < 0 {
+		startX = 0
+	}
+	for x := startX; x < w; x++ {
+		buf.WriteChar(x, screenY, ' ', codeStyle)
+	}
+
+	// If no code lines, still render one background row
+	if len(b.code) == 0 {
+		if *cur == lineY {
+			return true
+		}
+		*cur++
+		return false
+	}
+
+	for _, codeLine := range b.code {
+		if *cur == lineY {
+			// Render code text on top of background
+			x := indent - dx
+			for _, ch := range codeLine {
+				if x >= 0 && x < w {
+					buf.WriteChar(x, screenY, ch, codeStyle)
+				}
+				x++
+			}
+			return true
+		}
+		*cur++
+	}
+	return false
+}
+
+// =============================================================================
+// List rendering
+// =============================================================================
+
+func (r *mdRenderer) renderListLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	markerWidth := 4
+	itemIndent := depth*2 + markerWidth
+	avail := w - itemIndent
+	if avail < 1 {
+		avail = 1
+	}
+
+	markerStyle := r.cs.MarkdownListMarker
+	normalStyle := r.cs.MarkdownNormal
+
+	for itemNum, item := range b.items {
+		var lines [][]mdRun
+		if r.wrapText && len(item.runs) > 0 {
+			lines = wrapRuns(item.runs, avail)
+		} else {
+			lines = [][]mdRun{item.runs}
+		}
+
+		for lineIdx, line := range lines {
+			if *cur == lineY {
+				// Render marker on first line only
+				if lineIdx == 0 {
+					x := depth*2 - dx
+					marker := listMarkerText(b.kind, itemNum, item)
+					for _, ch := range marker {
+						if x >= 0 && x < w {
+							buf.WriteChar(x, screenY, ch, markerStyle)
+						}
+						x++
+					}
+				}
+				// Render content
+				x := itemIndent - dx
+				for _, run := range line {
+					s := composeStyle(normalStyle, run.style, r.cs)
+					for _, ch := range run.text {
+						if x >= 0 && x < w {
+							buf.WriteChar(x, screenY, ch, s)
+						}
+						x++
+					}
+				}
+				return true
+			}
+			*cur++
+		}
+
+		// Nested children
+		if len(item.children) > 0 {
+			if r.renderBlocksInto(buf, item.children, lineY, screenY, dx, w, depth+1, cur) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// listMarkerText returns the marker string for a list item.
+func listMarkerText(kind mdBlockKind, itemNum int, item mdItem) string {
+	switch kind {
+	case blockBulletList:
+		return "• "
+	case blockNumberList:
+		return fmt.Sprintf("%d. ", itemNum+1)
+	case blockCheckList:
+		if item.checked != nil && *item.checked {
+			return "☑ "
+		}
+		return "☐ "
+	}
+	return ""
+}
+
+// =============================================================================
+// Blockquote rendering
+// =============================================================================
+
+func (r *mdRenderer) renderBlockquoteLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	barStyle := r.cs.MarkdownBlockquote
+
+	for i, child := range b.children {
+		if i > 0 {
+			if *cur == lineY {
+				// Draw bar on separator line
+				x := depth*2 - dx
+				if x >= 0 && x < w {
+					buf.WriteChar(x, screenY, '▌', barStyle)
+				}
+				return true
+			}
+			*cur++
+		}
+		if r.renderBlockLine(buf, child, lineY, screenY, dx, w, depth+1, cur) {
+			// Overlay bar on the rendered content
+			x := depth*2 - dx
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, '▌', barStyle)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// =============================================================================
+// Horizontal rule rendering
+// =============================================================================
+
+func (r *mdRenderer) renderHRuleLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	if *cur == lineY {
+		hrStyle := r.cs.MarkdownHRule
+		indent := depth * 2
+		for x := 0; x < w; x++ {
+			// The hrule character starts after indent, but scroll offset affects position
+			// We fill with hrule chars considering the indent
+			absX := x - (indent - dx)
+			if absX >= 0 {
+				buf.WriteChar(x, screenY, '─', hrStyle)
+			}
+		}
+		return true
+	}
+	*cur++
+	return false
+}
+
+// =============================================================================
+// Definition list rendering
+// =============================================================================
+
+func (r *mdRenderer) renderDefListLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	defIndent := 4
+	defAvail := w - depth*2 - defIndent
+	if defAvail < 1 {
+		defAvail = 1
+	}
+
+	termStyle := r.cs.MarkdownDefTerm
+	normalStyle := r.cs.MarkdownNormal
+
+	for i, item := range b.items {
+		if i > 0 {
+			if *cur == lineY {
+				return true // blank separator line
+			}
+			*cur++
+		}
+		// Term: 1 line
+		if *cur == lineY {
+			x := depth*2 - dx
+			for _, run := range item.term {
+				s := composeStyle(termStyle, run.style, r.cs)
+				for _, ch := range run.text {
+					if x >= 0 && x < w {
+						buf.WriteChar(x, screenY, ch, s)
+					}
+					x++
+				}
+			}
+			return true
+		}
+		*cur++
+
+		// Definition: wrapped lines
+		var defLines [][]mdRun
+		if r.wrapText && len(item.runs) > 0 {
+			defLines = wrapRuns(item.runs, defAvail)
+		} else {
+			defLines = [][]mdRun{item.runs}
+		}
+		for _, line := range defLines {
+			if *cur == lineY {
+				x := depth*2 + defIndent - dx
+				for _, run := range line {
+					s := composeStyle(normalStyle, run.style, r.cs)
+					for _, ch := range run.text {
+						if x >= 0 && x < w {
+							buf.WriteChar(x, screenY, ch, s)
+						}
+						x++
+					}
+				}
+				return true
+			}
+			*cur++
+		}
+
+		// Nested children
+		if len(item.children) > 0 {
+			if r.renderBlocksInto(buf, item.children, lineY, screenY, dx, w, depth+1, cur) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// =============================================================================
+// Table rendering
+// =============================================================================
+
+func (r *mdRenderer) renderTableLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	indent := depth * 2
+	avail := w - indent
+	if avail < 1 {
+		avail = 1
+	}
+
+	colWidths := layoutTable(b, avail)
+	if colWidths == nil {
+		return false
+	}
+
+	eff := computeEffectiveWidths(colWidths, avail, r.wrapText)
+
+	borderStyle := r.cs.MarkdownTableBorder
+	normalStyle := r.cs.MarkdownNormal
+
+	// Top border
+	if *cur == lineY {
+		renderTableBorder(buf, screenY, dx, indent, eff, borderStyle, '┌', '┬', '┐')
+		return true
+	}
+	*cur++
+
+	// Headers
+	if len(b.headers) > 0 {
+		headerH := r.tableRowHeight(b.headers, eff)
+		for h := 0; h < headerH; h++ {
+			if *cur == lineY {
+				renderTableDataRow(buf, screenY, dx, indent, b.headers, eff, h, borderStyle, r.cs.MarkdownBold, r.wrapText, r.cs)
+				return true
+			}
+			*cur++
+		}
+
+		// Header separator
+		if *cur == lineY {
+			renderTableBorder(buf, screenY, dx, indent, eff, borderStyle, '├', '┼', '┤')
+			return true
+		}
+		*cur++
+	}
+
+	// Body rows
+	for _, row := range b.rows {
+		rowH := r.tableRowHeight(row, eff)
+		for h := 0; h < rowH; h++ {
+			if *cur == lineY {
+				renderTableDataRow(buf, screenY, dx, indent, row, eff, h, borderStyle, normalStyle, r.wrapText, r.cs)
+				return true
+			}
+			*cur++
+		}
+	}
+
+	// Bottom border
+	if *cur == lineY {
+		renderTableBorder(buf, screenY, dx, indent, eff, borderStyle, '└', '┴', '┘')
+		return true
+	}
+	*cur++
+
+	return false
+}
+
+// renderTableBorder draws a horizontal table border line.
+func renderTableBorder(buf *DrawBuffer, screenY, dx, indent int, colWidths []int, style tcell.Style, left, sep, right rune) {
+	w := buf.Width()
+	x := indent - dx
+
+	// Left corner
+	if x >= 0 && x < w {
+		buf.WriteChar(x, screenY, left, style)
+	}
+	x++
+
+	for j, cw := range colWidths {
+		for k := 0; k < cw; k++ {
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, '─', style)
+			}
+			x++
+		}
+		if j < len(colWidths)-1 {
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, sep, style)
+			}
+		} else {
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, right, style)
+			}
+		}
+		x++
+	}
+}
+
+// renderTableDataRow renders one visual line of table cell content.
+func renderTableDataRow(buf *DrawBuffer, screenY, dx, indent int, row [][]mdRun, colWidths []int, lineIdx int, borderStyle, normalStyle tcell.Style, wrapText bool, cs *theme.ColorScheme) {
+	w := buf.Width()
+	x := indent - dx
+
+	// Left border
+	if x >= 0 && x < w {
+		buf.WriteChar(x, screenY, '│', borderStyle)
+	}
+	x++
+
+	for j, cell := range row {
+		if j >= len(colWidths) {
+			break
+		}
+		cw := colWidths[j]
+
+		// Get cell runs for this visual line
+		var cellRuns []mdRun
+		if wrapText && len(cell) > 0 {
+			lines := wrapRuns(cell, cw)
+			if lineIdx < len(lines) {
+				cellRuns = lines[lineIdx]
+			}
+		} else if !wrapText && lineIdx == 0 {
+			cellRuns = cell
+		}
+
+		// Render content
+		rendered := 0
+		for _, run := range cellRuns {
+			s := composeStyle(normalStyle, run.style, cs)
+			for _, ch := range run.text {
+				if x >= 0 && x < w {
+					buf.WriteChar(x, screenY, ch, s)
+				}
+				x++
+				rendered++
+			}
+		}
+
+		// Pad remaining cell width
+		for rendered < cw {
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, ' ', normalStyle)
+			}
+			x++
+			rendered++
+		}
+
+		// Column separator (or right border for last column)
+		if x >= 0 && x < w {
+			buf.WriteChar(x, screenY, '│', borderStyle)
+		}
+		x++
+	}
+}
+
+// =============================================================================
+// Blocks-level rendering (handles blank lines between blocks)
+// =============================================================================
+
+// renderBlocksInto walks a slice of blocks, incrementing cur for each visual
+// line, and renders the target lineY when reached. Returns true when rendered.
+func (r *mdRenderer) renderBlocksInto(buf *DrawBuffer, blocks []mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
+	for i, b := range blocks {
+		if i > 0 {
+			if *cur == lineY {
+				return true // blank separator line; background already filled
+			}
+			*cur++
+		}
+		if r.renderBlockLine(buf, b, lineY, screenY, dx, w, depth, cur) {
+			return true
+		}
+	}
+	return false
+}
+
+// =============================================================================
+// computeEffectiveWidths — scaled column widths for tables
+// =============================================================================
+
+// computeEffectiveWidths scales column widths down when the table exceeds the
+// available width and wrapping is enabled, similar to tableHeight logic.
+func computeEffectiveWidths(colWidths []int, availWidth int, wrapText bool) []int {
+	effective := make([]int, len(colWidths))
+	copy(effective, colWidths)
+
+	if !wrapText {
+		return effective
+	}
+
+	totalTableWidth := len(colWidths) + 1 // border overhead
+	for _, w := range colWidths {
+		totalTableWidth += w
+	}
+	if totalTableWidth <= availWidth {
+		return effective
+	}
+	if availWidth <= len(colWidths)+1 {
+		return effective
+	}
+
+	contentAvail := availWidth - (len(colWidths) + 1)
+	totalCol := 0
+	for _, w := range colWidths {
+		totalCol += w
+	}
+	if totalCol == 0 {
+		return effective
+	}
+
+	allocated := 0
+	for i := range effective {
+		effective[i] = colWidths[i] * contentAvail / totalCol
+		if effective[i] < 1 {
+			effective[i] = 1
+		}
+		allocated += effective[i]
+	}
+	for i := 0; allocated < contentAvail && i < len(effective); i++ {
+		effective[i]++
+		allocated++
+	}
+
+	return effective
 }
