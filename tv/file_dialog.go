@@ -84,7 +84,7 @@ func NewFileDialogInDir(dir, wildcard, title string, flags FileDialogFlag) *File
 	fd.SetSelf(fd)
 
 	// --- Row 0: Label "File ~N~ame:" at (1, 0, 12, 1)
-	nameLabel := NewLabel(NewRect(1, 0, 12, 1), "~F~ile ~n~ame", nil)
+	nameLabel := NewLabel(NewRect(1, 0, 12, 1), "File ~n~ame", nil)
 	fd.Insert(nameLabel)
 
 	// --- Row 1: FileInputLine at (1, 1, 32, 1)

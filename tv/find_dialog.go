@@ -110,12 +110,17 @@ func (e *Editor) checkWholeWord(row, col, needleLen int) bool {
 }
 
 func (e *Editor) selectMatch(row, col, length int) {
-	e.Memo.cursorRow = row
-	e.Memo.cursorCol = col + length
 	e.Memo.selStartRow = row
 	e.Memo.selStartCol = col
 	e.Memo.selEndRow = row
 	e.Memo.selEndCol = col + length
+	// Ensure the match START is visible first, then position cursor at end.
+	// This prevents the selection from being scrolled off the left edge
+	// when jumping from a far-right match back to a short-line match.
+	e.Memo.cursorRow = row
+	e.Memo.cursorCol = col
+	e.Memo.ensureCursorVisible()
+	e.Memo.cursorCol = col + length
 	e.Memo.ensureCursorVisible()
 	e.Memo.syncScrollBars()
 }

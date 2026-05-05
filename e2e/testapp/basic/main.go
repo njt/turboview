@@ -69,7 +69,8 @@ func main() {
 				if result == tv.CmOK {
 					fn := fd.FileName()
 					if fn != "" {
-						st.SetText("Opened: " + fn)
+						ew := tv.NewEditWindow(tv.NewRect(2, 1, 50, 18), fn)
+						app.Desktop().Insert(ew)
 					}
 				}
 				return true
