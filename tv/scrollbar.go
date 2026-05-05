@@ -181,14 +181,14 @@ func (sb *ScrollBar) HandleEvent(event *Event) {
 		return
 	}
 
-	// Mouse wheel
-	if event.Mouse.Button == tcell.WheelUp {
+	// Mouse wheel — vertical and horizontal
+	if event.Mouse.Button == tcell.WheelUp || event.Mouse.Button == tcell.WheelLeft {
 		sb.broadcastToOwner(CmScrollBarClicked)
 		sb.step(-3 * sb.arStep)
 		event.Clear()
 		return
 	}
-	if event.Mouse.Button == tcell.WheelDown {
+	if event.Mouse.Button == tcell.WheelDown || event.Mouse.Button == tcell.WheelRight {
 		sb.broadcastToOwner(CmScrollBarClicked)
 		sb.step(3 * sb.arStep)
 		event.Clear()

@@ -538,6 +538,34 @@ func (m *Memo) HandleEvent(event *Event) {
 			event.Clear()
 			return
 		}
+		if me.Button == tcell.WheelLeft {
+			m.deltaX -= 3
+			if m.deltaX < 0 {
+				m.deltaX = 0
+			}
+			m.syncScrollBars()
+			event.Clear()
+			return
+		}
+		if me.Button == tcell.WheelRight {
+			maxWidth := 0
+			for _, line := range m.lines {
+				if len(line) > maxWidth {
+					maxWidth = len(line)
+				}
+			}
+			maxDX := maxWidth - m.Bounds().Width()
+			if maxDX < 0 {
+				maxDX = 0
+			}
+			m.deltaX += 3
+			if m.deltaX > maxDX {
+				m.deltaX = maxDX
+			}
+			m.syncScrollBars()
+			event.Clear()
+			return
+		}
 		if me.Button&tcell.Button1 != 0 {
 			if m.dragging {
 				// Continued drag (motion with button held).
