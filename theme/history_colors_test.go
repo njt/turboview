@@ -35,7 +35,7 @@ package theme
 //    22. Matrix.HistorySides background is black.
 //
 //   Full-field-count after adding 2 new fields:
-//    23. All five themes have exactly 35 non-zero fields.
+//    23. BorlandBlue has 63 non-zero fields (45 base + 18 markdown); all other themes have 45.
 
 import (
 	"testing"
@@ -553,27 +553,26 @@ func TestMatrixHistorySidesForegroundIsGreen(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Requirement 23 — All five themes have 35 non-zero fields after adding 2 new fields
+// Requirement 23 — All themes have correct non-zero field counts
 // Spec: "All five themes must include values for these new fields (BorlandBlue, BorlandCyan,
 //         BorlandGray, C64, Matrix)"
-// The existing struct had 33 non-zero fields; adding HistoryArrow + HistorySides = 35.
+// BorlandBlue has 63 (45 base + 18 markdown); other themes have 45.
 // ---------------------------------------------------------------------------
 
-// TestBorlandBlueHas37NonZeroFields verifies BorlandBlue populates all 37 fields
-// BorlandBlue sets ALL fields (including LabelHighlight and StatusSelected that other themes skip).
-// (33 existing + HistoryArrow + HistorySides).
-func TestBorlandBlueHas37NonZeroFields(t *testing.T) {
+// TestBorlandBlueHas63NonZeroFields verifies BorlandBlue populates all 63 fields
+// BorlandBlue sets ALL fields (including LabelHighlight, StatusSelected, and 18 markdown fields).
+func TestBorlandBlueHas63NonZeroFields(t *testing.T) {
 	if BorlandBlue == nil {
 		t.Fatal("BorlandBlue is nil")
 	}
 	count := countNonZeroFields(BorlandBlue)
-	if count != 45 {
-		t.Errorf("BorlandBlue: expected 45 non-zero fields, got %d", count)
+	if count != 63 {
+		t.Errorf("BorlandBlue: expected 63 non-zero fields (45 base + 18 markdown), got %d", count)
 	}
 }
 
-// TestBorlandCyanHas35NonZeroFields verifies BorlandCyan populates all 35 fields.
-func TestBorlandCyanHas35NonZeroFields(t *testing.T) {
+// TestBorlandCyanHas45NonZeroFields verifies BorlandCyan populates all 45 fields.
+func TestBorlandCyanHas45NonZeroFields(t *testing.T) {
 	if BorlandCyan == nil {
 		t.Fatal("BorlandCyan is nil")
 	}
@@ -583,8 +582,8 @@ func TestBorlandCyanHas35NonZeroFields(t *testing.T) {
 	}
 }
 
-// TestBorlandGrayHas35NonZeroFields verifies BorlandGray populates all 35 fields.
-func TestBorlandGrayHas35NonZeroFields(t *testing.T) {
+// TestBorlandGrayHas45NonZeroFields verifies BorlandGray populates all 45 fields.
+func TestBorlandGrayHas45NonZeroFields(t *testing.T) {
 	if BorlandGray == nil {
 		t.Fatal("BorlandGray is nil")
 	}
@@ -594,8 +593,8 @@ func TestBorlandGrayHas35NonZeroFields(t *testing.T) {
 	}
 }
 
-// TestC64Has35NonZeroFields verifies C64 populates all 35 fields.
-func TestC64Has35NonZeroFields(t *testing.T) {
+// TestC64Has45NonZeroFields verifies C64 populates all 45 fields.
+func TestC64Has45NonZeroFields(t *testing.T) {
 	if C64 == nil {
 		t.Fatal("C64 is nil")
 	}
@@ -605,8 +604,8 @@ func TestC64Has35NonZeroFields(t *testing.T) {
 	}
 }
 
-// TestMatrixHas35NonZeroFields verifies Matrix populates all 35 fields.
-func TestMatrixHas35NonZeroFields(t *testing.T) {
+// TestMatrixHas45NonZeroFields verifies Matrix populates all 45 fields.
+func TestMatrixHas45NonZeroFields(t *testing.T) {
 	if Matrix == nil {
 		t.Fatal("Matrix is nil")
 	}

@@ -48,4 +48,24 @@ type ColorScheme struct {
 	OutlineFocused   tcell.Style
 	OutlineSelected  tcell.Style
 	OutlineCollapsed tcell.Style
+
+	// Markdown viewer
+	MarkdownNormal      tcell.Style
+	MarkdownH1          tcell.Style
+	MarkdownH2          tcell.Style
+	MarkdownH3          tcell.Style
+	MarkdownH4          tcell.Style
+	MarkdownH5          tcell.Style
+	MarkdownH6          tcell.Style
+	MarkdownBold        tcell.Style
+	MarkdownItalic      tcell.Style
+	MarkdownBoldItalic  tcell.Style
+	MarkdownCode        tcell.Style
+	MarkdownCodeBlock   tcell.Style
+	MarkdownBlockquote  tcell.Style
+	MarkdownLink        tcell.Style
+	MarkdownHRule       tcell.Style
+	MarkdownListMarker  tcell.Style
+	MarkdownTableBorder tcell.Style
+	MarkdownDefTerm     tcell.Style
 }

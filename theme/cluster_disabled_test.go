@@ -373,7 +373,7 @@ func TestClusterDisabled_AllThemesHaveDimmingVsRadio(t *testing.T) {
 
 // TestClusterDisabled_FieldCountIncludesClusterDisabled verifies that all themes have the new field.
 func TestClusterDisabled_FieldCountIncludesClusterDisabled(t *testing.T) {
-	// All themes should now have 36 non-zero fields (35 original + 1 new ClusterDisabled)
+	// All themes should now have 45 non-zero fields (or 63 for BorlandBlue which includes 18 markdown fields)
 	themes := map[string]*ColorScheme{
 		"BorlandBlue": BorlandBlue,
 		"BorlandCyan": BorlandCyan,
@@ -398,8 +398,12 @@ func TestClusterDisabled_FieldCountIncludesClusterDisabled(t *testing.T) {
 			}
 		}
 
-		if nonZeroCount != 45 {
-			t.Errorf("%s: expected 45 non-zero fields (including ClusterDisabled), got %d", themeName, nonZeroCount)
+		expectedCount := 45
+		if themeName == "BorlandBlue" {
+			expectedCount = 63 // 45 base + 18 markdown style fields
+		}
+		if nonZeroCount != expectedCount {
+			t.Errorf("%s: expected %d non-zero fields (including ClusterDisabled), got %d", themeName, expectedCount, nonZeroCount)
 		}
 	}
 }

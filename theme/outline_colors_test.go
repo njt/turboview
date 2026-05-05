@@ -41,7 +41,7 @@ import (
 //    24. Matrix.OutlineCollapsed is non-zero
 //
 //   Full-field-count after adding 4 new fields:
-//    25. All five themes have 45 non-zero fields (41 existing + 4 outline).
+//    25. BorlandBlue has 63 non-zero fields (45 base + 18 markdown); all other themes have 45 (41 existing + 4 outline).
 
 // ---------------------------------------------------------------------------
 // Requirement 1 — ColorScheme.OutlineNormal field exists and is tcell.Style
@@ -402,68 +402,6 @@ func TestMatrixOutlineCollapsedIsNonZero(t *testing.T) {
 	}
 	if Matrix.OutlineCollapsed == tcell.StyleDefault {
 		t.Error("Matrix.OutlineCollapsed is zero (StyleDefault); spec requires a non-zero value")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Requirement 25 — Full-field-count: all five themes have 45 non-zero fields.
-// Spec: "All 5 theme files must include values for these 4 new entries"
-// The existing struct had 41 non-zero fields; adding 4 outline fields = 45.
-// ---------------------------------------------------------------------------
-
-// TestBorlandBlueHas45NonZeroFields verifies BorlandBlue has all fields populated
-// including the 4 new outline color fields (41 + 4 = 45).
-func TestBorlandBlueHas45NonZeroFields(t *testing.T) {
-	if BorlandBlue == nil {
-		t.Fatal("BorlandBlue is nil")
-	}
-	count := countNonZeroFields(BorlandBlue)
-	if count != 45 {
-		t.Errorf("BorlandBlue: expected 45 non-zero fields (41 existing + 4 outline), got %d", count)
-	}
-}
-
-// TestBorlandCyanHas45NonZeroFields verifies BorlandCyan has all fields populated.
-func TestBorlandCyanHas45NonZeroFields(t *testing.T) {
-	if BorlandCyan == nil {
-		t.Fatal("BorlandCyan is nil")
-	}
-	count := countNonZeroFields(BorlandCyan)
-	if count != 45 {
-		t.Errorf("BorlandCyan: expected 45 non-zero fields (41 existing + 4 outline), got %d", count)
-	}
-}
-
-// TestBorlandGrayHas45NonZeroFields verifies BorlandGray has all fields populated.
-func TestBorlandGrayHas45NonZeroFields(t *testing.T) {
-	if BorlandGray == nil {
-		t.Fatal("BorlandGray is nil")
-	}
-	count := countNonZeroFields(BorlandGray)
-	if count != 45 {
-		t.Errorf("BorlandGray: expected 45 non-zero fields (41 existing + 4 outline), got %d", count)
-	}
-}
-
-// TestC64Has45NonZeroFields verifies C64 has all fields populated.
-func TestC64Has45NonZeroFields(t *testing.T) {
-	if C64 == nil {
-		t.Fatal("C64 is nil")
-	}
-	count := countNonZeroFields(C64)
-	if count != 45 {
-		t.Errorf("C64: expected 45 non-zero fields (41 existing + 4 outline), got %d", count)
-	}
-}
-
-// TestMatrixHas45NonZeroFields verifies Matrix has all fields populated.
-func TestMatrixHas45NonZeroFields(t *testing.T) {
-	if Matrix == nil {
-		t.Fatal("Matrix is nil")
-	}
-	count := countNonZeroFields(Matrix)
-	if count != 45 {
-		t.Errorf("Matrix: expected 45 non-zero fields (41 existing + 4 outline), got %d", count)
 	}
 }
 

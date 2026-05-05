@@ -55,6 +55,25 @@ func init() {
 		OutlineFocused:   s(tcell.ColorYellow, tcell.ColorBlue),
 		OutlineSelected:  s(tcell.ColorWhite, tcell.ColorBlack),
 		OutlineCollapsed: s(tcell.ColorGreen, tcell.ColorTeal),
+
+			MarkdownNormal:      s(tcell.ColorLightGray, tcell.ColorBlue),
+			MarkdownH1:          s(tcell.ColorWhite, tcell.ColorBlue).Bold(true).Underline(true),
+			MarkdownH2:          s(tcell.ColorYellow, tcell.ColorBlue).Bold(true),
+			MarkdownH3:          s(tcell.ColorDarkCyan, tcell.ColorBlue).Bold(true),
+			MarkdownH4:          s(tcell.ColorDarkCyan, tcell.ColorBlue),
+			MarkdownH5:          s(tcell.ColorLightGray, tcell.ColorBlue).Bold(true),
+			MarkdownH6:          s(tcell.ColorLightGray, tcell.ColorBlue),
+			MarkdownBold:        s(tcell.ColorWhite, tcell.ColorBlue).Bold(true),
+			MarkdownItalic:      s(tcell.ColorLightGray, tcell.ColorBlue).Italic(true),
+			MarkdownBoldItalic:  s(tcell.ColorWhite, tcell.ColorBlue).Bold(true).Italic(true),
+			MarkdownCode:        s(tcell.ColorDarkCyan, tcell.ColorNavy),
+			MarkdownCodeBlock:   s(tcell.ColorGreen, tcell.ColorNavy),
+			MarkdownBlockquote:  s(tcell.ColorDarkGray, tcell.ColorBlue),
+			MarkdownLink:        s(tcell.ColorGreen, tcell.ColorBlue).Underline(true),
+			MarkdownHRule:       s(tcell.ColorDarkGray, tcell.ColorBlue),
+			MarkdownListMarker:  s(tcell.ColorYellow, tcell.ColorBlue),
+			MarkdownTableBorder: s(tcell.ColorDarkGray, tcell.ColorBlue),
+			MarkdownDefTerm:     s(tcell.ColorWhite, tcell.ColorBlue).Bold(true),
 	}
 
 	Register("borland-blue", BorlandBlue)
