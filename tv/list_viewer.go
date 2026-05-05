@@ -141,12 +141,13 @@ func (lv *ListViewer) syncScrollBar() {
 		return
 	}
 	count := lv.dataSource.Count()
-	maxVal := count - 1
-	if maxVal < 0 {
-		maxVal = 0
+	ipp := lv.itemsPerPage()
+	maxRange := count - 1 + ipp
+	if maxRange < 0 {
+		maxRange = 0
 	}
-	lv.scrollBar.SetRange(0, maxVal)
-	lv.scrollBar.SetPageSize(lv.itemsPerPage())
+	lv.scrollBar.SetRange(0, maxRange)
+	lv.scrollBar.SetPageSize(ipp)
 	lv.scrollBar.SetValue(lv.selected)
 	vh := lv.visibleHeight()
 	if vh < 1 {

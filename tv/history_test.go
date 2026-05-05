@@ -463,3 +463,39 @@ func TestHistoryDrawDifferentIDsProduceSameOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestViewToDesktopAccountsForDialogFrame(t *testing.T) {
+	// Dialog has a 1-pixel frame, same as Window. viewToDesktop must
+	// account for *Dialog, not just *Window.
+	desktop := NewDesktop(NewRect(0, 0, 80, 25))
+
+	dlg := NewDialog(NewRect(5, 3, 40, 15), "Test")
+	desktop.Insert(dlg)
+
+	il := NewInputLine(NewRect(2, 1, 20, 1), 64)
+	dlg.Insert(il)
+
+	x, y := viewToDesktop(il)
+	// InputLine at (2,1) inside Dialog client area.
+	// Dialog at (5,3) in Desktop, frame adds (1,1).
+	// Expected: (5+1+2, 3+1+1) = (8, 5)
+	if x != 8 || y != 5 {
+		t.Errorf("viewToDesktop(InputLine in Dialog) = (%d,%d), want (8,5)", x, y)
+	}
+}
+
+func TestViewToDesktopAccountsForWindowFrame(t *testing.T) {
+	desktop := NewDesktop(NewRect(0, 0, 80, 25))
+
+	win := NewWindow(NewRect(5, 3, 40, 15), "Test")
+	desktop.Insert(win)
+
+	il := NewInputLine(NewRect(2, 1, 20, 1), 64)
+	win.Insert(il)
+
+	x, y := viewToDesktop(il)
+	// Same arithmetic: (5+1+2, 3+1+1) = (8, 5)
+	if x != 8 || y != 5 {
+		t.Errorf("viewToDesktop(InputLine in Window) = (%d,%d), want (8,5)", x, y)
+	}
+}

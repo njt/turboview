@@ -522,8 +522,10 @@ func TestSetScrollBarSyncsRange(t *testing.T) {
 	if sb.Min() != 0 {
 		t.Errorf("ScrollBar Min() = %d, want 0", sb.Min())
 	}
-	if sb.Max() != 7 {
-		t.Errorf("ScrollBar Max() = %d, want 7 (Count()-1=7)", sb.Max())
+	// Range = count-1+itemsPerPage so scrollbar value can reach last item.
+	// 8 items, height=5, 1 col → ipp=5; max = 7 + 5 = 12
+	if sb.Max() != 12 {
+		t.Errorf("ScrollBar Max() = %d, want 12 (Count()-1+itemsPerPage)", sb.Max())
 	}
 }
 
@@ -646,8 +648,10 @@ func TestScrollBarUpdatedOnSetDataSource(t *testing.T) {
 	newDS := NewStringList([]string{"x", "y", "z", "w", "v", "u", "t"})
 	lv.SetDataSource(newDS)
 
-	if sb.Max() != newDS.Count()-1 {
-		t.Errorf("after SetDataSource, ScrollBar Max()=%d, want %d (new count-1)", sb.Max(), newDS.Count()-1)
+	// Range = count-1+itemsPerPage; 7 items, height=5, 1 col → ipp=5; max = 6 + 5 = 11
+	wantMax := newDS.Count() - 1 + lv.itemsPerPage()
+	if sb.Max() != wantMax {
+		t.Errorf("after SetDataSource, ScrollBar Max()=%d, want %d (count-1+itemsPerPage)", sb.Max(), wantMax)
 	}
 }
 
@@ -1363,7 +1367,7 @@ func TestScrollBarOnChangeSetsSelected(t *testing.T) {
 	}
 }
 
-func TestScrollBarRangeIsCountMinusOne(t *testing.T) {
+func TestScrollBarRangeAllowsFullSelection(t *testing.T) {
 	items := make([]string, 20)
 	for i := range items {
 		items[i] = fmt.Sprintf("Item %d", i)
@@ -1372,7 +1376,44 @@ func TestScrollBarRangeIsCountMinusOne(t *testing.T) {
 	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
 	lv.SetScrollBar(sb)
 
-	if sb.Max() != 19 {
-		t.Errorf("ScrollBar.Max() = %d, want 19 (count-1)", sb.Max())
+	// Range = count-1+itemsPerPage so that max-pageSize = count-1,
+	// allowing the scrollbar value to reach the last item.
+	ipp := lv.itemsPerPage()
+	wantMax := 19 + ipp
+	if sb.Max() != wantMax {
+		t.Errorf("ScrollBar.Max() = %d, want %d (count-1+itemsPerPage)", sb.Max(), wantMax)
+	}
+}
+
+func TestScrollBarValueReachesLastItem(t *testing.T) {
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i)
+	}
+	lv := newLV(items)
+	sb := NewScrollBar(NewRect(20, 0, 1, 5), Vertical)
+	lv.SetScrollBar(sb)
+
+	lv.SetSelected(19)
+	if sb.Value() != 19 {
+		t.Errorf("ScrollBar.Value() = %d after selecting last item, want 19", sb.Value())
+	}
+}
+
+func TestScrollBarThumbReachesEndForLastItem(t *testing.T) {
+	items := make([]string, 20)
+	for i := range items {
+		items[i] = fmt.Sprintf("Item %d", i)
+	}
+	lv := newLV(items)
+	sb := NewScrollBar(NewRect(20, 0, 1, 10), Vertical)
+	lv.SetScrollBar(sb)
+
+	lv.SetSelected(19)
+	pos, length := sb.thumbInfo()
+	trackLen := sb.trackLen()
+	if pos+length != trackLen {
+		t.Errorf("thumb at pos=%d len=%d, but trackLen=%d — thumb should reach end",
+			pos, length, trackLen)
 	}
 }

@@ -268,9 +268,10 @@ func viewToDesktop(v View) (int, int) {
 			b := view.Bounds()
 			x += b.A.X
 			y += b.A.Y
-			if _, isWindow := owner.(*Window); isWindow {
-				x += 1
-				y += 1
+			switch owner.(type) {
+			case *Window, *Dialog:
+				x++
+				y++
 			}
 			owner = view.Owner()
 		} else {
