@@ -132,7 +132,7 @@ func (m *Memo) syncScrollBars() {
 			}
 		}
 		m.hScrollBar.SetRange(0, maxWidth)
-		m.hScrollBar.SetPageSize(m.Bounds().Width() / 2)
+		m.hScrollBar.SetPageSize(m.Bounds().Width())
 		m.hScrollBar.SetValue(m.deltaX)
 	}
 }
