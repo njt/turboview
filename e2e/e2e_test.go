@@ -2486,3 +2486,47 @@ func TestFindDialogTypingAndEscape(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+// TestListViewerScrollbarReachesEnd verifies that navigating to the last item
+// in a ListViewer causes the scrollbar thumb to reach the bottom of the track.
+// Regression test for: syncScrollBar range was count-1 instead of count-1+ipp,
+// which prevented the scrollbar value from reaching the last item.
+func TestListViewerScrollbarReachesEnd(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-sb-end"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus win2 (Editor) which has a 2-column ListBox with 20 items + scrollbar
+	tmuxSendKeys(t, session, "M-2")
+	time.Sleep(300 * time.Millisecond)
+
+	// Ctrl+PgDn jumps to the very last item
+	tmuxSendKeys(t, session, "C-NPage")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Item 20 should be visible (last item in 2-col layout)
+	if !containsAny(lines, "Item 20") {
+		t.Error("Item 20 not visible after Ctrl+PgDn — last item not reachable")
+	}
+
+	// Navigate back to top with Ctrl+PgUp
+	tmuxSendKeys(t, session, "C-PPage")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "Item 1") {
+		t.Error("Item 1 not visible after Ctrl+PgUp — navigation back to top failed")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
