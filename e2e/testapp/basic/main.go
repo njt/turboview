@@ -183,6 +183,74 @@ Line 16: Last line of demo content.`)
 	win4.Insert(outline)
 	win4.Insert(vsb)
 
+	// Window 5 — Markdown viewer
+	mdViewer := tv.NewMarkdownViewer(tv.NewRect(0, 0, 43, 16))
+	mdViewer.SetMarkdown(`# MarkdownViewer Demo
+
+This is **bold**, *italic*, ***bold italic***, and ~~strikethrough~~.
+Here is ` + "`inline code`" + ` in a sentence.
+A [link](https://example.com) and an ![image](photo.jpg).
+
+## Code Block
+
+` + "```go" + `
+func main() {
+    fmt.Println("Hello, TurboView!")
+}
+` + "```" + `
+
+## Lists
+
+- First **bullet** item
+- Second item with ` + "`code`" + `
+- Third item
+
+1. Numbered one
+2. Numbered two
+
+- [x] Task complete
+- [ ] Task pending
+
+## Blockquote
+
+> This is a blockquote with **bold** text.
+> It can span multiple lines.
+
+---
+
+## Table
+
+| Name    | Type   | Description         |
+|---------|--------|---------------------|
+| width   | int    | Widget width        |
+| height  | int    | Widget height       |
+| visible | bool   | Visibility flag     |
+
+## Definition List
+
+Markdown
+: A lightweight markup language
+
+TurboView
+: A TUI framework reimplementing Borland Turbo Vision
+
+### H3 Heading
+#### H4 Heading
+##### H5 Heading
+###### H6 Heading
+`)
+
+	mdVSB := tv.NewScrollBar(tv.NewRect(43, 0, 1, 16), tv.Vertical)
+	mdViewer.SetVScrollBar(mdVSB)
+	mdViewer.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
+	mdVSB.SetGrowMode(tv.GfGrowLoX | tv.GfGrowHiX | tv.GfGrowHiY)
+
+	win5 := tv.NewWindow(tv.NewRect(3, 3, 45, 18), "Markdown", tv.WithWindowNumber(5))
+	win5.SetGrowMode(tv.GfGrowHiX | tv.GfGrowHiY)
+	win5.Insert(mdViewer)
+	win5.Insert(mdVSB)
+
+	app.Desktop().Insert(win5)
 	app.Desktop().Insert(win4)
 	app.Desktop().Insert(win1)
 	app.Desktop().Insert(win3)

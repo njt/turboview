@@ -2530,3 +2530,204 @@ func TestListViewerScrollbarReachesEnd(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+func TestMarkdownViewerVisible(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-visible"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5 (Markdown viewer)
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify "Markdown" title is visible
+	if !containsAny(lines, "Markdown") {
+		t.Error("Markdown window title not visible")
+	}
+
+	// Verify "MarkdownViewer Demo" content is visible
+	if !containsAny(lines, "MarkdownViewer Demo") {
+		t.Error("'MarkdownViewer Demo' header text not visible")
+	}
+
+	// Verify at least one bold/styled word is visible
+	if !containsAny(lines, "bold") {
+		t.Error("'bold' text not visible in MarkdownViewer")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMarkdownViewerCodeBlock(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-code"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify code block content visible
+	if !containsAny(lines, "func main()", "fmt.Println", "Hello, TurboView") {
+		t.Error("code block content not visible in MarkdownViewer")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMarkdownViewerList(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-list"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify bullet markers visible
+	if !containsAny(lines, "•") {
+		t.Error("bullet marker not visible in MarkdownViewer")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMarkdownViewerTable(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-table"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify table border characters visible
+	if !containsAny(lines, "┌", "│", "─") {
+		t.Error("table border characters not visible in MarkdownViewer")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMarkdownViewerScroll(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-scroll"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify initial content visible near top
+	if !containsAny(lines, "MarkdownViewer Demo") {
+		t.Fatal("precondition: 'MarkdownViewer Demo' not visible before PgDn")
+	}
+
+	// Press PgDn to scroll down
+	tmuxSendKeys(t, session, "NPage")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// Later content (below the fold) should now be visible.
+	// After one PgDn (~16 lines), we should see the numbered list, blockquote,
+	// or table content that was below the initial viewport.
+	if !containsAny(lines, "Numbered one", "Blockquote", "blockquote") {
+		t.Error("later content not visible after PgDn")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestMarkdownViewerWrapToggle(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-markdown-wrap"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Switch to Window 5
+	tmuxSendKeys(t, session, "M-5")
+	time.Sleep(300 * time.Millisecond)
+
+	// Press 'w' to toggle word wrap
+	tmuxSendKeys(t, session, "w")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// Verify content is still visible (the window doesn't crash)
+	if !containsAny(lines, "MarkdownViewer Demo") {
+		t.Error("content not visible after word wrap toggle")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
