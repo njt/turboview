@@ -966,3 +966,26 @@ func TestFileDialog_Falsifying_AllChildTypesPresent(t *testing.T) {
 		t.Error("missing Button child")
 	}
 }
+
+func TestFileDialog_HandleEvent_DirectCmOKValidatesAndSetsResultPath(t *testing.T) {
+	fd := newFileDialogTest(t, FdOpenButton)
+	// Simulate a FileList double-click: the FileInputLine has been updated
+	// with the filename by CmFileFocused broadcast, and the event is CmOK.
+	fd.fileInput.SetText("CLAUDE.md")
+
+	ev := &Event{What: EvCommand, Command: CmOK}
+	fd.HandleEvent(ev)
+
+	// The event should NOT be cleared (Valid returns true for a filename)
+	if ev.IsCleared() {
+		t.Error("CmOK with valid filename: event should not be cleared")
+	}
+	// resultPath must be set
+	fn := fd.FileName()
+	if fn == "" {
+		t.Fatal("FileName() empty — Valid() was not called for direct CmOK")
+	}
+	if !strings.HasSuffix(fn, "CLAUDE.md") {
+		t.Errorf("FileName() = %q, want suffix CLAUDE.md", fn)
+	}
+}

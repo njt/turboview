@@ -186,10 +186,14 @@ func (fd *FileDialog) HandleEvent(event *Event) {
 		return
 	}
 	fd.Dialog.HandleEvent(event)
-	if event.What == EvCommand && (event.Command == CmFileOpen || event.Command == CmFileReplace) {
-		event.Command = CmOK
-		if !fd.Valid(CmOK) {
-			event.Clear()
+	if event.What == EvCommand {
+		if event.Command == CmFileOpen || event.Command == CmFileReplace {
+			event.Command = CmOK
+		}
+		if event.Command == CmOK {
+			if !fd.Valid(CmOK) {
+				event.Clear()
+			}
 		}
 	}
 }
