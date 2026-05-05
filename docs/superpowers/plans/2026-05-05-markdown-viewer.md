@@ -114,7 +114,7 @@ MarkdownDefTerm:     s(tcell.ColorWhite, tcell.ColorBlue).Bold(true),
 - `mdBlock` struct with fields: `kind`, `level`, `runs`, `language`, `code`, `items`, `children`, `headers`, `rows`
 - `mdRun` struct with fields: `text`, `style`, `url`
 - `mdItem` struct with fields: `runs`, `children`, `checked`, `term`
-- `parseMarkdown(text string) []mdBlock` function that:
+- `parseMarkdown(src string) []mdBlock` function that:
   - Parses `text` via goldmark with GFM extensions (table, strikethrough, task list) and definition list extension
   - Walks the goldmark AST to produce `[]mdBlock`
   - Paragraphs: collects inline children into `[]mdRun` with appropriate styles
@@ -209,14 +209,14 @@ type mdItem struct {
     term     []mdRun
 }
 
-func parseMarkdown(text string) []mdBlock {
+func parseMarkdown(src string) []mdBlock {
     md := goldmark.New(
         goldmark.WithExtensions(
             extension.GFM,             // tables, strikethrough, task list
             extension.DefinitionList,  // definition lists
         ),
     )
-    source := []byte(text)
+    source := []byte(src)
     reader := text.NewReader(source)
     doc := md.Parser().Parse(reader)
     return walkBlocks(doc, source)
@@ -580,6 +580,7 @@ func mergeRuns(runs []mdRun) []mdRun {
 package tv
 
 import (
+    "fmt"
     "strings"
     "unicode"
 
@@ -724,15 +725,14 @@ type mdRenderer struct {
 // renderedHeight returns the total number of visual lines when the blocks
 // are rendered at the given width.
 func (r *mdRenderer) renderedHeight() int {
-    return r.blocksHeight(r.blocks, 0, 0)
+    return r.blocksHeight(r.blocks, 0)
 }
 
 // blocksHeight returns the height of a slice of blocks at a given indent depth.
-// sepBefore is 1 if a blank separator line should precede the first block, 0 otherwise.
-func (r *mdRenderer) blocksHeight(blocks []mdBlock, depth int, sepBefore int) int {
+func (r *mdRenderer) blocksHeight(blocks []mdBlock, depth int) int {
     h := 0
     for i, b := range blocks {
-        if i > 0 || sepBefore > 0 {
+        if i > 0 {
             h++ // blank line between blocks
         }
         h += r.blockHeight(b, depth)
@@ -765,8 +765,7 @@ func (r *mdRenderer) blockHeight(b mdBlock, depth int) int {
         return r.listHeight(b, depth)
 
     case blockBlockquote:
-        bqIndent := 2 // "▌ "
-        return r.blocksHeight(b.children, depth, 0) + r.adjustForBqIndent(b.children, depth, bqIndent)
+        return r.blocksHeight(b.children, depth+1)
 
     case blockTable:
         return r.tableHeight(b, avail)
@@ -778,17 +777,6 @@ func (r *mdRenderer) blockHeight(b mdBlock, depth int) int {
         return r.defListHeight(b, depth)
     }
     return 1
-}
-
-func (r *mdRenderer) adjustForBqIndent(blocks []mdBlock, depth int, extra int) int {
-    // Blockquote indent reduces available width for all children.
-    // The base blocksHeight already computes with depth, but blockquote
-    // adds extra indent. We compute the difference.
-    // For simplicity, re-compute with adjusted width.
-    _ = blocks
-    _ = depth
-    _ = extra
-    return 0 // Handled by depth tracking in blockHeight
 }
 
 func (r *mdRenderer) listHeight(b mdBlock, depth int) int {
@@ -808,7 +796,7 @@ func (r *mdRenderer) listHeight(b mdBlock, depth int) int {
         }
         // Nested children
         if len(item.children) > 0 {
-            h += r.blocksHeight(item.children, depth+1, 0)
+            h += r.blocksHeight(item.children, depth+1)
         }
     }
     return h
@@ -1034,6 +1022,9 @@ func layoutTable(b mdBlock, availWidth int) []int {
 - `SetVScrollBar(nil)` / `SetHScrollBar(nil)`: clears `OnChange` on old scrollbar
 - `syncScrollBars()`: updates range (`totalHeight - 1 + pageSize` for vertical, `maxWidth - 1 + pageSize` for horizontal), page size (viewport dimensions), value (current delta)
 
+**SetBounds override:**
+- `SetBounds(bounds)` calls `BaseView.SetBounds(bounds)` then `syncScrollBars()` so resize recalculates scrollbar ranges
+
 **SetState override:**
 - When `SfSelected` changes, toggle scrollbar visibility (same pattern as Memo)
 
@@ -1113,6 +1104,11 @@ func (mv *MarkdownViewer) SetHScrollBar(sb *ScrollBar) {
         }
         mv.syncScrollBars()
     }
+}
+
+func (mv *MarkdownViewer) SetBounds(bounds Rect) {
+    mv.BaseView.SetBounds(bounds)
+    mv.syncScrollBars()
 }
 
 func (mv *MarkdownViewer) SetState(flag ViewState, on bool) {
@@ -1418,22 +1414,32 @@ func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, depth int, line
         return r.renderParagraphLine(buf, b.runs, style, indent, lineY, screenY, dx, w, cur)
 
     case blockCodeBlock:
-        for _, line := range b.code {
+        if len(b.code) == 0 {
+            // Empty code block: render one blank line with code block background
             if *cur == lineY {
-                // Fill full width with code block background
                 for x := 0; x < w; x++ {
                     buf.WriteChar(x, screenY, ' ', cs.MarkdownCodeBlock)
-                }
-                runes := []rune(line)
-                for i, ch := range runes {
-                    x := indent + i - dx
-                    if x >= 0 && x < w {
-                        buf.WriteChar(x, screenY, ch, cs.MarkdownCodeBlock)
-                    }
                 }
                 return true
             }
             *cur++
+        } else {
+            for _, line := range b.code {
+                if *cur == lineY {
+                    for x := 0; x < w; x++ {
+                        buf.WriteChar(x, screenY, ' ', cs.MarkdownCodeBlock)
+                    }
+                    runes := []rune(line)
+                    for i, ch := range runes {
+                        x := indent + i - dx
+                        if x >= 0 && x < w {
+                            buf.WriteChar(x, screenY, ch, cs.MarkdownCodeBlock)
+                        }
+                    }
+                    return true
+                }
+                *cur++
+            }
         }
 
     case blockBulletList, blockNumberList, blockCheckList:
@@ -1789,8 +1795,6 @@ func (r *mdRenderer) renderDefListLine(buf *DrawBuffer, b mdBlock, depth int, li
     return false
 }
 ```
-
-Note: add `"fmt"` to the imports in `markdown_render.go` for `fmt.Sprintf` in `listMarker`.
 
 **Run tests:** `go test ./tv/ -run TestMarkdown -v`
 
