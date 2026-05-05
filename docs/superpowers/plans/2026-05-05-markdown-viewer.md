@@ -115,7 +115,7 @@ MarkdownDefTerm:     s(tcell.ColorWhite, tcell.ColorBlue).Bold(true),
 - `mdRun` struct with fields: `text`, `style`, `url`
 - `mdItem` struct with fields: `runs`, `children`, `checked`, `term`
 - `parseMarkdown(src string) []mdBlock` function that:
-  - Parses `text` via goldmark with GFM extensions (table, strikethrough, task list) and definition list extension
+  - Parses `src` via goldmark with GFM extensions (table, strikethrough, task list) and definition list extension
   - Walks the goldmark AST to produce `[]mdBlock`
   - Paragraphs: collects inline children into `[]mdRun` with appropriate styles
   - Headers: sets `level` (1-6) and collects inline runs
@@ -1377,7 +1377,7 @@ func (r *mdRenderer) renderLineInto(buf *DrawBuffer, lineY, screenY, dx, w int) 
     // Walk blocks, tracking current visual line number.
     // When we reach lineY, render that line and return.
     cur := 0
-    r.renderBlocksLine(buf, r.blocks, 0, lineY, screenY, dx, w, &cur, tcell.StyleDefault)
+    r.renderBlocksLine(buf, r.blocks, 0, lineY, screenY, dx, w, &cur, r.cs.MarkdownNormal)
 }
 
 // renderBlocksLine walks blocks looking for the target lineY.
@@ -1407,7 +1407,7 @@ func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, depth int, line
 
     switch b.kind {
     case blockParagraph:
-        return r.renderParagraphLine(buf, b.runs, cs.MarkdownNormal, indent, lineY, screenY, dx, w, cur)
+        return r.renderParagraphLine(buf, b.runs, parentBlockStyle, indent, lineY, screenY, dx, w, cur)
 
     case blockHeader:
         style := r.headerStyle(b.level)
@@ -1443,7 +1443,7 @@ func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, depth int, line
         }
 
     case blockBulletList, blockNumberList, blockCheckList:
-        return r.renderListLine(buf, b, depth, lineY, screenY, dx, w, cur)
+        return r.renderListLine(buf, b, depth, lineY, screenY, dx, w, cur, parentBlockStyle)
 
     case blockBlockquote:
         bqStyle := cs.MarkdownBlockquote
@@ -1482,7 +1482,7 @@ func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, depth int, line
         *cur++
 
     case blockDefList:
-        return r.renderDefListLine(buf, b, depth, lineY, screenY, dx, w, cur)
+        return r.renderDefListLine(buf, b, depth, lineY, screenY, dx, w, cur, parentBlockStyle)
     }
 
     return false
@@ -1535,7 +1535,7 @@ func (r *mdRenderer) renderParagraphLine(buf *DrawBuffer, runs []mdRun, blockSty
 }
 
 // renderListLine renders list items with markers and indentation.
-func (r *mdRenderer) renderListLine(buf *DrawBuffer, b mdBlock, depth int, lineY, screenY, dx, w int, cur *int) bool {
+func (r *mdRenderer) renderListLine(buf *DrawBuffer, b mdBlock, depth int, lineY, screenY, dx, w int, cur *int, blockStyle tcell.Style) bool {
     cs := r.cs
     for itemIdx, item := range b.items {
         markerWidth := 4
@@ -1569,7 +1569,7 @@ func (r *mdRenderer) renderListLine(buf *DrawBuffer, b mdBlock, depth int, lineY
                 }
                 // Draw item text
                 for _, run := range lineRuns {
-                    style := composeStyle(cs.MarkdownNormal, run.style, cs)
+                    style := composeStyle(blockStyle, run.style, cs)
                     for _, ch := range run.text {
                         if x >= 0 && x < w {
                             buf.WriteChar(x, screenY, ch, style)
@@ -1584,7 +1584,7 @@ func (r *mdRenderer) renderListLine(buf *DrawBuffer, b mdBlock, depth int, lineY
 
         // Nested children
         if len(item.children) > 0 {
-            if r.renderBlocksLine(buf, item.children, depth+1, lineY, screenY, dx, w, cur, cs.MarkdownNormal) {
+            if r.renderBlocksLine(buf, item.children, depth+1, lineY, screenY, dx, w, cur, blockStyle) {
                 return true
             }
         }
@@ -1738,7 +1738,7 @@ func (r *mdRenderer) drawTableDataRow(buf *DrawBuffer, cells [][]mdRun, colWidth
     }
 }
 
-func (r *mdRenderer) renderDefListLine(buf *DrawBuffer, b mdBlock, depth int, lineY, screenY, dx, w int, cur *int) bool {
+func (r *mdRenderer) renderDefListLine(buf *DrawBuffer, b mdBlock, depth int, lineY, screenY, dx, w int, cur *int, blockStyle tcell.Style) bool {
     cs := r.cs
     for i, item := range b.items {
         if i > 0 {
@@ -1779,7 +1779,7 @@ func (r *mdRenderer) renderDefListLine(buf *DrawBuffer, b mdBlock, depth int, li
             if *cur == lineY {
                 x := defIndent - dx
                 for _, run := range lineRuns {
-                    style := composeStyle(cs.MarkdownNormal, run.style, cs)
+                    style := composeStyle(blockStyle, run.style, cs)
                     for _, ch := range run.text {
                         if x >= 0 && x < w {
                             buf.WriteChar(x, screenY, ch, style)
