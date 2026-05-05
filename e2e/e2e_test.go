@@ -2153,17 +2153,17 @@ func TestFileDialogSelectFile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		tmuxSendKeys(t, session, "BSpace")
 	}
-	tmuxSendKeys(t, session, "testfile.txt")
+	tmuxType(t, session, "testfile.txt")
 	time.Sleep(200 * time.Millisecond)
 
 	// Press Enter to accept
 	tmuxSendKeys(t, session, "Enter")
 	time.Sleep(500 * time.Millisecond)
 
-	// Verify result appears in the static text area
+	// File > Open creates an EditWindow with the filename in its title bar
 	lines := tmuxCapture(t, session)
-	if !containsAny(lines, "Opened:") {
-		t.Fatal("'Opened:' text not found after file selection")
+	if !containsAny(lines, "testfile.txt") {
+		t.Fatal("EditWindow with 'testfile.txt' not visible after file selection")
 	}
 
 	// Clean exit
