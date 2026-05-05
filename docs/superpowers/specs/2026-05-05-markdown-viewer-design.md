@@ -70,6 +70,7 @@ const (
     runBoldItalic
     runCode
     runLink
+    runStrikethrough
 )
 
 type mdRun struct {
@@ -133,9 +134,12 @@ func (mv *MarkdownViewer) WrapText() bool
 - `SfVisible` — visible by default
 - `OfSelectable` — can receive focus
 - `OfFirstClick` — focusing click is also processed
+- `SetSelf(mv)` — required for BaseView click-to-focus
 - `wrapText = true` — word wrapping on by default
 
 Matches `NewMemo`, `NewListViewer`, `NewOutlineViewer` patterns.
+
+Note: `SetGrowMode` is NOT set by the constructor — it's the caller's responsibility, same as with Window and other container-placed widgets. The demo app should set `GfGrowHiX | GfGrowHiY` when placing the viewer in a resizable window.
 
 ### SetMarkdown
 
@@ -171,7 +175,7 @@ Parses the input string via goldmark, walks the AST to build `[]mdBlock`, stores
 | Table | GFM table syntax | Box-drawing borders, cell wrapping with min-width heuristic |
 | Definition list | `term\n: definition` | Term in bold style, definition indented 4 chars |
 | Image | `![alt](url)` | Rendered as `[IMG: alt text]` in code style |
-| Strikethrough | `~~text~~` | Rendered with `AttrStrikethrough` attribute |
+| Strikethrough | `~~text~~` | Rendered with `AttrStrikeThrough` attribute |
 
 ### Out of Scope
 
@@ -199,7 +203,7 @@ Footnotes, inline HTML tags, deeply nested blockquote styling beyond recursive r
 Block styles provide the background color and base foreground. Inline styles override the foreground and add attributes. The renderer composes them:
 
 - **Normal inline text**: uses block style directly
-- **Bold/Italic/BoldItalic**: takes foreground and attributes from the inline style field, background from the current block style
+- **Bold/Italic/BoldItalic/Strikethrough**: takes foreground and attributes from the inline style field, background from the current block style
 - **Inline code**: uses its own background (overrides block background) — this is the exception
 - **Links**: own foreground + underline, block background
 
@@ -264,7 +268,7 @@ Home/End go to document top/bottom directly (no Ctrl modifier needed) because th
 
 ## Color Scheme
 
-17 new fields added to `theme.ColorScheme`:
+18 new fields added to `theme.ColorScheme`:
 
 ```go
 // Markdown viewer styles
