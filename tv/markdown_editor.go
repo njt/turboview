@@ -5,6 +5,7 @@ package tv
 type MarkdownEditor struct {
 	*Editor
 	blocks      []mdBlock
+	revealSpans []revealSpan
 	sourceCache string
 	showSource  bool
 }
@@ -54,10 +55,12 @@ func (me *MarkdownEditor) reparse() {
 	me.sourceCache = src
 	if src == "" {
 		me.blocks = []mdBlock{}
+		me.buildRevealSpans()
 		return
 	}
 	me.blocks = parseMarkdown(src)
 	if me.blocks == nil {
 		me.blocks = []mdBlock{}
 	}
+	me.buildRevealSpans()
 }

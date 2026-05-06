@@ -27,7 +27,7 @@ func (me *MarkdownEditor) Draw(buf *DrawBuffer) {
 	buf.Fill(NewRect(0, 0, w, h), ' ', normalStyle)
 
 	if len(me.blocks) == 0 {
-		if me.HasState(SfSelected) {
+		if me.HasState(SfSelected) && cs != nil {
 			buf.WriteChar(0, 0, ' ', cs.MemoSelected)
 		}
 		return
@@ -42,6 +42,9 @@ func (me *MarkdownEditor) Draw(buf *DrawBuffer) {
 	}
 
 	me.drawCursor(buf, cs)
+
+	// Overlay revealed markers
+	me.overlayRevealSpans(buf, w, h, cs)
 }
 
 // HandleEvent overrides Editor.HandleEvent. When showSource is true it
@@ -66,6 +69,11 @@ func (me *MarkdownEditor) HandleEvent(event *Event) {
 // dimensions from mdRenderer instead of raw Memo line counts. This matches
 // the MarkdownViewer.syncScrollBars pattern.
 func (me *MarkdownEditor) syncScrollBars() {
+	if me.showSource {
+		me.Editor.Memo.syncScrollBars()
+		return
+	}
+
 	r := me.renderer()
 	totalH := r.renderedHeight()
 	vpH := me.Bounds().Height()
@@ -124,13 +132,25 @@ func (me *MarkdownEditor) syncScrollBars() {
 
 // renderer returns an mdRenderer configured from the current editor state.
 // Blocks come from the last parse, width from bounds, wrapText is always true,
-// and the color scheme from the widget.
+// and the color scheme from the widget. revealIndent is computed from reveal
+// spans so that rendered content does not overlap with revealed markers.
+// Reveal indent is only applied when the widget is selected (SfSelected).
 func (me *MarkdownEditor) renderer() *mdRenderer {
+	revealIndent := 0
+	if me.HasState(SfSelected) {
+		for _, s := range me.revealSpans {
+			if s.kind == revealBlock {
+				revealIndent = len([]rune(s.markerOpen))
+				break
+			}
+		}
+	}
 	return &mdRenderer{
-		blocks:   me.blocks,
-		width:    me.Bounds().Width(),
-		wrapText: true,
-		cs:       me.ColorScheme(),
+		blocks:       me.blocks,
+		width:        me.Bounds().Width(),
+		wrapText:     true,
+		cs:           me.ColorScheme(),
+		revealIndent: revealIndent,
 	}
 }
 
@@ -249,4 +269,298 @@ func (me *MarkdownEditor) drawCursor(buf *DrawBuffer, cs *theme.ColorScheme) {
 		}
 		buf.WriteChar(screenX, screenY, ch, style)
 	}
+}
+
+// overlayRevealSpans draws revealed syntax markers on top of rendered content.
+// It walks blocks to map visual lines to source rows, then draws marker text
+// at the appropriate screen positions using MarkdownBlockquote style.
+// Reveal is only active when the widget is selected (SfSelected).
+func (me *MarkdownEditor) overlayRevealSpans(buf *DrawBuffer, w, h int, cs *theme.ColorScheme) {
+	if len(me.revealSpans) == 0 || cs == nil || !me.HasState(SfSelected) {
+		return
+	}
+
+	// Build a lookup: source row -> marker text
+	spanBySourceRow := make(map[int]string)
+	for _, s := range me.revealSpans {
+		spanBySourceRow[s.startRow] = s.markerOpen
+	}
+
+	style := cs.MarkdownBlockquote
+
+	// Walk blocks visually, tracking source row correspondence.
+	me.walkRevealVisual(me.blocks, 0, func(visLine, srcRow, indent int) bool {
+		screenY := visLine - me.Memo.deltaY
+		if screenY < 0 {
+			return true // continue
+		}
+		if screenY >= h {
+			return false // stop
+		}
+
+		marker, ok := spanBySourceRow[srcRow]
+		if !ok {
+			return true
+		}
+
+		x := indent - me.Memo.deltaX
+		for _, ch := range marker {
+			if x >= 0 && x < w {
+				buf.WriteChar(x, screenY, ch, style)
+			}
+			x++
+		}
+		return true
+	})
+}
+
+// walkRevealVisual walks blocks tracking visual line position and calls fn for
+// each visual line with its corresponding source row and indentation level.
+// It stops when fn returns false.
+func (me *MarkdownEditor) walkRevealVisual(blocks []mdBlock, depth int, fn func(visLine, srcRow, indent int) bool) {
+	cur := 0
+	_ = me.walkBlocksForReveal(blocks, depth, &cur, fn)
+}
+
+func (me *MarkdownEditor) walkBlocksForReveal(blocks []mdBlock, depth int, cur *int, fn func(visLine, srcRow, indent int) bool) bool {
+	srcRow := 0
+
+	// Walk source to find non-blank lines and map them to blocks
+	blockIdx := 0
+	for srcRow < len(me.Memo.lines) {
+		if strings.TrimSpace(string(me.Memo.lines[srcRow])) == "" {
+			srcRow++
+			continue
+		}
+		if blockIdx >= len(blocks) {
+			break
+		}
+
+		b := blocks[blockIdx]
+		if !me.walkBlockForReveal(b, srcRow, depth, cur, fn) {
+			return false
+		}
+		srcRow += blockSourceLineCount(b, me.Memo.lines, srcRow)
+		blockIdx++
+	}
+	return true
+}
+
+func (me *MarkdownEditor) walkBlockForReveal(b mdBlock, srcRow, depth int, cur *int, fn func(visLine, srcRow, indent int) bool) bool {
+	indent := depth * 2
+
+	switch b.kind {
+	case blockParagraph, blockHeader:
+		r := me.renderer()
+		runs := b.runs
+		avail := r.width - indent
+		if avail < 1 {
+			avail = 1
+		}
+		var lines [][]mdRun
+		if r.wrapText && len(runs) > 0 {
+			lines = wrapRuns(runs, avail)
+		} else {
+			lines = [][]mdRun{runs}
+		}
+		for range lines {
+			if !fn(*cur, srcRow, indent) {
+				return false
+			}
+			*cur++
+		}
+		return true
+
+	case blockCodeBlock:
+		if len(b.code) == 0 {
+			if !fn(*cur, srcRow, indent) {
+				return false
+			}
+			*cur++
+			return true
+		}
+		for range b.code {
+			if !fn(*cur, srcRow, indent) {
+				return false
+			}
+			*cur++
+			srcRow++
+		}
+		return true
+
+	case blockBulletList, blockNumberList, blockCheckList:
+		markerWidth := 4
+		itemIndent := depth*2 + markerWidth
+		r := me.renderer()
+		avail := r.width - itemIndent
+		if avail < 1 {
+			avail = 1
+		}
+
+		itemSrcRow := srcRow
+		for _, item := range b.items {
+			var lines [][]mdRun
+			if r.wrapText && len(item.runs) > 0 {
+				lines = wrapRuns(item.runs, avail)
+			} else {
+				lines = [][]mdRun{item.runs}
+			}
+			for lineIdx := range lines {
+				// Report the source row only on the first visual line of the item
+				reportedSrcRow := -1
+				if lineIdx == 0 {
+					reportedSrcRow = itemSrcRow
+				}
+				if !fn(*cur, reportedSrcRow, itemIndent) {
+					return false
+				}
+				*cur++
+			}
+			itemSrcRow++
+
+			// Nested children
+			if len(item.children) > 0 {
+				childSrcRow := itemSrcRow
+				for _, child := range item.children {
+					if !me.walkBlockForReveal(child, childSrcRow, depth+1, cur, fn) {
+						return false
+					}
+					childSrcRow += blockSourceLineCount(child, me.Memo.lines, childSrcRow)
+				}
+				itemSrcRow = childSrcRow
+			}
+		}
+		return true
+
+	case blockBlockquote:
+		childSrcRow := srcRow
+		for i, child := range b.children {
+			if i > 0 {
+				if !fn(*cur, -1, indent) {
+					return false
+				}
+				*cur++
+			}
+			if !me.walkBlockForReveal(child, childSrcRow, depth+1, cur, fn) {
+				return false
+			}
+			childSrcRow += blockSourceLineCount(child, me.Memo.lines, childSrcRow)
+		}
+		return true
+
+	case blockTable:
+		r := me.renderer()
+		avail := r.width - indent
+		if avail < 1 {
+			avail = 1
+		}
+		colWidths := layoutTable(b, avail)
+		if colWidths == nil {
+			return true
+		}
+		eff := computeEffectiveWidths(colWidths, avail, r.wrapText)
+
+		// Top border
+		if !fn(*cur, srcRow, indent) {
+			return false
+		}
+		*cur++
+
+		// Headers
+		headerH := r.tableRowHeight(b.headers, eff)
+		for h := 0; h < headerH; h++ {
+			if !fn(*cur, srcRow, indent) {
+				return false
+			}
+			*cur++
+		}
+		srcRow++
+
+		// Header separator
+		if !fn(*cur, srcRow, indent) {
+			return false
+		}
+		*cur++
+		srcRow++
+
+		// Data rows
+		for _, row := range b.rows {
+			rowH := r.tableRowHeight(row, eff)
+			for h := 0; h < rowH; h++ {
+				if !fn(*cur, srcRow, indent) {
+					return false
+				}
+				*cur++
+			}
+			srcRow++
+		}
+
+		// Bottom border
+		if !fn(*cur, -1, indent) {
+			return false
+		}
+		*cur++
+		return true
+
+	case blockHRule:
+		return fn(*cur, srcRow, indent)
+
+	case blockDefList:
+		defIndent := 4
+		r := me.renderer()
+		defAvail := r.width - depth*2 - defIndent
+		if defAvail < 1 {
+			defAvail = 1
+		}
+
+		itemSrcRow := srcRow
+		for i, item := range b.items {
+			if i > 0 {
+				if !fn(*cur, -1, indent) {
+					return false
+				}
+				*cur++
+			}
+			// Term
+			if !fn(*cur, itemSrcRow, depth*2) {
+				return false
+			}
+			*cur++
+			itemSrcRow++
+
+			// Definition
+			var defLines [][]mdRun
+			if r.wrapText && len(item.runs) > 0 {
+				defLines = wrapRuns(item.runs, defAvail)
+			} else {
+				defLines = [][]mdRun{item.runs}
+			}
+			for lineIdx := range defLines {
+				reportedSrcRow := -1
+				if lineIdx == 0 {
+					reportedSrcRow = itemSrcRow
+				}
+				if !fn(*cur, reportedSrcRow, indent+defIndent) {
+					return false
+				}
+				*cur++
+			}
+			itemSrcRow++
+
+			// Children
+			if len(item.children) > 0 {
+				childSrcRow := itemSrcRow
+				for _, child := range item.children {
+					if !me.walkBlockForReveal(child, childSrcRow, depth+1, cur, fn) {
+						return false
+					}
+					childSrcRow += blockSourceLineCount(child, me.Memo.lines, childSrcRow)
+				}
+				itemSrcRow = childSrcRow
+			}
+		}
+		return true
+	}
+
+	return true
 }

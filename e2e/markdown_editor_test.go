@@ -168,12 +168,17 @@ func TestMarkdownEditorCursorVisible(t *testing.T) {
 		t.Fatal("Markdown Editor window not focused -- title bar not found with active frame")
 	}
 
-	// In Phase 1, cursor at (0,0) on "# Welcome" renders '#' at the screen
-	// position where the heading text starts. This causes "Welcome" to appear
-	// as "#elcome" (cursor overlays source '#' on the rendered 'W').
-	// Verify this cursor-overlay behavior is present.
-	if !containsAny(lines, "#elcome") {
-		t.Error("cursor overlay pattern '#elcome' not visible -- cursor may not be rendering at heading position")
+	// With reveal (Phase 2), the cursor at (0,0) on "# Welcome" draws the
+	// source '#' character at the screen position corresponding to source
+	// column 0. The reveal marker "# " appears dimmed starting at x=0, and
+	// the heading content "Welcome" is shifted right by the marker width.
+	// The cursor '#' overlays the dimmed marker '#' at x=0.
+	// Verify both the cursor/marker '#' and heading "Welcome" are visible.
+	if !containsAny(lines, "#") {
+		t.Error("cursor/marker '#' not visible -- cursor may not be rendering at heading position")
+	}
+	if !containsAny(lines, "Welcome") {
+		t.Error("heading 'Welcome' not visible -- content may not be rendering after reveal indent")
 	}
 
 	// Move cursor and verify content stays visible
@@ -267,7 +272,9 @@ func TestMarkdownEditorNewLineTyping(t *testing.T) {
 }
 
 // TestMarkdownEditorScrollbarVisible verifies both vertical and
-// horizontal scrollbars render in the MarkdownEditor window.
+// horizontal scrollbars render in the MarkdownEditor window, and that
+// PageDn actually scrolls the rendered content (later lines become
+// visible, earlier lines scroll out of view).
 func TestMarkdownEditorScrollbarVisible(t *testing.T) {
 	binPath := buildBasicApp(t)
 
@@ -288,7 +295,15 @@ func TestMarkdownEditorScrollbarVisible(t *testing.T) {
 	tmuxSendKeys(t, session, "M")
 	time.Sleep(500 * time.Millisecond)
 
+	// Move cursor down from the heading so the cursor overlay doesn't
+	// overwrite characters of "Welcome".
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(300 * time.Millisecond)
+
 	lines := tmuxCapture(t, session)
+
+	// --- Static structure assertions ---
 
 	// Vertical scrollbar arrow characters should be visible
 	if !containsAny(lines, "▲", "▼") {
@@ -298,6 +313,53 @@ func TestMarkdownEditorScrollbarVisible(t *testing.T) {
 	// Horizontal scrollbar arrow characters should be visible
 	if !containsAny(lines, "◄", "►") {
 		t.Error("horizontal scrollbar arrow characters '◄' or '►' not visible in MarkdownEditor")
+	}
+
+	// Window title should be visible
+	if !containsAny(lines, "Markdown Editor") {
+		t.Error("Markdown Editor window title not visible")
+	}
+
+	// --- Scroll behavior assertions ---
+
+	// Precondition: early content should be visible at the top of the viewport.
+	if !containsAny(lines, "Welcome") {
+		t.Fatal("precondition: 'Welcome' heading not visible before PageDn")
+	}
+	if !containsAny(lines, "Line 01") {
+		t.Fatal("precondition: 'Line 01' not visible before PageDn — content may be too short or rendering is broken")
+	}
+
+	// Press PageDn to scroll the rendered markdown content down one viewport.
+	tmuxSendKeys(t, session, "NPage")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// After PageDn, later content should be visible.
+	if !containsAny(lines, "Line 08", "Line 09", "Line 10", "Line 11", "Line 12") {
+		t.Error("later lines (Line 08+) not visible after PageDn — scroll may not have worked")
+	}
+
+	// Earlier content should have scrolled out of the visible viewport.
+	if containsAny(lines, "Line 01") {
+		t.Error("'Line 01' still visible after PageDn — content did not scroll")
+	}
+
+	// Press PageDn a second time to scroll further down.
+	tmuxSendKeys(t, session, "NPage")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// After another PageDn, even later content should be visible.
+	if !containsAny(lines, "Line 15", "Line 16", "Line 17", "Line 18", "Line 19", "Line 20") {
+		t.Error("even later lines (Line 15+) not visible after second PageDn — scroll may be stuck")
+	}
+
+	// Content from the first page should now be scrolled out.
+	if containsAny(lines, "Line 01") || containsAny(lines, "Line 02") {
+		t.Error("early lines still visible after two PageDn presses — scrolling may be incomplete")
 	}
 
 	// Clean exit
