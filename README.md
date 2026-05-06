@@ -11,6 +11,8 @@ TurboView is a from-scratch Go implementation of Turbo Vision's architecture: ov
 
 Built on [tcell/v2](https://github.com/gdamore/tcell) for terminal I/O.
 
+![Demo](docs/demo.gif)
+
 ## Widgets
 
 | Widget | Description |
