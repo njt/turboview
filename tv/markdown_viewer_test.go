@@ -1818,3 +1818,491 @@ func TestMarkdownViewer_SetStateDelegatesToBaseView(t *testing.T) {
 		t.Error("SetState(SfSelected, false) did not clear the flag via BaseView")
 	}
 }
+
+// =============================================================================
+// Regression Test 1: defListHeight includes nested children (Section 1a)
+// =============================================================================
+
+// TestMarkdownViewer_DefListHeightIncludesChildren verifies that defListHeight
+// accounts for item.children height. A definition list with nested child blocks
+// must have greater rendered height than the same list without children.
+//
+// Spec requirement (Section 1a): defListHeight must account for item.children
+// height.
+func TestMarkdownViewer_DefListHeightIncludesChildren(t *testing.T) {
+	// Construct a definition list where one item has a child code block.
+	blocksWithChildren := []mdBlock{{
+		kind: blockDefList,
+		items: []mdItem{
+			{
+				term: []mdRun{{text: "Term1", style: runNormal}},
+				runs: []mdRun{{text: "Definition one", style: runNormal}},
+				children: []mdBlock{
+					{kind: blockCodeBlock, code: []string{"line1", "line2", "line3"}},
+				},
+			},
+			{
+				term: []mdRun{{text: "Term2", style: runNormal}},
+				runs: []mdRun{{text: "Definition two", style: runNormal}},
+			},
+		},
+	}}
+
+	// Same list without children.
+	blocksWithoutChildren := []mdBlock{{
+		kind: blockDefList,
+		items: []mdItem{
+			{
+				term: []mdRun{{text: "Term1", style: runNormal}},
+				runs: []mdRun{{text: "Definition one", style: runNormal}},
+			},
+			{
+				term: []mdRun{{text: "Term2", style: runNormal}},
+				runs: []mdRun{{text: "Definition two", style: runNormal}},
+			},
+		},
+	}}
+
+	mv := NewMarkdownViewer(NewRect(0, 0, 40, 10))
+	mv.scheme = theme.BorlandBlue
+	mv.blocks = blocksWithChildren
+	rWith := &mdRenderer{
+		blocks:   mv.blocks,
+		width:    mv.Bounds().Width(),
+		wrapText: mv.WrapText(),
+		cs:       mv.ColorScheme(),
+	}
+
+	mv2 := NewMarkdownViewer(NewRect(0, 0, 40, 10))
+	mv2.scheme = theme.BorlandBlue
+	mv2.blocks = blocksWithoutChildren
+	rWithout := &mdRenderer{
+		blocks:   mv2.blocks,
+		width:    mv2.Bounds().Width(),
+		wrapText: mv2.WrapText(),
+		cs:       mv2.ColorScheme(),
+	}
+
+	hWith := rWith.renderedHeight()
+	hWithout := rWithout.renderedHeight()
+
+	if hWith <= hWithout {
+		t.Errorf("renderedHeight with children = %d, without children = %d; want greater with children", hWith, hWithout)
+	}
+}
+
+// TestMarkdownViewer_DefListHeightRendersChildren verifies that child content
+// actually appears in Draw() output, not just counted in height.
+//
+// Falsifying test: a lazy implementation could add a fixed increment to
+// renderedHeight when children exist, without actually rendering the child
+// content. This test catches that by verifying child content is visible.
+func TestMarkdownViewer_DefListHeightRendersChildren(t *testing.T) {
+	blocks := []mdBlock{{
+		kind: blockDefList,
+		items: []mdItem{{
+			term: []mdRun{{text: "Term", style: runNormal}},
+			runs: []mdRun{{text: "Definition", style: runNormal}},
+			children: []mdBlock{
+				{kind: blockCodeBlock, code: []string{"rendered-child-content"}},
+			},
+		}},
+	}}
+
+	mv := NewMarkdownViewer(NewRect(0, 0, 40, 10))
+	mv.scheme = theme.BorlandBlue
+	mv.blocks = blocks
+	buf := NewDrawBuffer(40, 10)
+	mv.Draw(buf)
+
+	// The child code block text must appear in rendered output.
+	childFound := false
+	for y := 0; y < 10; y++ {
+		text := renderText(buf, y)
+		if strings.Contains(text, "rendered") {
+			childFound = true
+			break
+		}
+	}
+	if !childFound {
+		t.Error("child block content not found in Draw() output; defList rendering does not emit children")
+	}
+}
+
+// =============================================================================
+// Regression Test 2: defListLine blank lines between items (Section 1b)
+// =============================================================================
+
+// TestMarkdownViewer_DefListBlankLinesBetweenItems verifies that
+// renderDefListLine emits a blank line between multi-item definition lists.
+//
+// Spec requirement (Section 1b): renderDefListLine must emit blank lines
+// between multi-item definition lists, matching defListHeight.
+func TestMarkdownViewer_DefListBlankLinesBetweenItems(t *testing.T) {
+	src := "Term1\n: Definition one\n\nTerm2\n: Definition two"
+
+	mv := NewMarkdownViewer(NewRect(0, 0, 40, 10))
+	mv.scheme = theme.BorlandBlue
+	mv.SetMarkdown(src)
+	buf := NewDrawBuffer(40, 10)
+	mv.Draw(buf)
+
+	r := &mdRenderer{
+		blocks:   mv.blocks,
+		width:    mv.Bounds().Width(),
+		wrapText: mv.WrapText(),
+		cs:       mv.ColorScheme(),
+	}
+	totalH := r.renderedHeight()
+
+	// Layout per spec: Term line, Def line(s), BLANK, Term line, Def line(s).
+	// A 2-item list with single-line definitions at width 40:
+	//   row 0: "Term1"
+	//   row 1: "    Definition one"
+	//   row 2: blank (all spaces, pre-filled by Draw)
+	//   row 3: "Term2"
+	//   row 4: "    Definition two"
+
+	blankLineIdx := -1
+	for y := 0; y < totalH; y++ {
+		if strings.TrimSpace(renderText(buf, y)) == "" {
+			blankLineIdx = y
+			break
+		}
+	}
+
+	if blankLineIdx < 0 {
+		t.Error("no blank line found between definition list items")
+		return
+	}
+
+	// Verify the blank line is between "Definition one" and "Term2".
+	hasTerm2After := false
+	hasDefOneBefore := false
+	for y := blankLineIdx + 1; y < totalH; y++ {
+		if strings.Contains(renderText(buf, y), "Term2") {
+			hasTerm2After = true
+			break
+		}
+	}
+	for y := blankLineIdx - 1; y >= 0; y-- {
+		if strings.Contains(renderText(buf, y), "Definition one") {
+			hasDefOneBefore = true
+			break
+		}
+	}
+
+	if !hasTerm2After {
+		t.Errorf("blank line at row %d is not followed by 'Term2'", blankLineIdx)
+	}
+	if !hasDefOneBefore {
+		t.Errorf("blank line at row %d is not preceded by 'Definition one'", blankLineIdx)
+	}
+}
+
+
+// TestMarkdownViewer_DefListBlankLineAllSpaces verifies the blank line between
+// definition list items is truly blank (all spaces, no stray characters).
+//
+// Falsifying test: a lazy implementation could emit arbitrary content on what
+// it considers a "blank" line, or place the blank in the wrong position.
+func TestMarkdownViewer_DefListBlankLineAllSpaces(t *testing.T) {
+	src := "Term1\n: Definition one\n\nTerm2\n: Definition two"
+
+	mv := NewMarkdownViewer(NewRect(0, 0, 40, 10))
+	mv.scheme = theme.BorlandBlue
+	mv.SetMarkdown(src)
+	buf := NewDrawBuffer(40, 10)
+	mv.Draw(buf)
+
+	r := &mdRenderer{
+		blocks:   mv.blocks,
+		width:    mv.Bounds().Width(),
+		wrapText: mv.WrapText(),
+		cs:       mv.ColorScheme(),
+	}
+	totalH := r.renderedHeight()
+
+	// Find the blank separator row and verify it's all spaces.
+	blankFound := false
+	for y := 0; y < totalH; y++ {
+		if strings.TrimSpace(renderText(buf, y)) == "" {
+			blankFound = true
+			// Every cell on this row must be a space rune (pre-filled by Draw).
+			for x := 0; x < 40; x++ {
+				cell := buf.GetCell(x, y)
+				if cell.Rune != ' ' {
+					t.Errorf("blank separator row %d: cell (%d, %d) rune = %q, want ' '",
+						y, x, y, string(cell.Rune))
+				}
+			}
+			break
+		}
+	}
+	if !blankFound {
+		t.Error("no blank separator row found between def list items")
+	}
+}
+
+// TestMarkdownViewer_CodeBlockInsideBlockquote verifies that a code block inside
+// a blockquote renders both the blockquote bar character and the code block
+// background fill.
+//
+// Spec requirement (Section 1c): A code block inside a blockquote must render
+// both the blockquote bar character and the code block background fill.
+func TestMarkdownViewer_CodeBlockInsideBlockquote(t *testing.T) {
+	mv := NewMarkdownViewer(NewRect(0, 0, 50, 8))
+	mv.scheme = theme.BorlandBlue
+	// Blockquote containing a fenced code block.
+	mv.SetMarkdown("> ```\n> code in blockquote\n> ```")
+
+	buf := NewDrawBuffer(50, 8)
+	mv.Draw(buf)
+
+	// Find the row containing the code text.
+	codeRow := -1
+	for y := 0; y < 8; y++ {
+		text := renderText(buf, y)
+		if strings.Contains(text, "code in blockquote") {
+			codeRow = y
+			break
+		}
+	}
+	if codeRow < 0 {
+		t.Fatal("code block text 'code in blockquote' not found in rendered output")
+	}
+
+	// (a) The blockquote bar character '▌' must be present on the code row.
+	barFound := false
+	for x := 0; x < 50; x++ {
+		cell := buf.GetCell(x, codeRow)
+		if cell.Rune == '▌' {
+			barFound = true
+			break
+		}
+	}
+	if !barFound {
+		t.Error("blockquote bar character '▌' not found on code block row")
+	}
+
+	// (b) The code block background fill must be present (MarkdownCodeBlock style).
+	//     Find a code text character and verify its style is MarkdownCodeBlock.
+	codeBlockStyle := theme.BorlandBlue.MarkdownCodeBlock
+	normalStyle := theme.BorlandBlue.MarkdownNormal
+	codeStyleFound := false
+	for x := 0; x < 50; x++ {
+		cell := buf.GetCell(x, codeRow)
+		if cell.Rune == 'c' {
+			codeStyleFound = true
+			if cell.Style != codeBlockStyle {
+				t.Errorf("code character 'c' at (%d,%d) style = %v, want MarkdownCodeBlock %v",
+					x, codeRow, cell.Style, codeBlockStyle)
+			}
+			if cell.Style == normalStyle {
+				t.Errorf("code character 'c' at (%d,%d) has MarkdownNormal style; code block background missing",
+					x, codeRow)
+			}
+			break
+		}
+	}
+	if !codeStyleFound {
+		t.Error("code character 'c' not found on code row; cannot verify code block style")
+	}
+
+	// (c) The code text "code in blockquote" is in the rendered output (already
+	//     confirmed above by finding codeRow).
+}
+
+
+// TestMarkdownViewer_CodeBlockInBlockquoteBarAtCorrectX verifies that the
+// blockquote bar is at the correct x position (the left margin), not randomly
+// placed.
+//
+// Falsifying test: a lazy implementation might draw the bar at an arbitrary
+// position rather than at the correct indent level.
+func TestMarkdownViewer_CodeBlockInBlockquoteBarAtCorrectX(t *testing.T) {
+	mv := NewMarkdownViewer(NewRect(0, 0, 50, 8))
+	mv.scheme = theme.BorlandBlue
+	mv.SetMarkdown("> ```\n> code in blockquote\n> ```")
+
+	buf := NewDrawBuffer(50, 8)
+	mv.Draw(buf)
+
+	// Find the code row.
+	codeRow := -1
+	for y := 0; y < 8; y++ {
+		if strings.Contains(renderText(buf, y), "code in blockquote") {
+			codeRow = y
+			break
+		}
+	}
+	if codeRow < 0 {
+		t.Fatal("code block text not found")
+	}
+
+	// The bar must be at the leftmost position (x=0 with no horizontal scroll).
+	// It should NOT appear only at the code text indent level.
+	cell := buf.GetCell(0, codeRow)
+	if cell.Rune != '▌' {
+		t.Errorf("cell (0, %d) = %q, want '▌' (blockquote bar at left margin)", codeRow, string(cell.Rune))
+	}
+
+	// Verify the bar character has a blockquote-associated style, not
+	// MarkdownCodeBlock or MarkdownNormal.
+	barStyle := cell.Style
+	codeBlockStyle := theme.BorlandBlue.MarkdownCodeBlock
+	normalStyle := theme.BorlandBlue.MarkdownNormal
+	if barStyle == codeBlockStyle {
+		t.Error("blockquote bar has MarkdownCodeBlock style; should have blockquote style")
+	}
+	if barStyle == normalStyle {
+		t.Error("blockquote bar has MarkdownNormal style; should have blockquote style")
+	}
+	wantBarStyle := theme.BorlandBlue.MarkdownBlockquote
+	if barStyle != wantBarStyle {
+		t.Errorf("bar style should be MarkdownBlockquote")
+	}
+}
+
+// =============================================================================
+// Regression Test 4: Table header style (Section 1d)
+// =============================================================================
+
+// TestMarkdownViewer_TableHeaderStyle verifies that table header cells use
+// MarkdownBold style and body cells use MarkdownNormal style.
+//
+// Spec requirement (Section 1d): Table header cells must use MarkdownBold style.
+func TestMarkdownViewer_TableHeaderStyle(t *testing.T) {
+	mv := NewMarkdownViewer(NewRect(0, 0, 50, 15))
+	mv.scheme = theme.BorlandBlue
+	mv.SetMarkdown("| Name | Type |\n|------|------|\n| foo  | bar  |")
+
+	buf := NewDrawBuffer(50, 15)
+	mv.Draw(buf)
+
+	boldStyle := theme.BorlandBlue.MarkdownBold
+	normalStyle := theme.BorlandBlue.MarkdownNormal
+
+	// Find the header row: it contains "Name" and/or "Type".
+	headerRow := -1
+	bodyRow := -1
+	for y := 0; y < 15; y++ {
+		text := renderText(buf, y)
+		if strings.Contains(text, "Name") {
+			headerRow = y
+		}
+		if strings.Contains(text, "foo") {
+			bodyRow = y
+		}
+	}
+
+	if headerRow < 0 {
+		t.Fatal("table header row with 'Name' not found")
+	}
+	if bodyRow < 0 {
+		t.Fatal("table body row with 'foo' not found")
+	}
+
+	// (a) A cell in the header row must have MarkdownBold style.
+	headerStyleFound := false
+	for x := 0; x < 50; x++ {
+		cell := buf.GetCell(x, headerRow)
+		if cell.Rune == 'N' {
+			headerStyleFound = true
+			if cell.Style != boldStyle {
+				t.Errorf("header 'N' at (%d,%d) style = %v, want MarkdownBold %v",
+					x, headerRow, cell.Style, boldStyle)
+			}
+			break
+		}
+	}
+	if !headerStyleFound {
+		t.Error("header cell character 'N' not found")
+	}
+
+	// (b) A cell in the body row must have MarkdownNormal style.
+	bodyStyleFound := false
+	for x := 0; x < 50; x++ {
+		cell := buf.GetCell(x, bodyRow)
+		if cell.Rune == 'f' {
+			bodyStyleFound = true
+			if cell.Style != normalStyle {
+				t.Errorf("body 'f' at (%d,%d) style = %v, want MarkdownNormal %v",
+					x, bodyRow, cell.Style, normalStyle)
+			}
+			break
+		}
+	}
+	if !bodyStyleFound {
+		t.Error("body cell character 'f' not found")
+	}
+}
+
+// TestMarkdownViewer_TableHeaderAndBodyStylesDiffer verifies that MarkdownBold
+// and MarkdownNormal are visually distinct (differ in foreground, background,
+// or attributes) using Decompose().
+//
+// Falsifying test: a lazy implementation could assign both header and body the
+// same style. This test proves the two styles are actually different.
+func TestMarkdownViewer_TableHeaderAndBodyStylesDiffer(t *testing.T) {
+	boldStyle := theme.BorlandBlue.MarkdownBold
+	normalStyle := theme.BorlandBlue.MarkdownNormal
+
+	boldFg, boldBg, boldAttrs := boldStyle.Decompose()
+	normalFg, normalBg, normalAttrs := normalStyle.Decompose()
+
+	if boldFg == normalFg && boldBg == normalBg && boldAttrs == normalAttrs {
+		t.Error("MarkdownBold and MarkdownNormal are identical; header and body cells would be indistinguishable")
+	}
+}
+
+// =============================================================================
+// Style Audit Test 5: BorlandBlue visual distinctiveness (Section 6)
+// =============================================================================
+
+// TestMarkdownViewer_StyleAuditBorlandBlue verifies that key style pairs are
+// visually distinct from MarkdownNormal via full Decompose() comparison
+// (foreground + background + attributes). Uses the BorlandBlue theme.
+//
+// Spec requirement (Section 6): Using the BorlandBlue theme, verify key style
+// pairs are visually distinct from MarkdownNormal.
+// MarkdownH6 is intentionally identical to MarkdownNormal and is excluded.
+func TestMarkdownViewer_StyleAuditBorlandBlue(t *testing.T) {
+	cs := theme.BorlandBlue
+	normalFg, normalBg, normalAttrs := cs.MarkdownNormal.Decompose()
+
+	stylePairs := []struct {
+		name  string
+		style tcell.Style
+	}{
+		{"MarkdownBold", cs.MarkdownBold},
+		{"MarkdownItalic", cs.MarkdownItalic},
+		{"MarkdownCode", cs.MarkdownCode},
+		{"MarkdownH1", cs.MarkdownH1},
+		{"MarkdownH2", cs.MarkdownH2},
+		{"MarkdownH3", cs.MarkdownH3},
+		{"MarkdownH4", cs.MarkdownH4},
+		{"MarkdownH5", cs.MarkdownH5},
+		{"MarkdownLink", cs.MarkdownLink},
+		{"MarkdownBlockquote", cs.MarkdownBlockquote},
+		{"MarkdownTableBorder", cs.MarkdownTableBorder},
+		{"MarkdownHRule", cs.MarkdownHRule},
+		{"MarkdownListMarker", cs.MarkdownListMarker},
+		{"MarkdownDefTerm", cs.MarkdownDefTerm},
+	}
+
+	for _, sp := range stylePairs {
+		fg, bg, attrs := sp.style.Decompose()
+		if fg == normalFg && bg == normalBg && attrs == normalAttrs {
+			t.Errorf("%s is visually identical to MarkdownNormal (fg=%v bg=%v attrs=%v)",
+				sp.name, fg, bg, attrs)
+		}
+	}
+
+	// MarkdownH6 is intentionally identical to MarkdownNormal per spec.
+	h6Fg, h6Bg, h6Attrs := cs.MarkdownH6.Decompose()
+	if h6Fg != normalFg || h6Bg != normalBg || h6Attrs != normalAttrs {
+		t.Errorf("MarkdownH6 (fg=%v bg=%v attrs=%v) differs from MarkdownNormal (fg=%v bg=%v attrs=%v); spec says they should be identical",
+			h6Fg, h6Bg, h6Attrs, normalFg, normalBg, normalAttrs)
+	}
+}
