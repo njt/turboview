@@ -57,4 +57,7 @@ func (me *MarkdownEditor) reparse() {
 		return
 	}
 	me.blocks = parseMarkdown(src)
+	if me.blocks == nil {
+		me.blocks = []mdBlock{}
+	}
 }
