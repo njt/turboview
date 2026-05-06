@@ -77,7 +77,7 @@ go test ./e2e/ -timeout 180s
 
 ## Status
 
-Work in progress. The core framework and the widgets listed above are functional. Not yet implemented from the original: TFileDialog, TColorDialog, TEditWindow, and various other specialized dialogs.
+Work in progress. All 22 widgets listed above are functional. Not yet implemented from the original Turbo Vision: TChDirDialog, TTerminal, TParamText, TMultiCheckBoxes, the help system (THelpFile/THelpIndex/THelpTopic), the resource/streaming system (TResourceFile/TCollection/TStreamable), and demo toys (TCalculator, TCalendar, TClock, TPuzzle).
 
 ## Acknowledgments
 
