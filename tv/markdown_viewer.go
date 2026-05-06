@@ -25,6 +25,7 @@ func NewMarkdownViewer(bounds Rect) *MarkdownViewer {
 	mv.SetState(SfVisible, true)
 	mv.SetOptions(OfSelectable|OfFirstClick, true)
 	mv.SetSelf(mv)
+	mv.SetGrowMode(GfGrowHiX | GfGrowHiY)
 	return mv
 }
 
@@ -267,15 +268,6 @@ func (mv *MarkdownViewer) HandleEvent(event *Event) {
 		event.Clear()
 	case tcell.KeyPgDn:
 		mv.deltaY += vpH
-		if len(mv.blocks) > 0 {
-			maxDY := totalH - vpH
-			if maxDY < 0 {
-				maxDY = 0
-			}
-			if mv.deltaY > maxDY {
-				mv.deltaY = maxDY
-			}
-		}
 		mv.syncScrollBars()
 		event.Clear()
 	case tcell.KeyHome:
@@ -283,11 +275,7 @@ func (mv *MarkdownViewer) HandleEvent(event *Event) {
 		mv.syncScrollBars()
 		event.Clear()
 	case tcell.KeyEnd:
-		maxDY := totalH - vpH
-		if maxDY < 0 {
-			maxDY = 0
-		}
-		mv.deltaY = maxDY
+		mv.deltaY = totalH
 		mv.syncScrollBars()
 		event.Clear()
 	case tcell.KeyLeft:

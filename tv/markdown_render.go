@@ -666,6 +666,13 @@ func (r *mdRenderer) renderLineInto(buf *DrawBuffer, lineY, screenY, dx, w int) 
 	}
 }
 
+// Block renderer checklist — every new mdBlockKind must handle:
+//   1. Height: blockHeight switch case accounting for depth indent
+//   2. MaxWidth: blockMaxWidth switch case accounting for depth indent + content width
+//   3. Render: renderBlockLine dispatch + render function using composeStyle for inline runs
+//   4. Background fill: start at (depth*2 - dx) clamped to [0, w), not x=0
+//   5. Nested children: blocksHeight / renderBlocksInto at depth+1 for any child blocks
+//   6. Blank lines: height function and render function must agree on blank-line placement
 // renderBlockLine dispatches to the appropriate block-type renderer.
 func (r *mdRenderer) renderBlockLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
 	switch b.kind {
