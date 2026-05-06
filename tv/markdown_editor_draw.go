@@ -47,21 +47,164 @@ func (me *MarkdownEditor) Draw(buf *DrawBuffer) {
 	me.overlayRevealSpans(buf, w, h, cs)
 }
 
-// HandleEvent overrides Editor.HandleEvent. When showSource is true it
-// delegates entirely to Editor. Otherwise it delegates to Editor for edit
-// processing and calls reparse after consumed events to refresh blocks.
+// HandleEvent overrides Editor.HandleEvent to add markdown-aware keyboard
+// shortcuts, smart list continuation, undo coalescing, paste handling, and
+// auto-reparse on edit.
+//
+// Dispatch order:
+//  1. Ctrl+T - toggle source mode (must be before showSource guard)
+//  2. showSource guard - delegate entirely to Editor
+//  3. Broadcast forward (CmIndicatorUpdate)
+//  4. Keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+K, Enter on link, Ctrl+V) - before Memo
+//  5. Smart list indent/outdent (Tab/Shift-Tab) - before Memo
+//  6. Undo coalescing: classify, save, dispatch to Memo directly
+//  7. Post-edit: reparse, list continuation, and link indicator
 func (me *MarkdownEditor) HandleEvent(event *Event) {
+	// 1. Ctrl+T toggles source mode — MUST be before showSource guard
+	if event.What == EvKeyboard && event.Key != nil && event.Key.Key == tcell.KeyCtrlT {
+		me.showSource = !me.showSource
+		if !me.showSource {
+			me.reparse()
+		}
+		event.Clear()
+		return
+	}
+
+	// 2. If in source mode, delegate completely to Editor
 	if me.showSource {
 		me.Editor.HandleEvent(event)
 		return
 	}
+
+	// 3. Forward broadcast events to Editor (for status line)
 	if event.What == EvBroadcast && event.Command == CmIndicatorUpdate {
 		me.Editor.HandleEvent(event)
 		return
 	}
-	me.Editor.HandleEvent(event)
+
+	// 4. Keyboard shortcuts (before Memo consumes the keystroke)
+	if event.What == EvKeyboard && event.Key != nil {
+		k := event.Key
+		// 4a. Ctrl+B / Ctrl+I toggle format
+		if k.Key == tcell.KeyCtrlB && k.Modifiers == tcell.ModNone {
+			me.toggleFormat("**")
+			event.Clear()
+			return
+		}
+		if k.Key == tcell.KeyCtrlI && k.Modifiers == tcell.ModNone {
+			me.toggleFormat("*")
+			event.Clear()
+			return
+		}
+		// 4b. Ctrl+K — open link dialog
+		if k.Key == tcell.KeyCtrlK && k.Modifiers == tcell.ModNone {
+			me.openLinkDialog()
+			event.Clear()
+			return
+		}
+		// 4c. Enter on a link opens link dialog (before Memo inserts newline)
+		if k.Key == tcell.KeyEnter && me.findLinkAt(me.Memo.cursorRow, me.Memo.cursorCol) != nil {
+			me.openLinkDialog()
+			event.Clear()
+			return
+		}
+		// 4d. Ctrl+V / Ctrl+Shift+V paste handling
+		if k.Key == tcell.KeyCtrlV {
+			forcePlain := k.Modifiers&tcell.ModShift != 0
+			me.pushUndo()
+			me.streakSaved = false
+			me.lastEditKind = editOther
+			me.handlePaste(forcePlain)
+			me.reparse()
+			me.updateLinkIndicator()
+			event.Clear()
+			return
+		}
+	}
+
+	// 5. Smart list indent/outdent (Tab/Shift-Tab, before Memo)
+	if me.handleListIndent(event) {
+		event.Clear()
+		return
+	}
+
+	// 6. Undo coalescing and dispatch to Memo.
+	//
+	// We call Memo.HandleEvent directly rather than Editor.HandleEvent because
+	// Editor.HandleEvent unconditionally calls saveSnapshot() before every edit
+	// key — which would defeat our coalescing. Instead we manage save/restore
+	// ourselves via the undo stack and only save at meaningful boundaries.
+	//
+	// Keyboard events that are not edit keys (arrows, Home, End, etc.) are still
+	// dispatched to Memo, which handles cursor movement and selection. Non-edit
+	// keys break the coalescing streak.
+	if event.What == EvKeyboard && event.Key != nil && !event.IsCleared() {
+		k := event.Key
+
+		// 6a. Ctrl+Z undo — restore most recent snapshot
+		if k.Key == tcell.KeyCtrlZ {
+			me.popUndo()
+			me.reparse()
+			me.updateLinkIndicator()
+			me.streakSaved = false
+			me.lastEditKind = editNone
+			event.Clear()
+			return
+		}
+
+		// 6b. Classify the event for undo coalescing
+		kind := me.classifyEvent(event)
+
+		// 6c. Save snapshot at meaningful boundaries:
+		//   - editOther always saves (Enter, paste, format, word boundaries)
+		//   - editChar/editBackspace save only when starting a new streak
+		shouldSave := false
+		if kind == editOther {
+			shouldSave = true
+			me.streakSaved = false // reset so next editChar starts a new streak
+		} else if (kind == editChar || kind == editBackspace) && !me.streakSaved {
+			shouldSave = true
+			me.streakSaved = true
+		}
+		if shouldSave {
+			me.pushUndo()
+		}
+
+		// 6d. Dispatch to Memo directly (bypass Editor to avoid its saveSnapshot)
+		me.Memo.HandleEvent(event)
+
+		// 6e. Post-edit
+		if event.IsCleared() {
+			if kind == editNone {
+				// Non-edit key (arrow, click) — breaks the coalescing streak
+				me.streakSaved = false
+				me.lastEditKind = editNone
+			} else {
+				me.lastEditKind = kind
+				me.reparse()
+				// List continuation after Enter.
+				// Also reset the coalescing streak so the next edit
+				// (on the new line) starts a fresh undo unit.
+				if k.Key == tcell.KeyEnter {
+					me.streakSaved = false
+					if me.listEnterContinuation() {
+						me.reparse()
+					}
+				}
+				me.updateLinkIndicator()
+			}
+		}
+		return
+	}
+
+	// 7. For non-keyboard events (mouse, etc.), delegate to Memo.
+	me.Memo.HandleEvent(event)
+
+	// Post-edit reparse for non-keyboard events that were consumed (e.g. mouse
+	// clicks that move cursor).
 	if event.IsCleared() {
 		me.reparse()
+		me.updateLinkIndicator()
 	}
 }
 
@@ -272,46 +415,79 @@ func (me *MarkdownEditor) drawCursor(buf *DrawBuffer, cs *theme.ColorScheme) {
 }
 
 // overlayRevealSpans draws revealed syntax markers on top of rendered content.
-// It walks blocks to map visual lines to source rows, then draws marker text
-// at the appropriate screen positions using MarkdownBlockquote style.
+// It handles two kinds of spans:
+//   - revealBlock: drawn at the start of a visual line (left margin).
+//   - revealInline: drawn at their source position within the content line.
+//
 // Reveal is only active when the widget is selected (SfSelected).
 func (me *MarkdownEditor) overlayRevealSpans(buf *DrawBuffer, w, h int, cs *theme.ColorScheme) {
 	if len(me.revealSpans) == 0 || cs == nil || !me.HasState(SfSelected) {
 		return
 	}
 
-	// Build a lookup: source row -> marker text
-	spanBySourceRow := make(map[int]string)
-	for _, s := range me.revealSpans {
-		spanBySourceRow[s.startRow] = s.markerOpen
-	}
-
 	style := cs.MarkdownBlockquote
 
-	// Walk blocks visually, tracking source row correspondence.
-	me.walkRevealVisual(me.blocks, 0, func(visLine, srcRow, indent int) bool {
-		screenY := visLine - me.Memo.deltaY
-		if screenY < 0 {
-			return true // continue
+	// ---- Block-level markers (drawn at visual-line starts) ----
+	spanBySourceRow := make(map[int]string)
+	for _, s := range me.revealSpans {
+		if s.kind == revealBlock {
+			spanBySourceRow[s.startRow] = s.markerOpen
 		}
-		if screenY >= h {
-			return false // stop
-		}
+	}
 
-		marker, ok := spanBySourceRow[srcRow]
-		if !ok {
-			return true
-		}
-
-		x := indent - me.Memo.deltaX
-		for _, ch := range marker {
-			if x >= 0 && x < w {
-				buf.WriteChar(x, screenY, ch, style)
+	if len(spanBySourceRow) > 0 {
+		me.walkRevealVisual(me.blocks, 0, func(visLine, srcRow, indent int) bool {
+			screenY := visLine - me.Memo.deltaY
+			if screenY < 0 {
+				return true // continue
 			}
-			x++
+			if screenY >= h {
+				return false // stop
+			}
+
+			marker, ok := spanBySourceRow[srcRow]
+			if !ok {
+				return true
+			}
+
+			x := indent - me.Memo.deltaX
+			for _, ch := range marker {
+				if x >= 0 && x < w {
+					buf.WriteChar(x, screenY, ch, style)
+				}
+				x++
+			}
+			return true
+		})
+	}
+
+	// ---- Inline markers (drawn at source-position screen coordinates) ----
+	for i := range me.revealSpans {
+		s := &me.revealSpans[i]
+		if s.kind != revealInline {
+			continue
 		}
-		return true
-	})
+
+		// Draw opening marker at the span's start position.
+		scrY, scrX := me.sourceToScreen(s.startRow, s.startCol)
+		for _, ch := range s.markerOpen {
+			if scrX >= 0 && scrX < w && scrY >= 0 && scrY < h {
+				buf.WriteChar(scrX, scrY, ch, style)
+			}
+			scrX++
+		}
+
+		// Draw closing marker.  endCol is inclusive, so the closing marker
+		// starts at (endCol - len(markerClose) + 1).
+		closeStart := s.endCol - len([]rune(s.markerClose)) + 1
+		scrY, scrX = me.sourceToScreen(s.endRow, closeStart)
+		for _, ch := range s.markerClose {
+			if scrX >= 0 && scrX < w && scrY >= 0 && scrY < h {
+				buf.WriteChar(scrX, scrY, ch, style)
+			}
+			scrX++
+		}
+	}
 }
 
 // walkRevealVisual walks blocks tracking visual line position and calls fn for

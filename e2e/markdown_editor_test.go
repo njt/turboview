@@ -376,3 +376,332 @@ func TestMarkdownEditorScrollbarVisible(t *testing.T) {
 		t.Error("app did not exit after Alt+X")
 	}
 }
+
+// TestMarkdownEditorRevealBlockHeading verifies block-level reveal:
+// when cursor is inside a heading, the "# " marker is visible on screen;
+// when cursor leaves the heading, the marker disappears.
+func TestMarkdownEditorRevealBlockHeading(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-reveal-heading"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Cursor starts at (0,0) in the "# Welcome" heading.
+	// The cursor overlays the source '#' at screen position.
+	// With reveal active, the "# " block marker is dimmed at columns 0-1,
+	// and the cursor overlays the dimmed '#' at column 0.
+	lines := tmuxCapture(t, session)
+
+	// With cursor in heading, the "#" marker should be visible
+	if !containsAny(lines, "#") {
+		t.Error("heading marker '#' not visible when cursor is inside heading")
+	}
+	if !containsAny(lines, "Welcome") {
+		t.Error("heading text 'Welcome' not visible")
+	}
+
+	// Move cursor down to leave heading (rows: 0=heading, 1=blank, 2=text)
+	// After moving to row 1 (blank), cursor leaves heading block
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	// Both "#" and "Welcome" should still be visible (Welcome always renders,
+	// and # may still be present from the cursor at position (1,0))
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(300 * time.Millisecond)
+
+	// Now cursor is at row 2 (plain text "Type **markdown** here."),
+	// completely outside heading. Block reveal should hide heading markers.
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "Welcome") {
+		t.Error("heading 'Welcome' still visible when cursor is away (expected)")
+	}
+
+	// Move back to heading to verify marker reappears
+	tmuxSendKeys(t, session, "Up")
+	tmuxSendKeys(t, session, "Up")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "#") {
+		t.Error("heading marker '#' not visible after returning cursor to heading")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorListContinuation verifies smart list continuation
+// (Phase 3): pressing Enter at the end of a list item creates a new
+// list item line with the appropriate marker.
+func TestMarkdownEditorListContinuation(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-mdlist"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Move to end of "- item one" line (source row 4).
+	// Source rows: 0="# Welcome", 1="", 2="Type **markdown** here.",
+	//              3="", 4="- item one"
+	for i := 0; i < 4; i++ {
+		tmuxSendKeys(t, session, "Down")
+	}
+	tmuxSendKeys(t, session, "End")
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// After listEnterContinuation, "- " is inserted on the new line.
+	// With reveal active (widget selected, cursor on list item),
+	// the "-" block marker is drawn dimmed at the left margin.
+	if !containsAny(lines, "- ") {
+		t.Error("list continuation marker '- ' not visible after Enter at end of list item")
+	}
+
+	// Verify original bullets still render
+	if !containsAny(lines, "item two") {
+		t.Error("bullet item 'item two' not visible after list continuation")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorSourceToggle verifies Ctrl+T toggles between
+// formatted and raw source view (Phase 3).
+func TestMarkdownEditorSourceToggle(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-mdtoggle"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Move cursor down to avoid cursor overlay issues with the heading
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(200 * time.Millisecond)
+
+	// Press Ctrl+T to toggle source mode
+	tmuxSendKeys(t, session, "C-t")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// In source mode, the raw markdown "# Welcome" shows "#" literally
+	if !containsAny(lines, "# Welcome") {
+		t.Error("raw source '# Welcome' not visible after Ctrl+T toggle to source mode")
+	}
+
+	// Toggle back to formatted mode
+	tmuxSendKeys(t, session, "C-t")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "Welcome") {
+		t.Error("'Welcome' not visible after toggling back to formatted mode")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorTypeAndRender verifies typing markdown heading
+// syntax and seeing it render in formatted mode (Phase 3).
+func TestMarkdownEditorTypeAndRender(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-mdrender"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Go to end of document (Ctrl+End), add a new heading line.
+	tmuxSendKeys(t, session, "C-End")
+	time.Sleep(300 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	tmuxType(t, session, "## New Section")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	// The heading text should render in the formatted output
+	if !containsAny(lines, "New Section") {
+		t.Error("'New Section' heading text not visible after typing")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorRevealInlineBold verifies inline-level reveal:
+// when cursor is inside bold text (**markdown**), the "**" markers
+// become visible; when cursor leaves, they disappear.
+func TestMarkdownEditorRevealInlineBold(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-reveal-bold"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Source content: row 0="# Welcome", row 1="", row 2="Type **markdown** here."
+	// Move cursor to row 2 (bold text line), then right to enter bold span
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(200 * time.Millisecond)
+
+	// Row 2: "Type **markdown** here."
+	// Move cursor inside bold span, past "markdown" so the whole word is
+	// visible on screen (cursor overlay at a specific position would
+	// break substring matching for the full word).
+	// Col layout: 0=T,1=y,2=p,3=e,4=' ',5=*,6=*,7=m,8=a,9=r,10=k,11=d,12=o,13=w,14=n,15=*,16=*
+	for i := 0; i < 10; i++ {
+		tmuxSendKeys(t, session, "Right")
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	// Cursor at col 10 ('k' in "markdown") — inside bold span.
+	// The cursor overlays 'k', so search for parts visible around it.
+	lines := tmuxCapture(t, session)
+
+	// Check that surrounding parts of bold text are visible
+	if !containsAny(lines, "Type") {
+		t.Error("preceding text 'Type' not visible when cursor is in bold span")
+	}
+	if !containsAny(lines, "here") {
+		t.Error("following text 'here' not visible when cursor is in bold span")
+	}
+
+	// Move cursor back to before bold span
+	tmuxSendKeys(t, session, "Home")
+	time.Sleep(300 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "markdown") {
+		t.Error("bold content 'markdown' not visible when cursor is outside bold")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}

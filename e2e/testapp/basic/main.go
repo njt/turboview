@@ -85,7 +85,13 @@ func main() {
 				w := tv.NewWindow(tv.NewRect(2, 1, 60, 20), "Markdown Editor", tv.WithWindowNumber(7))
 				iw, ih := w.Bounds().Width()-2, w.Bounds().Height()-2
 				editor := tv.NewMarkdownEditor(tv.NewRect(1, 1, iw-1, ih-1))
-				editor.SetText("# Welcome\n\nType **markdown** here.\n\n- item one\n- item two")
+				// 50+ lines of scroll-test content so the MarkdownEditor
+				// viewport overflows and scrollbar behavior is testable.
+				mdText := "# Welcome\n\nType **markdown** here.\n\n- item one\n- item two"
+				for i := 1; i <= 50; i++ {
+					mdText += fmt.Sprintf("\nLine %02d\n", i)
+				}
+				editor.SetText(mdText)
 				vScroll := tv.NewScrollBar(tv.NewRect(iw, 1, 1, ih-1), tv.Vertical)
 				hScroll := tv.NewScrollBar(tv.NewRect(1, ih, iw-1, 1), tv.Horizontal)
 				editor.SetVScrollBar(vScroll)

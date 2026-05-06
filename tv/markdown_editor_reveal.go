@@ -127,7 +127,11 @@ func blockSourceLineCount(b mdBlock, source [][]rune, startRow int) int {
 	case blockDefList:
 		count := 0
 		row := startRow
-		for _, item := range b.items {
+		for i, item := range b.items {
+			if i > 0 {
+				count++ // blank line between items
+				row++
+			}
 			count++ // term line
 			row++
 			count++ // definition line
@@ -357,7 +361,381 @@ func (me *MarkdownEditor) buildRevealSpans() []revealSpan {
 	if me.revealSpans == nil {
 		me.revealSpans = []revealSpan{}
 	}
+
+	// Append inline-level spans from scanInlineMarkers.
+	inlineSpans := scanInlineMarkers(me.Memo.lines, me.blocks, me.Memo.cursorRow, me.Memo.cursorCol)
+	me.revealSpans = append(me.revealSpans, inlineSpans...)
+
 	return me.revealSpans
+}
+
+// scanInlineMarkers walks blocks to find inline syntax markers (bold, italic,
+// code, strikethrough) in the source text. It matches found markers to the
+// block's mdRun inline styles from goldmark's parse tree and returns only the
+// revealSpan for the span containing (or adjacent to) the cursor position.
+//
+// Adjacent means the cursor is within 1 character of the span bounds: on the
+// marker itself, immediately before the opening marker, or immediately after
+// the closing marker.
+//
+// If the cursor is not inside or adjacent to any inline span, returns nil.
+func scanInlineMarkers(source [][]rune, blocks []mdBlock, cursorRow int, cursorCol int) []revealSpan {
+	if len(source) == 0 || len(blocks) == 0 {
+		return nil
+	}
+
+	srcRow := 0
+	blockIdx := 0
+
+	for srcRow < len(source) && blockIdx < len(blocks) {
+		// Skip blank source lines (they separate blocks).
+		if strings.TrimSpace(string(source[srcRow])) == "" {
+			srcRow++
+			continue
+		}
+
+		b := blocks[blockIdx]
+		lineCount := blockSourceLineCount(b, source, srcRow)
+
+		// Check if cursorRow falls within this block's source range.
+		if cursorRow >= srcRow && cursorRow < srcRow+lineCount {
+			spans := blockInlineSpans(b, source, srcRow)
+			for _, s := range spans {
+				if cursorRow >= s.startRow && cursorRow <= s.endRow {
+					if cursorCol >= s.startCol-1 && cursorCol <= s.endCol+1 {
+						return []revealSpan{s}
+					}
+				}
+			}
+			return nil
+		}
+
+		srcRow += lineCount
+		blockIdx++
+	}
+
+	return nil
+}
+
+// blockquotePrefixSkip computes the number of columns to skip at the start
+// of a blockquote source line to get past ">" prefixes and whitespace.
+// Example: "  > > text" -> skip skips past "  > > " (the leading spaces and
+// all ">" prefixes and their trailing spaces).
+func blockquotePrefixSkip(line []rune) int {
+	rawLine := string(line)
+	trimmed := strings.TrimLeft(rawLine, " ")
+	skip := len(rawLine) - len(trimmed) // leading spaces
+	rest := trimmed
+	for strings.HasPrefix(rest, ">") {
+		rest = rest[1:]
+		skip++
+		if strings.HasPrefix(rest, " ") {
+			rest = rest[1:]
+			skip++
+		}
+	}
+	return skip
+}
+
+// defListPrefixSkip computes the number of columns to skip for a definition
+// list definition line (": " or "~ " prefix plus leading whitespace).
+func defListPrefixSkip(line []rune) int {
+	rawLine := string(line)
+	trimmed := strings.TrimLeft(rawLine, " ")
+	skip := len(rawLine) - len(trimmed)
+	if strings.HasPrefix(trimmed, ": ") || strings.HasPrefix(trimmed, "~ ") {
+		skip += 2
+	} else if strings.HasPrefix(trimmed, ":") || strings.HasPrefix(trimmed, "~") {
+		skip++
+	}
+	return skip
+}
+
+// blockInlineSpans returns all inline reveal spans for a block, anchored at
+// blockSrcRow in the source. It dispatches to the appropriate handler based
+// on block kind.
+func blockInlineSpans(b mdBlock, source [][]rune, blockSrcRow int) []revealSpan {
+	switch b.kind {
+	case blockParagraph:
+		if blockSrcRow >= len(source) {
+			return nil
+		}
+		return lineInlineSpans(b.runs, source[blockSrcRow], blockSrcRow, 0)
+
+	case blockHeader:
+		if blockSrcRow >= len(source) {
+			return nil
+		}
+		// Header marker is "#"*level + " "; skip it to find inline content.
+		skip := b.level + 1
+		return lineInlineSpans(b.runs, source[blockSrcRow], blockSrcRow, skip)
+
+	case blockBulletList, blockNumberList, blockCheckList:
+		var allSpans []revealSpan
+		itemRow := blockSrcRow
+		for _, item := range b.items {
+			if itemRow < len(source) && len(item.runs) > 0 {
+				marker, _, _ := detectListMarker(string(source[itemRow]))
+				skip := len([]rune(marker))
+				allSpans = append(allSpans,
+					lineInlineSpans(item.runs, source[itemRow], itemRow, skip)...)
+			}
+			itemRow++
+			for _, child := range item.children {
+				allSpans = append(allSpans,
+					blockInlineSpans(child, source, itemRow)...)
+				itemRow += blockSourceLineCount(child, source, itemRow)
+			}
+		}
+		return allSpans
+
+	case blockBlockquote:
+		var allSpans []revealSpan
+		childRow := blockSrcRow
+		for _, child := range b.children {
+			if childRow >= len(source) {
+				break
+			}
+			skip := blockquotePrefixSkip(source[childRow])
+
+			// Dispatch based on child kind, adjusting skip for the
+			// blockquote ">" prefix.
+			switch child.kind {
+			case blockParagraph:
+				allSpans = append(allSpans,
+					lineInlineSpans(child.runs, source[childRow], childRow, skip)...)
+			case blockHeader:
+				// Header marker comes after the ">" prefix.
+				headerSkip := skip + child.level + 1
+				allSpans = append(allSpans,
+					lineInlineSpans(child.runs, source[childRow], childRow, headerSkip)...)
+			default:
+				allSpans = append(allSpans,
+					blockInlineSpans(child, source, childRow)...)
+			}
+			childRow += blockSourceLineCount(child, source, childRow)
+		}
+		return allSpans
+
+	case blockTable:
+		var allSpans []revealSpan
+		row := blockSrcRow
+
+		// Header row (if present).
+		if len(b.headers) > 0 && row < len(source) {
+			allSpans = append(allSpans,
+				tableRowInlineSpans(b.headers, source[row], row)...)
+			row++
+		}
+		// Separator row.
+		row++
+
+		// Body rows.
+		for _, bodyRow := range b.rows {
+			if row >= len(source) {
+				break
+			}
+			allSpans = append(allSpans,
+				tableRowInlineSpans(bodyRow, source[row], row)...)
+			row++
+		}
+		return allSpans
+
+	case blockDefList:
+		var allSpans []revealSpan
+		itemRow := blockSrcRow
+		for i, item := range b.items {
+			if i > 0 {
+				itemRow++ // blank line between items
+			}
+			// Term line.
+			if itemRow < len(source) && len(item.term) > 0 {
+				allSpans = append(allSpans,
+					lineInlineSpans(item.term, source[itemRow], itemRow, 0)...)
+			}
+			itemRow++
+			// Definition line.
+			if itemRow < len(source) && len(item.runs) > 0 {
+				skip := defListPrefixSkip(source[itemRow])
+				allSpans = append(allSpans,
+					lineInlineSpans(item.runs, source[itemRow], itemRow, skip)...)
+			}
+			itemRow++
+			// Nested children.
+			for _, child := range item.children {
+				allSpans = append(allSpans,
+					blockInlineSpans(child, source, itemRow)...)
+				itemRow += blockSourceLineCount(child, source, itemRow)
+			}
+		}
+		return allSpans
+
+	default:
+		return nil
+	}
+}
+
+// tableRowInlineSpans scans a table row source line for inline syntax markers
+// in each cell, using the parsed cell runs.
+func tableRowInlineSpans(cells [][]mdRun, line []rune, srcRow int) []revealSpan {
+	var allSpans []revealSpan
+	pos := 0
+
+	// Skip the opening "|".
+	for pos < len(line) && line[pos] == '|' {
+		pos++
+	}
+
+	for _, cell := range cells {
+		// Skip whitespace before cell content.
+		for pos < len(line) && (line[pos] == ' ' || line[pos] == '\t') {
+			pos++
+		}
+
+		cellStart := pos
+		if cellStart < len(line) && len(cell) > 0 {
+			allSpans = append(allSpans,
+				lineInlineSpans(cell, line, srcRow, cellStart)...)
+		}
+
+		// Advance past this cell to the next "|" separator.
+		// Walk past the rendered cell content and any inline markers.
+		for pos < len(line) && line[pos] != '|' {
+			pos++
+		}
+		if pos < len(line) {
+			pos++ // skip "|"
+		}
+	}
+	return allSpans
+}
+
+// lineInlineSpans scans a single source line (as []rune) for inline syntax
+// markers that correspond to the given runs. The skip parameter is the number
+// of columns to skip at the start of the line (e.g., for header markers).
+// Returned spans have column positions relative to the full source line.
+func lineInlineSpans(runs []mdRun, line []rune, srcRow, skip int) []revealSpan {
+	if skip >= len(line) {
+		return nil
+	}
+
+	var spans []revealSpan
+	srcPos := 0 // position within the content part of the line (after skip)
+
+	for _, run := range runs {
+		// Allocate enough runes for the run text to avoid re-allocation.
+		runRunes := []rune(run.text)
+		runLen := len(runRunes)
+
+		if run.style == runNormal || run.style == runLink {
+			// Plain text: advance past it in the source.  The content
+			// starting at (skip + srcPos) must match run.text.
+			if skip+srcPos+runLen <= len(line) {
+				srcPos += runLen
+			} else {
+				// Run text exceeds remaining line — stop scanning.
+				break
+			}
+			continue
+		}
+
+		// Styled run: detect the opening marker at the current source position.
+		openStart := srcPos
+		markerOpen := detectInlineMarker(line, skip+srcPos, run.style)
+		if markerOpen == "" {
+			continue
+		}
+		srcPos += len([]rune(markerOpen))
+
+		// Content text — skip past it.
+		srcPos += runLen
+
+		// Detect the closing marker after the content text.
+		// Goldmark may strip trailing whitespace from content text
+		// (e.g., "**text  **" -> content is "text", not "text  "),
+		// and nested formatting (e.g., "**bold *italic***")
+		// puts inner markers before the outer closing marker.
+		// Scan forward when the closing marker is not at the
+		// expected position.
+		closeAbsPos := skip + srcPos
+		markerClose := detectInlineMarker(line, closeAbsPos, run.style)
+		if markerClose == "" {
+			for closeAbsPos < len(line) {
+				closeAbsPos++
+				markerClose = detectInlineMarker(line, closeAbsPos, run.style)
+				if markerClose != "" {
+					break
+				}
+			}
+		}
+		if markerClose == "" {
+			continue
+		}
+		srcPos = closeAbsPos - skip // realign to found position
+		closeLen := len([]rune(markerClose))
+		closeEnd := srcPos + closeLen - 1 // inclusive end column in skip-relative coords
+
+		spans = append(spans, revealSpan{
+			startRow:    srcRow,
+			startCol:    skip + openStart,
+			endRow:      srcRow,
+			endCol:      skip + closeEnd,
+			markerOpen:  markerOpen,
+			markerClose: markerClose,
+			kind:        revealInline,
+		})
+
+		srcPos = closeEnd + 1
+	}
+
+	return spans
+}
+
+// detectInlineMarker reads the opening or closing marker at the given position
+// in the source line for the specified run style. Returns the marker string,
+// or "" if no matching marker is found.
+func detectInlineMarker(line []rune, pos int, style mdRunStyle) string {
+	if pos >= len(line) {
+		return ""
+	}
+
+	switch style {
+	case runBold:
+		if pos+2 <= len(line) && line[pos] == '*' && line[pos+1] == '*' {
+			return "**"
+		}
+		if pos+2 <= len(line) && line[pos] == '_' && line[pos+1] == '_' {
+			return "__"
+		}
+
+	case runItalic:
+		if line[pos] == '*' {
+			return "*"
+		}
+		if line[pos] == '_' {
+			return "_"
+		}
+
+	case runBoldItalic:
+		if pos+3 <= len(line) && line[pos] == '*' && line[pos+1] == '*' && line[pos+2] == '*' {
+			return "***"
+		}
+		if pos+3 <= len(line) && line[pos] == '_' && line[pos+1] == '_' && line[pos+2] == '_' {
+			return "___"
+		}
+
+	case runCode:
+		if line[pos] == '`' {
+			return "`"
+		}
+
+	case runStrikethrough:
+		if pos+2 <= len(line) && line[pos] == '~' && line[pos+1] == '~' {
+			return "~~"
+		}
+	}
+
+	return ""
 }
 
 // inRevealSpan returns a pointer to the revealSpan containing the given

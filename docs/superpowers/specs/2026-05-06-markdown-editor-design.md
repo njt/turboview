@@ -69,7 +69,7 @@ Auto-format triggers when typed syntax becomes complete. Source is NOT mutated �
 
 These DO mutate source:
 
-- **Enter** at end of a non-empty list item → new line with same marker (`- `, `1. `, `- [ ] `)
+- **Enter** at end of a non-empty list item → new line with same marker type. Bullet and checklist markers are copied verbatim (`- `, `- [ ] `). Numbered list markers are incremented (`1. ` → `2. `, `99. ` → `100. `).
 - **Enter** on an empty list item → delete empty marker, exit list, insert blank line
 - **Tab** at list item → indent (add `  ` before marker, e.g., `- ` → `  - `)
 - **Shift-Tab** at indented list item → outdent (remove `  ` prefix)
@@ -90,7 +90,7 @@ Toggle behavior: with selection, wraps/unwraps. Without selection, inserts empty
 Links render as formatted text (green, underlined). When cursor is on link text:
 
 - Status line hints available action ("Enter to edit link")
-- Pressing Enter opens a standard modal dialog with fields for URL and link text, plus OK/Cancel/Remove buttons
+- Pressing Enter opens sequential InputBox dialogs for link text and URL (standard Turbo Vision pattern), with OK/Cancel on each step. Clearing the URL field and pressing OK removes the link (keeps the text).
 - Ctrl+K with a selection opens the same dialog to create a new link
 
 ## Paste Behavior
