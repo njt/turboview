@@ -76,14 +76,18 @@ This also fixes the missing `len(mv.blocks) > 0` guard in `KeyEnd` since `syncSc
 
 **Bug:** Weak style assertions in existing tests verify text content but not that styles are visually distinct. A theme change that made all Markdown styles identical would not be caught.
 
-**Test:** Using the BorlandBlue theme, verify that key style pairs have distinct foreground colors:
-- `MarkdownBold` != `MarkdownNormal`
-- `MarkdownItalic` != `MarkdownNormal`
-- `MarkdownCode` has different background from `MarkdownNormal`
-- `MarkdownH1` through `MarkdownH6` are all distinct from `MarkdownNormal`
-- `MarkdownLink` != `MarkdownNormal`
-- `MarkdownBlockquote` != `MarkdownNormal`
-- `MarkdownTableBorder` != `MarkdownNormal`
-- `MarkdownHRule` != `MarkdownNormal`
-- `MarkdownListMarker` != `MarkdownNormal`
-- `MarkdownDefTerm` != `MarkdownNormal`
+**Test:** Using the BorlandBlue theme, verify that key style pairs are visually distinct. Use full `Decompose()` comparison (foreground + background + attributes), not just foreground color — styles can differ by Bold, Italic, background, etc. while sharing the same foreground.
+
+Verify these styles differ from `MarkdownNormal` (LightGray on Blue, no attrs):
+- `MarkdownBold` — same fg/bg, Bold attr
+- `MarkdownItalic` — same fg/bg, Italic attr
+- `MarkdownCode` — different background (Cyan)
+- `MarkdownH1` through `MarkdownH5` — various fg/attribute differences
+- `MarkdownLink` — Yellow foreground
+- `MarkdownBlockquote` — DarkGray background
+- `MarkdownTableBorder` — DarkCyan foreground, Bold
+- `MarkdownHRule` — DarkCyan foreground
+- `MarkdownListMarker` — DarkCyan foreground
+- `MarkdownDefTerm` — White foreground, Bold
+
+Note: `MarkdownH6` in BorlandBlue is intentionally identical to `MarkdownNormal` (matches original TV convention where H6 uses the same formatting as body text). This is not tested as "distinct."
