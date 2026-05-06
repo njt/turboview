@@ -32,6 +32,7 @@ func main() {
 		),
 		tv.NewSubMenu("~O~ptions",
 			tv.NewMenuItem("~C~olors...", tv.CmUser+30, tv.KbNone()),
+			tv.NewMenuItem("~M~arkdown Editor", tv.CmUser+40, tv.KbCtrl('M')),
 		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
@@ -78,6 +79,21 @@ func main() {
 			if cmd == tv.CmUser+30 {
 				cd := tv.NewColorDialog(nil, nil)
 				app.Desktop().ExecView(cd)
+				return true
+			}
+			if cmd == tv.CmUser+40 {
+				w := tv.NewWindow(tv.NewRect(2, 1, 60, 20), "Markdown Editor", tv.WithWindowNumber(7))
+				iw, ih := w.Bounds().Width()-2, w.Bounds().Height()-2
+				editor := tv.NewMarkdownEditor(tv.NewRect(1, 1, iw-1, ih-1))
+				editor.SetText("# Welcome\n\nType **markdown** here.\n\n- item one\n- item two")
+				vScroll := tv.NewScrollBar(tv.NewRect(iw, 1, 1, ih-1), tv.Vertical)
+				hScroll := tv.NewScrollBar(tv.NewRect(1, ih, iw-1, 1), tv.Horizontal)
+				editor.SetVScrollBar(vScroll)
+				editor.SetHScrollBar(hScroll)
+				w.Insert(editor)
+				w.Insert(vScroll)
+				w.Insert(hScroll)
+				app.Desktop().Insert(w)
 				return true
 			}
 			return false
