@@ -31,7 +31,11 @@ Built on [tcell/v2](https://github.com/gdamore/tcell) for terminal I/O.
 | ListBox | ListViewer + ScrollBar composite |
 | ScrollBar | Vertical/horizontal scrollbar with thumb dragging and arrow clicks |
 | History | Input line history dropdown (Turbo Vision's THistory) |
+| ColorDialog | Color selection dialog with group/item lists and palette preview |
+| EditWindow | Windowed text editor with scrollbars, line numbers, file loading |
+| FileDialog | File browser dialog with directory navigation and wildcard filtering |
 | MarkdownViewer | Read-only Markdown renderer with word wrap, scroll, and 18 element types |
+| Outline | Collapsible tree viewer with scrollbar and keyboard navigation |
 | StaticText | Non-interactive text display |
 
 ## Architectural choices
