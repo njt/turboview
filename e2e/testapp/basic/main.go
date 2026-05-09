@@ -32,6 +32,7 @@ func main() {
 		),
 		tv.NewSubMenu("~O~ptions",
 			tv.NewMenuItem("~C~olors...", tv.CmUser+30, tv.KbNone()),
+			tv.NewMenuItem("~M~arkdown Editor", tv.CmUser+40, tv.KbAlt('M')),
 		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
@@ -80,6 +81,27 @@ func main() {
 				app.Desktop().ExecView(cd)
 				return true
 			}
+			if cmd == tv.CmUser+40 {
+				w := tv.NewWindow(tv.NewRect(2, 1, 60, 20), "Markdown Editor", tv.WithWindowNumber(7))
+				iw, ih := w.Bounds().Width()-2, w.Bounds().Height()-2
+				editor := tv.NewMarkdownEditor(tv.NewRect(1, 1, iw-1, ih-1))
+				// 50+ lines of scroll-test content so the MarkdownEditor
+				// viewport overflows and scrollbar behavior is testable.
+				mdText := "# Welcome\n\nType **markdown** here.\n\n- item one\n- item two"
+				for i := 1; i <= 50; i++ {
+					mdText += fmt.Sprintf("\nLine %02d\n", i)
+				}
+				editor.SetText(mdText)
+				vScroll := tv.NewScrollBar(tv.NewRect(iw, 1, 1, ih-1), tv.Vertical)
+				hScroll := tv.NewScrollBar(tv.NewRect(1, ih, iw-1, 1), tv.Horizontal)
+				editor.SetVScrollBar(vScroll)
+				editor.SetHScrollBar(hScroll)
+				w.Insert(editor)
+				w.Insert(vScroll)
+				w.Insert(hScroll)
+				app.Desktop().Insert(w)
+				return true
+			}
 			return false
 		}),
 	)
@@ -88,7 +110,7 @@ func main() {
 	}
 
 	// Window 1 — buttons, checkboxes, radio buttons, input, history, label, validated port
-	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 14), "File Manager", tv.WithWindowNumber(1))
+	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 14), "Controls", tv.WithWindowNumber(1))
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
 	win1.Insert(btnOK)
@@ -112,15 +134,15 @@ func main() {
 	win1.Insert(portLabel)
 
 	// Window 2 — ListBox (ListViewer + ScrollBar)
-	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
+	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "List", tv.WithWindowNumber(2))
 
-	editorScheme := &theme.ColorScheme{}
-	*editorScheme = *theme.BorlandBlue
-	editorScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
-	editorScheme.ListSelected = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorGreen)
-	editorScheme.ListFocused = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
-	editorScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
-	win2.SetColorScheme(editorScheme)
+	listScheme := &theme.ColorScheme{}
+	*listScheme = *theme.BorlandBlue
+	listScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	listScheme.ListSelected = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorGreen)
+	listScheme.ListFocused = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
+	listScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	win2.SetColorScheme(listScheme)
 
 	clientW := 40 - 2
 	clientH := 12 - 2

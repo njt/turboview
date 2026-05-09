@@ -191,10 +191,11 @@ func overlayFgAttrs(dst, src tcell.Style) tcell.Style {
 
 // mdRenderer computes layout metrics for a set of parsed markdown blocks.
 type mdRenderer struct {
-	blocks   []mdBlock
-	width    int
-	wrapText bool
-	cs       *theme.ColorScheme
+	blocks       []mdBlock
+	width        int
+	wrapText     bool
+	cs           *theme.ColorScheme
+	revealIndent int // extra indent for revealed syntax markers (0 when none)
 }
 
 // renderedHeight returns the total height (in lines) needed to render all blocks.
@@ -223,9 +224,18 @@ func (r *mdRenderer) blockHeight(b mdBlock, depth int) int {
 	}
 
 	switch b.kind {
-	case blockParagraph, blockHeader:
+	case blockParagraph:
 		if r.wrapText {
 			return len(wrapRuns(b.runs, avail))
+		}
+		return 1
+	case blockHeader:
+		headerAvail := avail - r.revealIndent
+		if headerAvail < 1 {
+			headerAvail = 1
+		}
+		if r.wrapText {
+			return len(wrapRuns(b.runs, headerAvail))
 		}
 		return 1
 	case blockCodeBlock:
@@ -741,7 +751,9 @@ func (r *mdRenderer) renderParagraphLine(buf *DrawBuffer, b mdBlock, lineY, scre
 
 func (r *mdRenderer) renderHeaderLine(buf *DrawBuffer, b mdBlock, lineY, screenY, dx, w, depth int, cur *int) bool {
 	indent := depth * 2
-	avail := w - indent
+	// Shift content right to make room for reveal markers (e.g. "# ", "## ")
+	contentIndent := indent + r.revealIndent
+	avail := w - contentIndent
 	if avail < 1 {
 		avail = 1
 	}
@@ -771,7 +783,7 @@ func (r *mdRenderer) renderHeaderLine(buf *DrawBuffer, b mdBlock, lineY, screenY
 
 	for _, line := range lines {
 		if *cur == lineY {
-			x := indent - dx
+			x := contentIndent - dx
 			for _, run := range line {
 				s := composeStyle(headerStyle, run.style, r.cs)
 				for _, ch := range run.text {

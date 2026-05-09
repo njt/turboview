@@ -74,7 +74,7 @@ func TestBasicAppBoot(t *testing.T) {
 	// Window title visible
 	titleFound := false
 	for _, line := range lines {
-		if strings.Contains(line, "File Manager") || strings.Contains(line, "Editor") {
+		if strings.Contains(line, "Controls") || strings.Contains(line, "List") {
 			titleFound = true
 			break
 		}
@@ -333,6 +333,92 @@ func TestMenuOpenAndSelect(t *testing.T) {
 	}
 }
 
+func TestMarkdownEditorOpensViaMenu(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-md-menu"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options menu via F10 → navigate to Options → Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	// Navigate right to Options (File, Edit, Options)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	// Second item in Options is Markdown Editor — press 'm' for hotkey
+	tmuxSendKeys(t, session, "m")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	if !containsAny(lines, "Markdown Editor") {
+		t.Error("'Markdown Editor' window title not found after opening via Options menu")
+		for i, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				t.Logf("  line %d: %s", i, l)
+			}
+		}
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Error("app did not exit after Alt+X")
+}
+
+func TestMarkdownEditorKeyboardShortcut(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-md-shortcut"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Verify Markdown Editor is NOT visible before the shortcut
+	linesBefore := tmuxCapture(t, session)
+	if containsAny(linesBefore, "Markdown Editor") {
+		t.Fatal("'Markdown Editor' should not be visible at startup")
+	}
+
+	// Send the keyboard shortcut that should open the Markdown Editor.
+	// The menu item declares KbAlt('M') as the accelerator.
+	// (Was KbCtrl('M'), but Ctrl-M = Enter in terminals.)
+	tmuxSendKeys(t, session, "M-m")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	if !containsAny(lines, "Markdown Editor") {
+		t.Error("'Markdown Editor' window title not found after pressing Ctrl-M")
+		for i, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				t.Logf("  line %d: %s", i, l)
+			}
+		}
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Error("app did not exit after Alt+X")
+}
+
 func TestMenuSelectExit(t *testing.T) {
 	binPath := buildBasicApp(t)
 
@@ -565,9 +651,9 @@ func TestListViewerDifferentTheme(t *testing.T) {
 		t.Error("list items not visible in win2 — custom theme may have broken rendering")
 	}
 
-	// win2 "Editor" title should be visible
-	if !containsAny(lines, "Editor") {
-		t.Error("win2 'Editor' title not found — window may not have rendered")
+	// win2 "List" title should be visible
+	if !containsAny(lines, "List") {
+		t.Error("win2 'List' title not found — window may not have rendered")
 	}
 
 	// Clean exit
@@ -753,11 +839,11 @@ func TestTerminalResize(t *testing.T) {
 	}
 
 	// Window titles should still be visible
-	if !containsAny(lines, "File Manager") {
-		t.Error("'File Manager' window title not visible after resize")
+	if !containsAny(lines, "Controls") {
+		t.Error("'Controls' window title not visible after resize")
 	}
-	if !containsAny(lines, "Editor") {
-		t.Error("'Editor' window title not visible after resize")
+	if !containsAny(lines, "List") {
+		t.Error("'List' window title not visible after resize")
 	}
 
 	// App should still be responsive — Alt+X exits cleanly
@@ -1083,11 +1169,11 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 
 	// Verify both windows exist before tiling
 	lines := tmuxCapture(t, session)
-	if !containsAny(lines, "File Manager") {
-		t.Fatal("win1 'File Manager' not visible before tile")
+	if !containsAny(lines, "Controls") {
+		t.Fatal("win1 'Controls' not visible before tile")
 	}
-	if !containsAny(lines, "Editor") {
-		t.Fatal("win2 'Editor' not visible before tile")
+	if !containsAny(lines, "List") {
+		t.Fatal("win2 'List' not visible before tile")
 	}
 
 	// Open Window menu: F10 → Right x3 (skip Edit, Options, land on Window) → Enter (open popup) → Enter (select Tile)
@@ -1107,11 +1193,11 @@ func TestMenuTileRearrangesWindows(t *testing.T) {
 	lines = tmuxCapture(t, session)
 
 	// After tiling, both window titles must still be visible
-	if !containsAny(lines, "File Manager") {
-		t.Error("win1 'File Manager' not visible after Tile")
+	if !containsAny(lines, "Controls") {
+		t.Error("win1 'Controls' not visible after Tile")
 	}
-	if !containsAny(lines, "Editor") {
-		t.Error("win2 'Editor' not visible after Tile")
+	if !containsAny(lines, "List") {
+		t.Error("win2 'List' not visible after Tile")
 	}
 
 	// Tiled windows share rows: look for a row that contains two or more frame
@@ -1289,20 +1375,20 @@ func TestF5ZoomWindow(t *testing.T) {
 	titleRowBefore := -1
 	titleRowAfter := -1
 	for i, line := range linesBefore {
-		if strings.Contains(line, "File Manager") {
+		if strings.Contains(line, "Controls") {
 			titleRowBefore = i
 			break
 		}
 	}
 	for i, line := range linesAfter {
-		if strings.Contains(line, "File Manager") {
+		if strings.Contains(line, "Controls") {
 			titleRowAfter = i
 			break
 		}
 	}
 
 	if titleRowBefore < 0 || titleRowAfter < 0 {
-		t.Fatal("window title 'File Manager' not found before or after F5")
+		t.Fatal("window title 'Controls' not found before or after F5")
 	}
 
 	if titleRowAfter >= titleRowBefore {
@@ -1326,21 +1412,19 @@ func TestAltF3CloseWindow(t *testing.T) {
 	startTmux(t, session, binPath)
 
 	lines := tmuxCapture(t, session)
-	if !containsAny(lines, "File Manager") {
+	if !containsAny(lines, "Controls") {
 		t.Fatal("win1 not visible")
 	}
-	// win2 title "Editor" appears in the title bar with many ═ frame chars.
-	// A content line with "Hello, Editor!" has at most a few frame chars,
-	// whereas the title row has the full width filled with ═ chars.
-	editorTitleVisible := false
+	// win2 title "List" appears in the title bar with many ═ frame chars.
+	listTitleVisible := false
 	for _, line := range lines {
-		if strings.Contains(line, "Editor") && strings.Count(line, "═") > 5 {
-			editorTitleVisible = true
+		if strings.Contains(line, "List") && strings.Count(line, "═") > 5 {
+			listTitleVisible = true
 			break
 		}
 	}
-	if !editorTitleVisible {
-		t.Fatal("win2 not visible (no 'Editor' window title found in frame)")
+	if !listTitleVisible {
+		t.Fatal("win2 not visible (no 'List' window title found in frame)")
 	}
 
 	tmuxSendKeys(t, session, "M-2")
@@ -1348,15 +1432,15 @@ func TestAltF3CloseWindow(t *testing.T) {
 
 	lines = tmuxCapture(t, session)
 
-	// After closing win2, no line should have "Editor" with many ═ frame chars
+	// After closing win2, no line should have "List" with many ═ frame chars
 	for _, line := range lines {
-		if strings.Contains(line, "Editor") && strings.Count(line, "═") > 5 {
-			t.Errorf("Alt+F3: Editor window title still visible in frame after close: %q", line)
+		if strings.Contains(line, "List") && strings.Count(line, "═") > 5 {
+			t.Errorf("Alt+F3: List window title still visible in frame after close: %q", line)
 			break
 		}
 	}
-	if !containsAny(lines, "File Manager") {
-		t.Error("Alt+F3: File Manager window disappeared — wrong window closed")
+	if !containsAny(lines, "Controls") {
+		t.Error("Alt+F3: Controls window disappeared — wrong window closed")
 	}
 
 	tmuxSendKeys(t, session, "M-x")
@@ -1432,21 +1516,21 @@ func TestF6NextWindow(t *testing.T) {
 
 	lines := tmuxCapture(t, session)
 
-	fileManagerStillActive := false
+	controlsStillActive := false
 	for _, line := range lines {
-		if strings.Contains(line, "File Manager") && strings.Contains(line, "═") {
-			fileManagerStillActive = true
+		if strings.Contains(line, "Controls") && strings.Contains(line, "═") {
+			controlsStillActive = true
 			break
 		}
 	}
-	if fileManagerStillActive {
-		t.Error("F6 did not switch focus — File Manager still has active frame")
+	if controlsStillActive {
+		t.Error("F6 did not switch focus — Controls still has active frame")
 	}
 
 	// Verify some other window got the active frame
 	switchedToOther := false
 	for _, line := range lines {
-		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "Editor") || strings.Contains(line, "Outline")) && strings.Contains(line, "═")
+		otherActive := (strings.Contains(line, "Untitled") || strings.Contains(line, "List") || strings.Contains(line, "Outline") || strings.Contains(line, "Markdown")) && strings.Contains(line, "═")
 		if otherActive {
 			switchedToOther = true
 			break
@@ -1647,7 +1731,7 @@ func TestHistoryIconVisible(t *testing.T) {
 	tmuxSendKeys(t, session, "M-F3")
 	time.Sleep(300 * time.Millisecond)
 
-	// Focus win1 (File Manager)
+	// Focus win1 (Controls)
 	tmuxSendKeys(t, session, "M-1")
 	time.Sleep(300 * time.Millisecond)
 
@@ -1681,7 +1765,7 @@ func TestHistoryDropdown(t *testing.T) {
 	exec.Command("tmux", "kill-session", "-t", session).Run()
 	startTmux(t, session, binPath)
 
-	// Focus win1 (File Manager)
+	// Focus win1 (Controls)
 	tmuxSendKeys(t, session, "M-1")
 	time.Sleep(300 * time.Millisecond)
 
@@ -2385,7 +2469,7 @@ func TestInputLineTypeTDoesNotActivateRadioButton(t *testing.T) {
 
 	startTmux(t, session, binPath)
 
-	// Focus Window 1 (File Manager)
+	// Focus Window 1 (Controls)
 	tmuxSendKeys(t, session, "M-1")
 	time.Sleep(300 * time.Millisecond)
 
@@ -2720,6 +2804,55 @@ func TestMarkdownViewerWrapToggle(t *testing.T) {
 	// Verify content is still visible (the window doesn't crash)
 	if !containsAny(lines, "MarkdownViewer Demo") {
 		t.Error("content not visible after word wrap toggle")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func TestWidgetNamesReflectContent(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-widget-names"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	lines := tmuxCapture(t, session)
+
+	// The window containing buttons/checkboxes/radio/input should be named
+	// "Controls", not "File Manager" — it doesn't manage files.
+	if containsAny(lines, "File Manager") {
+		t.Error("window should not be titled 'File Manager' — it contains form controls, not a file manager")
+	}
+	controlsFound := false
+	for _, line := range lines {
+		if strings.Contains(line, "Controls") {
+			controlsFound = true
+			break
+		}
+	}
+	if !controlsFound {
+		t.Error("expected window titled 'Controls' for the buttons/checkboxes/radio/input demo")
+	}
+
+	// The window containing a ListBox should be named "List", not "Editor"
+	// — it displays list items, not editable text.
+	listFound := false
+	for _, line := range lines {
+		if strings.Contains(line, "List") {
+			listFound = true
+			break
+		}
+	}
+	if !listFound {
+		t.Error("expected window titled 'List' for the ListBox demo")
 	}
 
 	// Clean exit
