@@ -41,11 +41,14 @@ func (me *MarkdownEditor) Draw(buf *DrawBuffer) {
 		r.renderLineInto(buf, lineY, row, me.Memo.deltaX, w)
 	}
 
-	me.drawCursor(buf, cs)
-
-	// Overlay revealed markers
+	// Overlay revealed markers: shifts text right for inline
+	// markers, then draws all markers (block + inline). Must be
+	// before drawCursor so the cursor renders on top.
 	me.overlayRevealSpans(buf, w, h, cs)
+
+	me.drawCursor(buf, cs)
 }
+
 
 // HandleEvent overrides Editor.HandleEvent to add markdown-aware keyboard
 // shortcuts, smart list continuation, undo coalescing, paste handling, and
@@ -86,18 +89,18 @@ func (me *MarkdownEditor) HandleEvent(event *Event) {
 	if event.What == EvKeyboard && event.Key != nil {
 		k := event.Key
 		// 4a. Ctrl+B / Ctrl+I toggle format
-		if k.Key == tcell.KeyCtrlB && k.Modifiers == tcell.ModNone {
+		if k.Key == tcell.KeyCtrlB {
 			me.toggleFormat("**")
 			event.Clear()
 			return
 		}
-		if k.Key == tcell.KeyCtrlI && k.Modifiers == tcell.ModNone {
+		if k.Key == tcell.KeyCtrlI {
 			me.toggleFormat("*")
 			event.Clear()
 			return
 		}
 		// 4b. Ctrl+K — open link dialog
-		if k.Key == tcell.KeyCtrlK && k.Modifiers == tcell.ModNone {
+		if k.Key == tcell.KeyCtrlK {
 			me.openLinkDialog()
 			event.Clear()
 			return
@@ -297,6 +300,85 @@ func (me *MarkdownEditor) renderer() *mdRenderer {
 	}
 }
 
+// inlineCompaction returns the total width of inline syntax markers that
+// are fully before the given source column. The renderer skips all syntax
+// markers, so content characters are shifted left (compacted) by the total
+// width of preceding markers. A marker is counted only when col is past the
+// entire marker (opening or closing), not when col is inside it.
+func (me *MarkdownEditor) inlineCompaction(blockIdx, row, col int) int {
+	if blockIdx < 0 || blockIdx >= len(me.blocks) {
+		return 0
+	}
+	blockSrcRow := 0
+	nonBlankSeen := 0
+	for i := 0; i < len(me.Memo.lines); i++ {
+		if strings.TrimSpace(string(me.Memo.lines[i])) != "" {
+			if nonBlankSeen == blockIdx {
+				blockSrcRow = i
+				break
+			}
+			nonBlankSeen++
+		}
+	}
+
+	spans := blockInlineSpans(me.blocks[blockIdx], me.Memo.lines, blockSrcRow)
+	offset := 0
+	for _, s := range spans {
+		if s.kind != revealInline {
+			continue
+		}
+		if s.startRow != row {
+			continue
+		}
+		// Opening marker: incrementally count chars as col advances past them.
+		if col > s.startCol {
+			openLen := len([]rune(s.markerOpen))
+			if n := col - s.startCol; n < openLen {
+				offset += n
+			} else {
+				offset += openLen
+			}
+		}
+		// Closing marker: incrementally count chars as col advances past them.
+		if col > s.endCol {
+			closeLen := len([]rune(s.markerClose))
+			if n := col - s.endCol; n < closeLen {
+				offset += n
+			} else {
+				offset += closeLen
+			}
+		}
+	}
+	return offset
+}
+
+// revealShift returns the cumulative rightward shift caused by revealed inline
+// markers that appear before the given source position. When inline markers are
+// revealed and text is shifted right to make room, the cursor position must
+// account for this shift.
+func (me *MarkdownEditor) revealInlineShift(row, col int) int {
+	shift := 0
+	for _, s := range me.revealSpans {
+		if s.kind != revealInline {
+			continue
+		}
+		if s.startRow != row && s.endRow != row {
+			continue
+		}
+		// Opening marker: shifts text if it starts before col.
+		if s.startCol < col {
+			shift += len([]rune(s.markerOpen))
+		}
+		// Closing marker: shifts text if its insertion point is before col.
+		// The closing marker insertion point is endCol - len(close) + 1.
+		closeStart := s.endCol - len([]rune(s.markerClose)) + 1
+		if closeStart < col {
+			shift += len([]rune(s.markerClose))
+		}
+	}
+	return shift
+}
+
 // sourceToScreen maps a source (row, col) position in Memo.lines to a screen
 // position in the rendered markdown output. It walks blocks to find the
 // rendered line that contains the given source row, then computes the screen
@@ -308,9 +390,10 @@ func (me *MarkdownEditor) renderer() *mdRenderer {
 //     starts a new top-level block (paragraph, header, hrule, etc.).
 //   - Walk blocks, accumulating rendered line counts (including blank
 //     separators between blocks) to find the screen Y offset.
-//   - Screen X is computed as: indent + sourceCol - deltaX, where indent
-//     depends on block type (0 for paragraph/header, 4 for lists, 2 for
-//     blockquotes).
+//   - Screen X is computed as: indent + sourceCol - deltaX + inlineShift,
+//     where indent depends on block type (0 for paragraph/header, 4 for lists,
+//     2 for blockquotes), and inlineShift accounts for revealed inline markers
+//     that push text rightward.
 func (me *MarkdownEditor) sourceToScreen(row, col int) (screenY, screenX int) {
 	// Clamp inputs to valid ranges.
 	if row < 0 {
@@ -375,8 +458,11 @@ func (me *MarkdownEditor) sourceToScreen(row, col int) (screenY, screenX int) {
 		indent = 2 // blockquote indent
 	}
 
+	// The renderer compacts text by skipping ALL syntax markers (not just
+	// revealed ones). Subtract the total width of markers before this column
+	// so the screen position matches where the renderer places the content.
 	screenY = renderedLine - me.Memo.deltaY
-	screenX = indent + col - me.Memo.deltaX
+	screenX = indent + col - me.Memo.deltaX - me.inlineCompaction(blockIdx, row, col)
 
 	if screenY < 0 {
 		screenY = 0
@@ -396,6 +482,8 @@ func (me *MarkdownEditor) drawCursor(buf *DrawBuffer, cs *theme.ColorScheme) {
 	}
 
 	screenY, screenX := me.sourceToScreen(me.Memo.cursorRow, me.Memo.cursorCol)
+	// Account for text shifted right by revealed inline markers.
+	screenX += me.revealInlineShift(me.Memo.cursorRow, me.Memo.cursorCol)
 
 	w := me.Bounds().Width()
 	h := me.Bounds().Height()
@@ -461,31 +549,70 @@ func (me *MarkdownEditor) overlayRevealSpans(buf *DrawBuffer, w, h int, cs *them
 		})
 	}
 
-	// ---- Inline markers (drawn at source-position screen coordinates) ----
+	// ---- Inline markers (shift text right then draw) ----
+	// Collect per-row shifts: opening and closing markers on each screen row.
+	type rowShift struct {
+		screenX int    // screen column to insert marker at
+		width   int    // width of the marker in cells
+		marker  string // marker text to draw
+	}
+	rowShifts := make(map[int][]rowShift)
 	for i := range me.revealSpans {
 		s := &me.revealSpans[i]
 		if s.kind != revealInline {
 			continue
 		}
 
-		// Draw opening marker at the span's start position.
+		// Opening marker
 		scrY, scrX := me.sourceToScreen(s.startRow, s.startCol)
-		for _, ch := range s.markerOpen {
-			if scrX >= 0 && scrX < w && scrY >= 0 && scrY < h {
-				buf.WriteChar(scrX, scrY, ch, style)
-			}
-			scrX++
-		}
+		rowShifts[scrY] = append(rowShifts[scrY], rowShift{
+			screenX: scrX, width: len([]rune(s.markerOpen)), marker: s.markerOpen,
+		})
 
-		// Draw closing marker.  endCol is inclusive, so the closing marker
-		// starts at (endCol - len(markerClose) + 1).
+		// Closing marker
 		closeStart := s.endCol - len([]rune(s.markerClose)) + 1
 		scrY, scrX = me.sourceToScreen(s.endRow, closeStart)
-		for _, ch := range s.markerClose {
-			if scrX >= 0 && scrX < w && scrY >= 0 && scrY < h {
-				buf.WriteChar(scrX, scrY, ch, style)
+		rowShifts[scrY] = append(rowShifts[scrY], rowShift{
+			screenX: scrX, width: len([]rune(s.markerClose)), marker: s.markerClose,
+		})
+	}
+
+	// Process each row: sort left-to-right, shift text cumulatively, draw markers.
+	for scrY, shifts := range rowShifts {
+		// Sort left-to-right
+		for i := 1; i < len(shifts); i++ {
+			for j := i; j > 0 && shifts[j].screenX < shifts[j-1].screenX; j-- {
+				shifts[j], shifts[j-1] = shifts[j-1], shifts[j]
 			}
-			scrX++
+		}
+
+		cumShift := 0
+		for _, sh := range shifts {
+			insertX := sh.screenX + cumShift
+
+			// Shift text right: work right-to-left to avoid
+			// overwriting cells we haven't read yet.
+			for dst := w - 1; dst >= insertX+sh.width; dst-- {
+				src := dst - sh.width
+				if src >= insertX {
+					cell := buf.GetCell(src, scrY)
+					buf.WriteChar(dst, scrY, cell.Rune, cell.Style)
+				}
+			}
+			// Clear the space vacated for the marker
+			for i := 0; i < sh.width && insertX+i < w; i++ {
+				buf.WriteChar(insertX+i, scrY, ' ', tcell.StyleDefault)
+			}
+
+			// Draw marker in the vacated space
+			for i, ch := range sh.marker {
+				x := insertX + i
+				if x >= 0 && x < w && scrY >= 0 && scrY < h {
+					buf.WriteChar(x, scrY, ch, style)
+				}
+			}
+
+			cumShift += sh.width
 		}
 	}
 }

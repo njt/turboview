@@ -32,7 +32,7 @@ func main() {
 		),
 		tv.NewSubMenu("~O~ptions",
 			tv.NewMenuItem("~C~olors...", tv.CmUser+30, tv.KbNone()),
-			tv.NewMenuItem("~M~arkdown Editor", tv.CmUser+40, tv.KbCtrl('M')),
+			tv.NewMenuItem("~M~arkdown Editor", tv.CmUser+40, tv.KbAlt('M')),
 		),
 		tv.NewSubMenu("~W~indow",
 			tv.NewMenuItem("~T~ile", tv.CmTile, tv.KbNone()),
@@ -110,7 +110,7 @@ func main() {
 	}
 
 	// Window 1 — buttons, checkboxes, radio buttons, input, history, label, validated port
-	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 14), "File Manager", tv.WithWindowNumber(1))
+	win1 := tv.NewWindow(tv.NewRect(5, 2, 35, 14), "Controls", tv.WithWindowNumber(1))
 	win1.Insert(st)
 	btnOK := tv.NewButton(tv.NewRect(1, 3, 12, 2), "OK", tv.CmOK)
 	win1.Insert(btnOK)
@@ -134,15 +134,15 @@ func main() {
 	win1.Insert(portLabel)
 
 	// Window 2 — ListBox (ListViewer + ScrollBar)
-	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "Editor", tv.WithWindowNumber(2))
+	win2 := tv.NewWindow(tv.NewRect(20, 5, 40, 12), "List", tv.WithWindowNumber(2))
 
-	editorScheme := &theme.ColorScheme{}
-	*editorScheme = *theme.BorlandBlue
-	editorScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
-	editorScheme.ListSelected = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorGreen)
-	editorScheme.ListFocused = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
-	editorScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
-	win2.SetColorScheme(editorScheme)
+	listScheme := &theme.ColorScheme{}
+	*listScheme = *theme.BorlandBlue
+	listScheme.ListNormal = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	listScheme.ListSelected = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorGreen)
+	listScheme.ListFocused = tcell.StyleDefault.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
+	listScheme.WindowBackground = tcell.StyleDefault.Foreground(tcell.ColorGreen).Background(tcell.ColorBlack)
+	win2.SetColorScheme(listScheme)
 
 	clientW := 40 - 2
 	clientH := 12 - 2

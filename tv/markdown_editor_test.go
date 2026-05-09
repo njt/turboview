@@ -3453,7 +3453,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBWrapsSelection(t *testing.T) {
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 5
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3481,7 +3481,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBUnwrapsSelection(t *testing.T) {
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 13
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3505,7 +3505,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBNoSelection(t *testing.T) {
 		t.Fatal("test setup failed: HasSelection should be false")
 	}
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3534,7 +3534,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBNoSelectionCursorStaysWithin(t *te
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 7
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3563,7 +3563,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBSelectionAtLineStart(t *testing.T)
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 5
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3589,12 +3589,65 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlBUnwrapsOnlyOuterMarkers(t *testing
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 11
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
 	if got != "important" {
 		t.Errorf("Text() = %q, want %q (only content, markers removed)", got, "important")
+	}
+}
+
+// TestMarkdownEditor_KeyboardShortcut_CtrlBWithModCtrl verifies that Ctrl+B
+// works when the KeyEvent has ModCtrl set, as tcell reports for real keyboard
+// input. This is a regression test for kata issue #8.
+func TestMarkdownEditor_KeyboardShortcut_CtrlBWithModCtrl(t *testing.T) {
+	me := NewMarkdownEditor(NewRect(0, 0, 40, 10))
+	me.SetState(SfSelected, true)
+	me.SetText("hello world")
+
+	me.Memo.selStartRow = 0
+	me.Memo.selStartCol = 0
+	me.Memo.selEndRow = 0
+	me.Memo.selEndCol = 5
+	me.Memo.cursorRow = 0
+	me.Memo.cursorCol = 5
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}}
+	me.HandleEvent(ev)
+
+	got := me.Text()
+	if got != "**hello** world" {
+		t.Errorf("Text() = %q, want %q", got, "**hello** world")
+	}
+	if !ev.IsCleared() {
+		t.Error("Ctrl+B with ModCtrl not consumed — ModNone guard rejects real keyboard input")
+	}
+}
+
+// TestMarkdownEditor_KeyboardShortcut_CtrlIWithModCtrl verifies that Ctrl+I
+// works when the KeyEvent has ModCtrl set.
+func TestMarkdownEditor_KeyboardShortcut_CtrlIWithModCtrl(t *testing.T) {
+	me := NewMarkdownEditor(NewRect(0, 0, 40, 10))
+	me.SetState(SfSelected, true)
+	me.SetText("italic text here")
+
+	me.Memo.selStartRow = 0
+	me.Memo.selStartCol = 7
+	me.Memo.selEndRow = 0
+	me.Memo.selEndCol = 11
+	me.Memo.cursorRow = 0
+	me.Memo.cursorCol = 11
+
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI, Modifiers: tcell.ModCtrl}}
+	me.HandleEvent(ev)
+
+	got := me.Text()
+	if got != "italic *text* here" {
+		t.Errorf("Text() = %q, want %q", got, "italic *text* here")
+	}
+	if !ev.IsCleared() {
+		t.Error("Ctrl+I with ModCtrl not consumed — ModNone guard rejects real keyboard input")
 	}
 }
 
@@ -3618,7 +3671,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlIWrapsSelection(t *testing.T) {
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 11
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3646,7 +3699,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlIUnwrapsSelection(t *testing.T) {
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 13
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3671,7 +3724,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlINoSelection(t *testing.T) {
 		t.Fatal("test setup failed: HasSelection should be false")
 	}
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -3698,7 +3751,7 @@ func TestMarkdownEditor_KeyboardShortcut_CtrlINoSelectionInContext(t *testing.T)
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 7
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlI, Modifiers: tcell.ModCtrl}}
 	me.HandleEvent(ev)
 
 	got := me.Text()
@@ -4359,7 +4412,7 @@ func TestMarkdownEditor_LinkInteraction_CtrlKDoesNotPanicWithoutDesktop(t *testi
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 3 // on 'i' in "click"
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK, Modifiers: tcell.ModCtrl}}
 	// Must not panic
 	me.HandleEvent(ev)
 
@@ -4389,7 +4442,7 @@ func TestMarkdownEditor_LinkInteraction_CtrlKWithSelectionDoesNotPanic(t *testin
 		t.Fatal("test setup failed: selection not active")
 	}
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK, Modifiers: tcell.ModCtrl}}
 	// Must not panic
 	me.HandleEvent(ev)
 
@@ -4665,7 +4718,7 @@ func TestMarkdownEditor_LinkInteraction_CtrlKNoLinkNoSelectionDoesNotPanic(t *te
 	me.Memo.cursorRow = 0
 	me.Memo.cursorCol = 6
 
-	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK}}
+	ev := &Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlK, Modifiers: tcell.ModCtrl}}
 	// Must not panic
 	me.HandleEvent(ev)
 
@@ -4787,7 +4840,7 @@ func TestMarkdownEditor_Undo_CtrlBFormatBreaksCoalescing(t *testing.T) {
 	me.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'l'}})
 	me.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'o'}})
 	// Ctrl+B with no selection at end of "hello" inserts "****" at cursor pos or toggles bold
-	me.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB}})
+	me.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl}})
 
 	// Type "world" after the format insert
 	me.HandleEvent(&Event{What: EvKeyboard, Key: &KeyEvent{Key: tcell.KeyRune, Rune: 'w'}})

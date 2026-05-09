@@ -705,3 +705,249 @@ func TestMarkdownEditorRevealInlineBold(t *testing.T) {
 		t.Error("app did not exit after Alt+X")
 	}
 }
+
+// TestMarkdownEditorResizeScrollbars verifies that when the terminal is
+// resized while the MarkdownEditor is open, the scrollbar positions update
+// correctly and no orphaned scrollbar artifacts remain.
+func TestMarkdownEditorResizeScrollbars(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-md-resize"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify initial scrollbar arrows visible in the right place
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "▲") || !containsAny(lines, "▼") {
+		t.Fatal("initial scrollbar arrows not visible before resize")
+	}
+
+	// Resize to a smaller window — this forces scrollbar position recalculation
+	err := exec.Command("tmux", "resize-window", "-t", session, "-x", "80", "-y", "20").Run()
+	if err != nil {
+		t.Fatalf("tmux resize-window failed: %v", err)
+	}
+	time.Sleep(1 * time.Second)
+
+	lines = tmuxCapture(t, session)
+
+	// After resize, scrollbar arrows should still be present, and content
+	// should still be rendered (not corrupted).
+	if !containsAny(lines, "▲") {
+		t.Error("vertical scrollbar up arrow not visible after resize")
+	}
+	if !containsAny(lines, "▼") {
+		t.Error("vertical scrollbar down arrow not visible after resize")
+	}
+	if !containsAny(lines, "Welcome") {
+		t.Error("heading text 'Welcome' not visible after resize")
+	}
+
+	// Resize to larger window
+	err = exec.Command("tmux", "resize-window", "-t", session, "-x", "80", "-y", "30").Run()
+	if err != nil {
+		t.Fatalf("tmux resize-window (larger) failed: %v", err)
+	}
+	time.Sleep(1 * time.Second)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "▲") {
+		t.Error("scrollbar arrows not visible after resize to larger window")
+	}
+	if !containsAny(lines, "Welcome") {
+		t.Error("'Welcome' not visible after resize to larger window")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorBoldCursorSync verifies that typing inside a bold span
+// does not desync the cursor position from the displayed text. Regression
+// test for a bug where inline reveal markers shifted text without the
+// cursor position accounting for the shift.
+func TestMarkdownEditorBoldCursorSync(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-mdbold"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Navigate to the bold line: "Type **markdown** here."
+	// Source: row 0="# Welcome", row 1=blank, row 2="Type **markdown** here."
+	tmuxSendKeys(t, session, "Down")
+	tmuxSendKeys(t, session, "Down")
+	time.Sleep(200 * time.Millisecond)
+
+	// Move cursor into the bold word "markdown"
+	// Col layout: 0=T,1=y,2=p,3=e,4=' ',5=*,6=*,7=m,8=a,9=r,10=k,11=d,12=o,13=w,14=n,15=*,16=*
+	// Move to col 10 ('k' in "markdown") — inside bold span
+	for i := 0; i < 10; i++ {
+		tmuxSendKeys(t, session, "Right")
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	// Type a character inside the bold word — this is the repro for the bug
+	tmuxType(t, session, "X")
+	time.Sleep(500 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+
+	// The key assertion: surrounding text should NOT be corrupted by
+	// the cursor/marker desync — "Type" and "here" should still be visible.
+	if !containsAny(lines, "Type") {
+		t.Error("preceding text 'Type' corrupted after typing inside bold span")
+	}
+	if !containsAny(lines, "here") {
+		t.Error("following text 'here' corrupted after typing inside bold span")
+	}
+
+	// After typing, the inline reveal markers ** should be present (since
+	// cursor is inside the bold span). The text should not be overwritten
+	// by the revealed markers — verify the bold content is still present.
+	if !containsAny(lines, "marX") {
+		t.Error("bold content 'marX' not visible after typing inside bold span — markers may be overwriting text")
+	}
+
+	// Type more characters and verify consistency
+	tmuxType(t, session, "YZ")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "Type") {
+		t.Error("preceding text 'Type' corrupted after additional typing in bold span")
+	}
+	if !containsAny(lines, "here") {
+		t.Error("following text 'here' corrupted after additional typing in bold span")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}
+
+// TestMarkdownEditorScrollEndTyping verifies that scrolling to the end of the
+// document and typing behaves sensibly: the cursor stays with the inserted text
+// and the display doesn't jump around. Regression test for a bug where
+// sourceToScreen produced incorrect screen positions for wrapped content at
+// the end of the document.
+func TestMarkdownEditorScrollEndTyping(t *testing.T) {
+	binPath := buildBasicApp(t)
+
+	session := "tv3-e2e-md-endtype"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+
+	startTmux(t, session, binPath)
+
+	// Open Options > Markdown Editor
+	tmuxSendKeys(t, session, "F10")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Right")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(500 * time.Millisecond)
+	tmuxSendKeys(t, session, "M")
+	time.Sleep(500 * time.Millisecond)
+
+	// Scroll all the way to the end: Ctrl+End
+	tmuxSendKeys(t, session, "C-End")
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify we can see content near the bottom of the document
+	lines := tmuxCapture(t, session)
+	if !containsAny(lines, "Line 50") && !containsAny(lines, "Line 49") {
+		t.Log("could not verify end-of-document position; proceeding anyway")
+	}
+
+	// Press Enter at the end to start a new line
+	tmuxSendKeys(t, session, "Enter")
+	time.Sleep(300 * time.Millisecond)
+
+	// Type content on the new line
+	tmuxType(t, session, "new end text")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// The typed text should be visible on screen.
+	if !containsAny(lines, "new end text") && !containsAny(lines, "new") {
+		t.Error("typed text not visible after Enter at end of document — cursor may have jumped")
+	}
+
+	// Continue typing to verify stability
+	tmuxType(t, session, " more content here")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+	if !containsAny(lines, "more") {
+		t.Error("additional typed text not visible — cursor position is unstable")
+	}
+
+	// Content near the end should still be visible (no wild jumps)
+	if !containsAny(lines, "Line 50") && !containsAny(lines, "Line 49") {
+		t.Error("end-of-document context disappeared — viewport may have jumped")
+	}
+
+	// Clean exit
+	tmuxSendKeys(t, session, "M-x")
+	exited := false
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			exited = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !exited {
+		t.Error("app did not exit after Alt+X")
+	}
+}

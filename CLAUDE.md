@@ -44,7 +44,7 @@ go run ./e2e/testapp/basic
 go test ./tv/ ./theme/
 
 # Run e2e tests (requires tmux)
-go test ./e2e/ -timeout 180s
+go test ./e2e/ -timeout 600s
 ```
 
 ### Audit after fixing
@@ -65,6 +65,33 @@ This project uses a modified fork of [obra/superpowers](https://github.com/obra/
 
 **executing-plans, finishing-a-development-branch, brainstorming, using-git-worktrees, verification-before-completion, using-superpowers:** Unchanged from upstream — included for the complete workflow pipeline.
 
+## Issue and task tracking
+
+This project uses two CLI tools for coordination:
+
+- **`kata`** — issue tracker. File bugs, features, and audit findings. Project is bound via `.kata.toml` at repo root. Use `--as claude` for agent-authored issues/comments.
+- **`job`** — hierarchical task tracker. Import workflow templates from `workflows/`, claim tasks, mark criteria, close with notes. Use `--as claude` for agent work.
+- **`/work-on-issue`** — skill that picks up a kata issue, classifies it (feature / confirmed bug / triage), imports the right workflow template into job, and starts execution.
+
+Workflow templates live in `workflows/`. The workflow requirements doc is `workflows/requirements.md`.
+
+### CLI quick reference
+
+```bash
+# kata
+kata list --status open                          # not --state
+kata create "Title here" --as claude --body "…"  # title is positional, not --title
+kata comment 3 --as claude --body "…"            # not -m
+kata close 3 --as claude
+
+# job
+job import plan.md                               # file must have ```yaml tasks: block
+job claim --next --as claude
+job edit <id> --set-criterion "label=passed"     # mark criteria before closing
+job done <id> --as claude -m "notes"
+job done <id> --as claude -m "notes" --claim-next
+```
+
 ## Demo app
 
-`e2e/testapp/basic/main.go` — exercises all built widgets. Window names ("File Manager", "Editor", "Notes") are referenced by e2e tests; don't rename without updating tests. Any new widget should be added to this demo app.
+`e2e/testapp/basic/main.go` — exercises all built widgets. Window names ("Controls", "List", "Untitled", "Outline", "Markdown") are referenced by e2e tests; don't rename without updating tests. Any new widget should be added to this demo app.

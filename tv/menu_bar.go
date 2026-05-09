@@ -274,6 +274,21 @@ func (mb *MenuBar) matchMenuShortcut(r rune) {
 	}
 }
 
+func (mb *MenuBar) MatchAccelerator(ke *KeyEvent) CommandCode {
+	for _, menu := range mb.menus {
+		for _, item := range menu.Items {
+			mi, ok := item.(*MenuItem)
+			if !ok || mi.Disabled || mi.Accel == (KeyBinding{}) {
+				continue
+			}
+			if mi.Accel.Matches(ke) {
+				return mi.Command
+			}
+		}
+	}
+	return 0
+}
+
 func (mb *MenuBar) HandleEvent(event *Event) {
 	if event.What == EvCommand && event.Command == CmMenu {
 		if mb.app != nil {

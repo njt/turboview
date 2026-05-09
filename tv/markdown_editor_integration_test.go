@@ -1185,7 +1185,7 @@ func TestIntegrationMarkdownEditor_CtrlBToggleBold_WrapAndUnwrap(t *testing.T) {
 	// First Ctrl+B: wrap
 	ev := &Event{
 		What: EvKeyboard,
-		Key:  &KeyEvent{Key: tcell.KeyCtrlB},
+		Key:  &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl},
 	}
 	me.HandleEvent(ev)
 
@@ -1209,7 +1209,7 @@ func TestIntegrationMarkdownEditor_CtrlBToggleBold_WrapAndUnwrap(t *testing.T) {
 	// Second Ctrl+B: unwrap
 	ev2 := &Event{
 		What: EvKeyboard,
-		Key:  &KeyEvent{Key: tcell.KeyCtrlB},
+		Key:  &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl},
 	}
 	me.HandleEvent(ev2)
 
@@ -1237,7 +1237,7 @@ func TestIntegrationMarkdownEditor_CtrlBToggleBold_NoSelectionInsertsMarkers(t *
 
 	ev := &Event{
 		What: EvKeyboard,
-		Key:  &KeyEvent{Key: tcell.KeyCtrlB},
+		Key:  &KeyEvent{Key: tcell.KeyCtrlB, Modifiers: tcell.ModCtrl},
 	}
 	me.HandleEvent(ev)
 

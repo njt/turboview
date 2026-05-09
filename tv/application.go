@@ -425,6 +425,15 @@ func (app *Application) handleEvent(event *Event) {
 			event.Clear()
 			return
 		}
+
+		if app.menuBar != nil {
+			if cmd := app.menuBar.MatchAccelerator(event.Key); cmd != 0 {
+				cmdEvent := &Event{What: EvCommand, Command: cmd}
+				app.handleCommand(cmdEvent)
+				event.Clear()
+				return
+			}
+		}
 	}
 
 	if !event.IsCleared() && app.desktop != nil {
