@@ -74,7 +74,7 @@ func (kb KeyBinding) Matches(ke *KeyEvent) bool {
 	}
 	if kb.Key == tcell.KeyRune {
 		return unicode.ToLower(ke.Rune) == unicode.ToLower(kb.Rune) &&
-			ke.Modifiers&kb.Mod == kb.Mod
+			ke.Modifiers == kb.Mod
 	}
-	return ke.Key == kb.Key && ke.Modifiers&kb.Mod == kb.Mod
+	return ke.Key == kb.Key && ke.Modifiers == kb.Mod
 }

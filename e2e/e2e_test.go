@@ -2864,3 +2864,63 @@ func TestWidgetNamesReflectContent(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
+
+// TestAltF3CloseWindowWithStatusF3 verifies Alt+F3 closes the focused window
+// even when an F3 status-line item is active for the current help context.
+// Regression: the status line matched F3 (ignoring Alt modifier) and opened
+// an InputBox instead of letting windowKeyCommand handle Alt+F3 → CmClose.
+func TestAltF3CloseWindowWithStatusF3(t *testing.T) {
+	binPath := buildBasicApp(t)
+	session := "tv3-e2e-altf3-status"
+	exec.Command("tmux", "kill-session", "-t", session).Run()
+	startTmux(t, session, binPath)
+
+	// Focus win1 (Controls, helpCtx=1) — this activates the "F3 Input" status item
+	tmuxSendKeys(t, session, "M-1")
+	time.Sleep(300 * time.Millisecond)
+
+	lines := tmuxCapture(t, session)
+	controlsVisible := false
+	for _, line := range lines {
+		if strings.Contains(line, "Controls") && strings.Count(line, "═") > 3 {
+			controlsVisible = true
+			break
+		}
+	}
+	if !controlsVisible {
+		t.Fatal("Controls window not visible before Alt+F3")
+	}
+
+	// Press Alt+F3 — should close the window, not open a dialog
+	tmuxSendKeys(t, session, "M-F3")
+	time.Sleep(500 * time.Millisecond)
+
+	lines = tmuxCapture(t, session)
+
+	// The Controls window should be gone
+	for _, line := range lines {
+		if strings.Contains(line, "Controls") && strings.Count(line, "═") > 3 {
+			t.Errorf("Alt+F3 did not close Controls window — title still visible: %q", line)
+			break
+		}
+	}
+
+	// No dialog should have appeared (the bug opens an "Open File" InputBox)
+	for _, line := range lines {
+		if strings.Contains(line, "Open File") || strings.Contains(line, "untitled.txt") {
+			t.Errorf("Alt+F3 opened a dialog instead of closing the window: %q", line)
+			break
+		}
+	}
+
+	// Clean exit — dismiss any dialog first with Escape, then Alt+X
+	tmuxSendKeys(t, session, "Escape")
+	time.Sleep(200 * time.Millisecond)
+	tmuxSendKeys(t, session, "M-x")
+	for i := 0; i < 15; i++ {
+		if !tmuxHasSession(session) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
